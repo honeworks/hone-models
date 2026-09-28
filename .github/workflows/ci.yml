@@ -16,8 +16,8 @@ jobs:
       fail-fast: false
       matrix: { python: ["3.11", "3.12", "3.13"] }
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
         with: { python-version: "${{ matrix.python }}", enable-cache: true }
       - run: uv sync --locked --extra cli --extra gpu --extra litellm
       - run: uv run ruff check .
@@ -29,8 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
       - run: uv build
       - name: Smoke test the wheel in a clean env (no extras)
         run: |
@@ -38,15 +38,15 @@ jobs:
           uv pip install --python "$RUNNER_TEMP/smoke/bin/python" dist/*.whl
           "$RUNNER_TEMP/smoke/bin/python" -c "import hone_models; print(hone_models.__version__)"
           "$RUNNER_TEMP/smoke/bin/python" tests/smoke_quickstart.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: dist, path: dist/ }
   speech-import:
     # Import-only smoke test of the heavy speech extras (CPU torch; no model download, no synthesis).
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
         with: { python-version: "3.12" }
       - name: Install the speech extras with CPU-only torch
         run: |

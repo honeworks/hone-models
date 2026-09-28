@@ -1,0 +1,23 @@
+{
+  "id": "chatcmpl-1",
+  "object": "chat.completion",
+  "model": "gpt-4.1-mini-2025-04-14",
+  "system_fingerprint": "fp_abc123",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {"role": "assistant", "content": "{\"ok\": true}"},
+      "logprobs": {
+        "content": [
+          {"token": "{\"", "logprob": -0.0001, "top_logprobs": [{"token": "{\"", "logprob": -0.0001}]},
+          {"token": "ok", "logprob": -0.001, "top_logprobs": [{"token": "ok", "logprob": -0.001}]},
+          {"token": "\":", "logprob": -0.0002, "top_logprobs": [{"token": "\":", "logprob": -0.0002}]},
+          {"token": " true", "logprob": -0.22, "top_logprobs": [{"token": " true", "logprob": -0.22}, {"token": " false", "logprob": -1.6}]},
+          {"token": "}", "logprob": -0.0001, "top_logprobs": [{"token": "}", "logprob": -0.0001}]}
+        ]
+      }
+    }
+  ],
+  "usage": {"prompt_tokens": 42, "completion_tokens": 5, "total_tokens": 47}
+}

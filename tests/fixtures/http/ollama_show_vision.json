@@ -1,0 +1,4 @@
+{
+  "capabilities": ["completion", "vision"],
+  "model_info": {"general.architecture": "qwen25vl", "qwen25vl.context_length": 128000}
+}

@@ -1,0 +1,46 @@
+# environments and secrets
+.venv/
+venv/
+.env
+.env.*
+*.pem
+*.key
+
+# caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.pyright/
+
+# coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# build artefacts
+dist/
+build/
+*.egg-info/
+
+# run output: call records, example audio, generated media
+.hone/
+out/
+runs/
+*.wav
+*.mp3
+*.flac
+!src/hone_models/data/voices/*.flac
+*.mp4
+*.png
+*.jpg
+*.log
+
+# editors and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store

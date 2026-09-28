@@ -1,0 +1,10 @@
+{
+  "model": "jev-1-2026-09",
+  "answers": [
+    {"id": "urgent", "type": "yes_no", "p_yes": 0.91},
+    {"id": "team", "type": "choice", "probabilities": {"infra": 0.72, "backend": 0.21, "frontend": 0.07}},
+    {"id": "severity", "type": "score", "score": 4.2},
+    {"id": "blame", "type": "yes_no", "error": "question outside the model's domain"}
+  ],
+  "usage": {"input_tokens": 57, "output_tokens": 0}
+}

@@ -1,0 +1,8 @@
+{
+  "model": "gemma4-12b:latest",
+  "message": {"role": "assistant", "content": "", "thinking": "The user wants a haiku. Let me count syllables..."},
+  "done": true,
+  "done_reason": "length",
+  "prompt_eval_count": 18,
+  "eval_count": 2048
+}

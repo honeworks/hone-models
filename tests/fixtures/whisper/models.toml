@@ -1,0 +1,20 @@
+# Transcription entries for the tests (the packaged catalog brings the real ones).
+
+[models."test-whisper"]
+provider = "faster_whisper"
+kind = "transcription"
+model = "deepdml/faster-whisper-large-v3-turbo-ct2"
+defaults = { compute_type = "float16", beam_size = 5 }
+[models."test-whisper".capabilities]
+word_timestamps = true
+vram_gb = 2.0
+license = "MIT"
+commercial_use = true
+
+[models."test-whisper-cpu"]
+provider = "faster_whisper"
+kind = "transcription"
+model = "tiny.en"
+defaults = { device = "cpu", vad_filter = true, beam_size = 1 }
+[models."test-whisper-cpu".capabilities]
+word_timestamps = false

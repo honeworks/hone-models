@@ -12,6 +12,13 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
 [0003 examples set and a scriptable FakeOllama](design/changes/0003-examples-and-scriptable-fake-ollama.md).
 
 ### Added
+- Transcription: `mk.transcriber(model_id)` returns a `Transcriber` whose `transcribe(audio, *,
+  language=None, prompt=None, words=True, timeout_s=None, trace=None)` returns a `Transcript` (text,
+  language, duration, `TranscriptSegment`s and timed `Word`s); one `hone.models.transcribe` span per call
+  (text, words and prompt are content); a GPU lease and a model load per call, or once per `session()`.
+  Provider `faster_whisper` (extra `transcribe`), which finds the CUDA 12 cuBLAS / cuDNN 9 libraries or
+  raises `ConfigError` before the lease; `FakeTranscriber`; entry point `hone.transcribers`
+  ([0015](design/changes/0015-generation-models.md), step 3).
 - `mk.machine`: `snapshot()` reports every GPU (name, memory, utilization, processes), the Ollama and
   ComfyUI servers and the models they hold (partly on the CPU or not), the machine-wide GPU lock and the
   leases, with `None` for anything unknown; `prepare(needed, if_busy=...)` unloads every model not needed

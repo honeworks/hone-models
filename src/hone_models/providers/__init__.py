@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any, TypeVar
 
+from .._transcript import TranscribeEngine
 from ..errors import ConfigError
 from ..registry import Capabilities, ModelConfig
-from . import chatterbox, comfyui, kokoro, litellm, ollama, openai_compat
+from . import chatterbox, comfyui, faster_whisper, kokoro, litellm, ollama, openai_compat
 from .common import ChatReply, ChatRequest, MediaProvider, SpeechEngine
 
 CHAT: dict[str, Callable[[ModelConfig, ChatRequest], ChatReply]] = {
@@ -30,6 +31,10 @@ SPEECH: dict[str, Callable[[ModelConfig], SpeechEngine]] = {
 SPEECH_READY: dict[str, Callable[[str], None]] = {"kokoro": kokoro.check_ready}
 # Images, music and video (change 0015): which inputs an entry takes, one job, a session (common.py).
 MEDIA: dict[str, MediaProvider] = {"comfyui": comfyui.PROVIDER}
+# Transcription (change 0015): config -> a loaded engine; engine(audio, language, prompt, words, deadline)
+# -> Heard; engine.close() frees it. The checks fail before the GPU lease when the model cannot run here.
+TRANSCRIBE: dict[str, Callable[[ModelConfig], TranscribeEngine]] = {"faster_whisper": faster_whisper.Engine}
+TRANSCRIBE_READY: dict[str, Callable[[ModelConfig], None]] = {"faster_whisper": faster_whisper.check_ready}
 # Capability probes for ad-hoc ids.
 PROBE: dict[str, Callable[[ModelConfig], Capabilities]] = {"ollama": ollama.probe, "litellm": litellm.probe}
 # `gen_ai.provider.name` (OTel GenAI) for each provider.

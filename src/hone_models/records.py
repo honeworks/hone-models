@@ -42,6 +42,9 @@ CONTENT_KEYS = (
     "hone.models.media.revised_prompt",
     "hone.models.media.log_tail",
     "hone.models.media.error",
+    "hone.models.transcribe.prompt",
+    "hone.models.transcribe.text",
+    "hone.models.transcribe.words",
 )
 # Attributes whose text values are content (lyrics, texts) while the rest (numbers, file hashes) is not.
 TEXT_CONTENT_KEYS = ("hone.models.media.inputs",)

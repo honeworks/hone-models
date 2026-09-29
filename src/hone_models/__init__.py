@@ -17,6 +17,7 @@ from .prompt import Prompt, Section
 from .runtime.session import session, unload
 from .speech import SpeechClient, SpeechResult, SpeechSegment, speech
 from .text import TextClient, TextResult, text
+from .transcribe import Transcriber, Transcript, TranscriptSegment, Word, transcriber
 
 __all__ = [
     "PORTS_VERSION",
@@ -35,6 +36,10 @@ __all__ = [
     "SpeechSegment",
     "TextClient",
     "TextResult",
+    "Transcriber",
+    "Transcript",
+    "TranscriptSegment",
+    "Word",
     "YesNo",
     "__version__",
     "current_trace",
@@ -51,6 +56,7 @@ __all__ = [
     "session",
     "speech",
     "text",
+    "transcriber",
     "unload",
     "video",
 ]

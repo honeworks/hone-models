@@ -202,6 +202,39 @@ def test_packaged_catalog_has_no_machine_paths_and_marks_non_commercial_models()
     ]
 
 
+def test_heartmula_runs_in_heartlibs_own_environment(isolated: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    reg = mk.registry.load()
+    checkpoints = {"heartmula-3b": "HeartMuLa-oss-3B", "heartmula-rl-3b": "HeartMuLa-RL-oss-3B-20260123"}
+    for model_id, checkpoint in checkpoints.items():
+        cfg = reg.models[model_id]
+        assert (cfg.provider, cfg.workflow, cfg.lyrics_format) == ("command", None, "heartmula")
+        assert cfg.command == ["$HONE_HEARTLIB_DIR/.venv/bin/python", "{adapter:heartmula}", "{request}"]
+        assert cfg.defaults["checkpoint"] == checkpoint
+        assert cfg.install is not None
+        assert cfg.install.dir_env == "HONE_HEARTLIB_DIR"
+    project = isolated / "heartlib"
+    monkeypatch.setenv("HONE_HEARTLIB_DIR", str(project))
+    commands = catalog.install_commands(reg.models["heartmula-rl-3b"])
+    assert commands[-3:] == [
+        f"git clone https://github.com/HeartMuLa/heartlib {project}",
+        f"cd {project} && python3.10 -m venv .venv",
+        f"cd {project} && .venv/bin/pip install -e .",
+    ]
+    assert any("HeartMuLa-RL-oss-3B-20260123 --local-dir" in c for c in commands)
+    assert catalog.installed(reg.models["heartmula-rl-3b"]) == "no"
+    (project / ".venv" / "bin").mkdir(parents=True)
+    (project / ".venv" / "bin" / "python").write_text("#!/bin/sh\n")
+    (project / ".venv" / "bin" / "python").chmod(0o755)
+    assert catalog.installed(reg.models["heartmula-rl-3b"]) == "yes"
+
+
+def test_songgeneration_loads_its_bundled_prompt_pickle() -> None:
+    models = mk.registry.load().models
+    assert models["songgeneration-v2-medium"].env == {"TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD": "1"}  # D-077
+    others = [m.id for m in models.values() if "TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD" in (m.env or {})]
+    assert others == ["songgeneration-v2-medium"]  # no other entry loads pickles that way
+
+
 def test_scoring_entries_cannot_be_called() -> None:
     with pytest.raises(ConfigError, match="no client for kind 'scoring' yet"):
         mk.speech("htdemucs")
@@ -224,3 +257,18 @@ def test_a_packaged_id_declared_twice_is_refused(monkeypatch: pytest.MonkeyPatch
     with pytest.raises(ConfigError, match=r"\['same'\] declared again in data/models/b.toml"):
         mk.registry.load()
     assert os.environ.get("HONE_COMFYUI_DIR")  # the test isolation keeps installed checks offline
+
+
+THINKING = [  # Ollama's /api/show lists `thinking` for these (the tunes not installed here: their base)
+    "gemma4-12b", "gemma4-26b-a4b", "gemma4-31b", "deepseek-r1-8b", "deepseek-r1-14b", "deepseek-r1-32b",
+    "gpt-oss-20b", "hemmingway-1", "muse-glimmer-30b", "qwen3.8-27b", "qwen3.6-27b", "qwen3.6-35b-a3b",
+    "qwen3.6-35b-a3b-styletune", "pantheon-reasoning-26b-a4b", "nemotron-3.5-lightning",
+    "nemotron-3.5-30b-a3b-antislop", "ornith-1.5-9b", "ornith-1.5-35b",
+]  # fmt: skip
+
+
+def test_thinking_models_declare_it_so_think_false_is_sent() -> None:
+    chat = {m.id: m for m in mk.registry.load().models.values() if m.kind == "chat"}
+    assert [i for i in THINKING if not chat[i].capabilities.thinking] == []
+    others = [i for i, m in chat.items() if m.capabilities.thinking and i not in THINKING]
+    assert others == []  # e.g. the Gemma 4 StyleTunes: Ollama reports no thinking for them

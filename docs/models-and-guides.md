@@ -64,8 +64,9 @@ Where one format fits many models, write it once and hone-models converts it for
 
 **Lyrics** have one common format: section tags on their own line (`[intro]`, `[verse]`,
 `[pre-chorus]`, `[chorus]`, `[bridge]`, `[inst]`, `[outro]`), then one sung line per line. The entry's
-`lyrics_format` names the converter: `sections` (as is: ACE-Step, HeartMuLa, YuE2, MiniMax-Music3),
-`levo` (SongGeneration's `[verse] line. line. ; [chorus] ...`) or `plain` (tags removed). The media client
+`lyrics_format` names the converter: `sections` (as is: ACE-Step, YuE2, MiniMax-Music3),
+`levo` (SongGeneration's `[verse] line. line. ; [chorus] ...`), `heartmula` (HeartMuLa's `[Verse]`,
+`[Prechorus]`, `[Instrumental]` markers with a blank line between sections) or `plain` (tags removed). The media client
 converts `lyrics` before the provider sees it, and the span records what the model got.
 
 ```python

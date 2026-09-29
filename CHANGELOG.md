@@ -16,14 +16,18 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
   machine snapshot checks only ComfyUI servers of entries that have a workflow
   ([decisions.md](design/decisions.md) D-066, D-067). With the packaged workflows it now checks the local
   ComfyUI on every machine (D-074). A seed hone-models picks is below 2^31 (D-071).
+- `heartmula-3b` and `heartmula-rl-3b` run through the `command` provider with heartlib in its own
+  Python 3.10 environment (`HONE_HEARTLIB_DIR`) and the new `heartmula` adapter, instead of the ComfyUI
+  node that fails with transformers 5; their workflows are removed. The checkpoints stay in ComfyUI's
+  model folder (`defaults.checkpoints`); `low_mem` (4-bit HeartMuLa, HeartCodec's flow matching off the
+  GPU before decoding) fits an 8 GB card; new lyrics format `heartmula` (D-073, D-076).
 
 ### Added
 - Packaged ComfyUI workflows (`hone_models/data/workflows/<id>.json`) for every ComfyUI model installed on
   the reference machine: `z-image-turbo`, `ace-step-1.5-turbo` / `-xl-turbo` / `-xl-sft`,
-  `minimax-music3`, `yue2-3b`, `heartmula-3b`, `heartmula-rl-3b`, `stable-audio-open-1.0`,
+  `minimax-music3`, `yue2-3b`, `stable-audio-open-1.0`,
   `wan2.2-i2v-14b` (lightx2v, 4 steps), `wan2.2-ti2v-5b` and `ltx-video-2b-0.9.5`, each entry with its
-  `inputs`, `outputs`, `defaults` and a measured `vram_gb` (D-070; HeartMuLa's node fails in ComfyUI's
-  environment here, D-073). A file input mapped to a list of slots is optional (D-071).
+  `inputs`, `outputs`, `defaults` and a measured `vram_gb` (D-070). A file input mapped to a list of slots is optional (D-071).
   `hone-models models check <id> [--out DIR]` runs a tiny job for image, music and video entries in a
   session and reports the file and the peak GPU memory (D-072). AC-30 runs for real: an image and a song
   through ComfyUI and a transcription; a slow real test runs every installed entry's tiny job
@@ -150,6 +154,20 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
 - Docs (`docs/`) and a real-model test suite (`tests/gpu/`, run through `scripts/gpu-lock.sh`).
 
 ### Fixed (before release)
+- `models check` on a chat entry saved a speed of 0.3-5 tok/s where warm calls make 3.6-45: it divided
+  a 2-3 token reply by the whole call, cold load included. It now makes the smoke call (up to 1024 tokens,
+  which `deepseek-r1-8b` needs), times a ~200-token warm reply for `speed_tok_s`, and prints `load_s`
+  apart (D-079).
+- Every packaged chat entry whose model thinks declares `thinking = true` (Hemmingway-1, Muse-Glimmer,
+  the Qwen 3.x and Nemotron 3.5 entries, Gemma 4 26B / 31B, Ornith 1.5), so `think=false` is sent;
+  `models check` on them returned only thinking text (D-078).
+- `songgeneration-v2-medium` sets `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1` for its own process, so torch 2.6
+  loads the project's bundled `tools/new_prompt.pt`; its setup starts with `git lfs pull` (D-077).
+- `models check` for a music entry that takes the whole shared vocabulary (a `command` entry) no longer
+  sends the video start frame as `image` (D-072).
+- An `out` without a file suffix whose name has a dot (`takes/ace-step-1.5-turbo`, `clips/v1.2`) gets the
+  provider's suffix; only a media suffix or the provider's own counts as `out`'s (D-075). `models check`
+  writes `<id>.<suffix>`.
 - ComfyUI video results are fetched: a `SaveVideo` history entry lists `"animated": [true]` next to its
   files, which made the output reader fail.
 - The default test suite never reaches a real ComfyUI on the machine (it freed the local server).

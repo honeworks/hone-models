@@ -90,8 +90,8 @@ print([m.id for m in mk.select({"features": ["camera angle"]}, kind="image")])  
 The catalog declares only capabilities that were checked, and it lists models this machine may not have:
 name the model when you call one (`mk.text("gemma4-12b")`) rather than relying on the first match.
 
-`hone-models models check <id>` makes a smoke call to a chat model and saves the measured `speed_tok_s` to
-the user registry (for an image, music or video entry it runs a tiny job and reports the peak GPU memory
+`hone-models models check <id>` makes a smoke call to a chat model (which loads it), times a warm
+~200-token reply and saves that `speed_tok_s` to the user registry; it prints the load time apart (for an image, music or video entry it runs a tiny job and reports the peak GPU memory
 for `vram_gb`: [generation.md](generation.md#packaged-comfyui-models)); request timeouts grow with it: `2 * max_tokens / speed_tok_s`, at least 120 s, at most
 `max_timeout_s` (default 600 s). A local model that was never measured is assumed to make 10 tokens/s,
 so a long answer (`max_tokens=7000`) gets up to 600 s on a fresh machine; hosted models without a

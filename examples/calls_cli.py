@@ -9,7 +9,7 @@ How: install the `cli` extra (`pip install "hone-models[cli]"`), then
         hone-models calls show  <span_id> [--db PATH]
         hone-models calls stats [--by model|provider|tag] [--since 1d] [--db PATH] [--json]
         hone-models models list|show <id> [--json] [--registry FILE]
-        hone-models models check <id> [--json]    smoke call; saves the measured tokens/s
+        hone-models models check <id> [--json]    smoke call; saves the warm tokens/s
     `calls` read `${HONE_HOME:-.hone}/models/spans.db` unless `--db` is given. In code,
     `hone_models.calls.find_calls(spans, since=..., model=...)` and `call_stats(calls, by=...)` are the
     same queries over `mk.records.read_spans(path)`.

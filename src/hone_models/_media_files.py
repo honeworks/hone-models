@@ -20,6 +20,12 @@ from typing import Any
 from ._images import HEAD_BYTES, header_size
 
 FFPROBE_TIMEOUT_S = 30
+# File suffixes that name a media file: an `out` ending in one of these keeps it (`output_paths`).
+MEDIA_SUFFIXES = frozenset({
+    ".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif", ".bmp", ".tif", ".tiff",
+    ".wav", ".flac", ".mp3", ".ogg", ".opus", ".m4a", ".aac",
+    ".mp4", ".webm", ".mov", ".mkv", ".avi",
+})  # fmt: skip
 _IMAGE_MIME = {
     b"\x89PNG": "image/png",
     b"\xff\xd8": "image/jpeg",
@@ -72,12 +78,17 @@ def file_record(path: Path) -> dict[str, Any]:
 
 def output_paths(out: Path, suffixes: list[str]) -> list[Path]:
     """Where each of several outputs goes: `out` for one file, else `<stem>_1<suffix>`, `<stem>_2<suffix>`,
-    ...; without a suffix on `out`, the provider's (`suffixes[i]`) is used. Parent folders are created."""
+    ...; when `out` has no file suffix, the provider's (`suffixes[i]`) is appended. Only a media suffix
+    (`MEDIA_SUFFIXES`) or one of the provider's counts as `out`'s own, so a dot in a name
+    (`takes/ace-step-1.5-turbo`, `clips/v1.2`) is kept. Parent folders are created."""
     out.parent.mkdir(parents=True, exist_ok=True)
+    known = MEDIA_SUFFIXES | {s.lower() for s in suffixes}
+    own = out.suffix if out.suffix.lower() in known else ""
+    stem = out.name.removesuffix(own) if own else out.name
     paths: list[Path] = []
     for i, suffix in enumerate(suffixes, 1):
-        name = out.stem if len(suffixes) == 1 else f"{out.stem}_{i}"
-        paths.append(out.with_name(name + (out.suffix or suffix)))
+        name = stem if len(suffixes) == 1 else f"{stem}_{i}"
+        paths.append(out.with_name(name + (own or suffix)))
     return paths
 
 

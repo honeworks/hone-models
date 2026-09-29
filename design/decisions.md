@@ -16,8 +16,6 @@ saying what was decided.
 | [D-016](#d-016-sibling-packages-as-development-only-path-sources) | Remove the `[tool.uv.sources]` path sources once the sibling packages are published, before hone-models is published. |
 | [D-019](#d-019-the-jev-api-mapping-is-unverified) | Verify the Jev API mapping against the real API (endpoint, auth, field names, token counts). |
 | [D-022](#d-022-the-packaged-gemma4-12b-entry-and-its-ollama-tag) | Before publishing, point the packaged `gemma4-12b` entry at the public Ollama tag `gemma4:12b` (and keep the local tag through a user registry alias). |
-| [D-073](#d-073-heartmulas-node-does-not-load-on-the-reference-machine) | HeartMuLa's ComfyUI node fails with transformers 5 in ComfyUI's environment: pin transformers 4.x for it, wait for a node release, or drop the entries? |
-| [D-074](#d-074-the-machine-snapshot-now-asks-the-local-comfyui-wherever-the-catalog-is-loaded) | The snapshot now reports a local ComfyUI server (not running) on machines without one: keep it, or check only servers whose entries' files are installed? |
 
 ## D-001: `records.py` is a public module
 The span sinks live in one public module, `hone_models.records` (with `read_spans`, `add_secret` and
@@ -493,9 +491,11 @@ No review needed.
 runs one job in `client.session()` (so it starts ComfyUI from `HONE_COMFYUI_START` when nothing answers,
 and stops it after) with the smallest inputs every packaged model accepts: 256x256 for images, 10 s of
 audio (HeartMuLa's sampler takes at least 10 s), 1 s at 256x256 for video, from a generated gradient PNG
-when the entry takes `image`; a line of lyrics when it takes `lyrics`; seed 1. Only the inputs the entry
-takes are passed. The file goes to `--out` (default `$HONE_HOME/models/checks/<id>/tiny.<suffix>`: the
-provider's suffix, because ids such as `ace-step-1.5-turbo` look like they have one). It prints the time,
+when an image or video entry takes `image`; a line of lyrics when a music entry takes `lyrics`; seed 1.
+Only the inputs the entry takes are passed (a `command` entry takes the whole shared vocabulary, so a
+song never gets the start frame). The file goes to `--out` (default `$HONE_HOME/models/checks/`) as
+`<id>.<suffix>`, the provider's suffix (a dot in an id such as `ace-step-1.5-turbo` is not taken for one,
+D-075). It prints the time,
 the measured file and `peak_vram_gb`: GPU 0's used memory sampled every 0.25 s (NVML, else `nvidia-smi`)
 minus the memory in use at the start; the whole card, because ComfyUI is another process. Unlike the chat
 check it saves nothing to the user registry: the value is for the entry's `vram_gb`, which a person sets.
@@ -516,7 +516,9 @@ marks both entries as expected failures, and their `vram_gb` (6.0) is the node's
 (`models/heartmula/HeartMuLa-oss-3B`, a link to the RL weights here), so `heartmula-3b` runs the RL
 weights on this machine. Fix: a transformers 4.x for the node, or a node release that loads HeartCodec
 with transformers 5. Part of [0015](changes/0015-generation-models.md).
-Awaiting owner review (how to fix ComfyUI's environment for HeartMuLa).
+Decided (owner: command provider in heartlib's own venv): both entries are `command` entries run by the
+`heartmula` adapter in heartlib's own Python 3.10 environment (transformers 4.57); their workflows are
+removed (D-076).
 
 ## D-074: the machine snapshot now asks the local ComfyUI wherever the catalog is loaded
 D-066 checked only servers of `comfyui` entries with a workflow, so machines without ComfyUI reported
@@ -525,4 +527,92 @@ none while the catalog had no workflows. Now that the packaged catalog has workf
 server as `running: False` with the connection error, which is true and costs one refused connection.
 A registry that should not look (a machine without ComfyUI) can point `HONE_COMFYUI_URL` elsewhere or
 override the entries. Part of [0015](changes/0015-generation-models.md).
-Awaiting owner review (keep the row, or skip servers whose entries' files are not installed).
+Decided (owner: keep).
+
+## D-075: which suffix of `out` counts
+`output_paths` read `Path.suffix`, so `takes/ace-step-1.5-turbo` was taken to end in `.5-turbo` and the
+file was written without the provider's suffix. Now only a suffix in `_media_files.MEDIA_SUFFIXES` (images,
+audio, video, compared without case) or one of the provider's own suffixes for the job counts as `out`'s;
+anything else is part of the name and the provider's suffix is appended. A fixed list rather than
+`mimetypes`, whose table depends on the machine. `models check` no longer works around it (it wrote
+`<id>/tiny.<suffix>`) and writes `<id>.<suffix>`. Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-076: the HeartMuLa adapter
+Per the owner's answer to D-073, `heartmula-3b` and `heartmula-rl-3b` are `command` entries:
+`$HONE_HEARTLIB_DIR/.venv/bin/python {adapter:heartmula} {request}` in a heartlib clone with its own
+Python 3.10 environment (0015 §2), and their ComfyUI workflows are gone. Details:
+- **Checkpoints without machine paths.** heartlib's `from_pretrained` wants one `ckpt` folder with
+  `HeartMuLa-oss-<version>` in it, which cannot name the RL weights. The adapter builds
+  `HeartMuLaGenPipeline` itself from `defaults.checkpoints` (heartlib's layout: `tokenizer.json`,
+  `gen_config.json`), `defaults.checkpoint` (the HeartMuLa folder) and `defaults.codec` (HeartCodec,
+  `HeartCodec-oss-20260123` as heartlib's README recommends). `checkpoints` is absolute, or relative to
+  ComfyUI's model folder (`HONE_COMFYUI_DIR`, else `~/ComfyUI`): the weights stay where the ComfyUI node
+  kept them, and `install.files` downloads them there, so no second variable is needed. `install.check`
+  runs without a shell in the heartlib folder, so it checks the environment only; missing checkpoints are
+  a result error naming the paths, before torch is imported.
+- **8 GB.** HeartMuLa 3B is 3.9 B parameters (7.8 GB in bf16) and torchtune caches every attention head
+  (5.6 GB for its 8192 positions with guidance), and HeartCodec is 6.2 GB in fp32. `defaults.low_mem`
+  (on in the catalog) loads HeartMuLa in 4-bit NF4 with bitsandbytes (3.0 GB, as the node's `use_4bit`)
+  and moves HeartCodec's flow-matching part to the CPU before its scalar model decodes the latents to
+  audio. Always: lazy loading (HeartMuLa is freed before HeartCodec loads), and the key-value cache sized
+  for the song (prompt + `duration_s` / 80 ms + 1 positions). HeartCodec stays fp32 (heartlib warns that
+  bf16 degrades the audio).
+- **Output.** The adapter runs the pipeline's `preprocess` and `_forward` and writes the FLAC with
+  soundfile itself, because the pipeline's save calls `torchaudio.save`, which needs `torchcodec` with
+  torchaudio 2.9+ (the heartlib checkout here carries a local soundfile patch for that).
+- **Inputs.** The prompt becomes heartlib's tags, comma-separated without spaces; `duration_s` (default
+  60) is `max_audio_length_ms`, the longest the song may be; `topk`, `temperature`, `cfg_scale` come from
+  `defaults` (heartlib's 50, 1.0, 1.5); `max_duration_s` is 240 (heartlib's default length).
+- **Lyrics.** A `heartmula` format: heartlib's README writes `[Intro]`, `[Verse]`, `[Prechorus]`,
+  `[Chorus]`, `[Bridge]`, `[Outro]` with a blank line between sections; the pipeline lower-cases the text,
+  so case does not matter, but `[pre-chorus]` would tokenize differently from `[prechorus]`. `[inst]`
+  becomes `[Instrumental]`, the ComfyUI node's marker (heartlib's README has none).
+- **Weights here.** Only the RL weights are on the reference machine: `models/HeartMuLa/HeartMuLa-oss-3B`
+  (and `models/heartmula/HeartMuLa-oss-3B`) are links to `HeartMuLa-RL-oss-3B-20260123`, and
+  `HeartCodec-oss` a link to `HeartCodec-oss-20260123`; so `heartmula-3b` runs the RL weights on this
+  machine until the base weights are downloaded into `HeartMuLa-oss-3B`.
+Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-077: SongGeneration loads its bundled prompt pickle
+The project's `generate.py` calls `torch.load("tools/new_prompt.pt")`, a pickle bundled with the project,
+and torch 2.6 in its environment refuses it under the `weights_only` default. The owner chose ("go with
+a") to set `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1` in the `songgeneration-v2-medium` entry's `env`: the
+`command` provider passes it to that job's process only, so no other model or the caller's process loads
+pickles that way, and the project is not changed. The real run on the reference machine (2026-09-29) shows
+the variable reaching `generate.py` (torch warns that it forces `weights_only=False`), but the job still
+fails with `UnpicklingError: invalid load key, 'v'`: that checkout's `tools/new_prompt.pt` is a 133-byte
+Git LFS pointer, not the 15 MB file, and git-lfs is not installed, so `git lfs pull` in the project (now
+the first `install.setup` step) is still needed; `install.check` cannot tell a pointer from the file.
+Part of [0015](changes/0015-generation-models.md).
+Decided (owner).
+Update 2026-09-29: after `git lfs pull` the prompt file loads, and the real run fails one step later, in
+the project: `size mismatch for condition_provider.conditioners.type_info.output_proj.weight: [151652,
+1536]` in the checkpoint, `[151646, 1536]` in the model. The `type_info` conditioner sizes its embedding
+from the tokenizer in `third_party/Qwen2-7B` (from SongGeneration-Runtime; 151,643 + 3 added tokens) with
+the project's pinned transformers 4.37.2, and the v2-medium checkpoint expects six more tokens.
+Not fixed here (the project and its downloads are the owner's); `vram_gb` stays the estimate.
+
+## D-078: which chat entries declare `thinking`
+`models check` returned "only 'thinking' text" for `hemmingway-1`, `muse-glimmer-30b`,
+`nemotron-3.5-lightning`, `qwen3.6-27b` and `qwen3.6-35b-a3b`: their entries did not declare `thinking`,
+so `think=false` was never sent and the 64-token smoke call ran out while thinking. `thinking = true` now
+marks every packaged chat entry whose installed model Ollama's `/api/show` lists with the `thinking`
+capability (checked 2026-09-29: also `qwen3.8-27b`, `gemma4-26b-a4b`, `gemma4-31b`, `ornith-1.5-9b` and
+`-35b`), and the two tunes not installed here by their base (`qwen3.6-35b-a3b-styletune`,
+`nemotron-3.5-30b-a3b-antislop`). The Gemma 4 StyleTune, MeroMero and Equinox builds report no thinking
+and stay unmarked. `tests/unit/test_catalog.py` pins the list both ways.
+No review needed.
+
+## D-079: `models check` times a warm reply
+The chat check divided the 2-3 tokens of "Say OK." by the whole call, cold load included, and saved
+0.3-5 tok/s for models that make 3.6-45 warm. Now the smoke call (which loads the model and must answer)
+comes first, then a ~200-token reply ("Describe the sea at dawn in about 200 words.", `max_tokens=200`)
+is timed: `speed_tok_s` = its output tokens / its seconds. A timed reply cut at the limit or with only
+thinking text still counts (its tokens were generated). `load_s` = the smoke call's seconds less its own
+tokens at the measured speed, `None` when either is unknown; it is printed, not saved. The smoke call
+has 1024 tokens, because `deepseek-r1:8b` thinks even with `think=false` (§13) and answered "OK" at 1024.
+Timing on the client works for every provider; Ollama's own `load_duration` / `eval_duration` would need
+new fields on `TextResult` for one provider.
+No review needed.

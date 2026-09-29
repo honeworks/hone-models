@@ -50,4 +50,15 @@ docs/  examples/  design/  scripts/
 7. **Shared GPU:** real-model runs go through `scripts/gpu-lock.sh`; never start or stop the Ollama
    service; unload models you load.
 8. **Design changes** get a record in `design/changes/`; small choices go into `design/decisions.md`.
-9. **Git:** Conventional Commits, small commits. Never push, tag or publish without the maintainer.
+9. **Git:** Conventional Commits, small commits. Push a branch and open a pull request only when the user asks ("push", "ship it"). Inside that pull
+request's flow, reviewing it on GitHub and pushing fixes the user asked for need no new request.
+Never push to `main`, tag or publish unless the maintainer asks.
+
+## Workflow and tooling
+
+One branch per task; a change record before a design change; tests first; the docs updated with the
+code (the table in [`.claude/skills/sync-docs/SKILL.md`](.claude/skills/sync-docs/SKILL.md));
+`scripts/check.sh` green; a pull request from
+[`.github/pull_request_template.md`](.github/pull_request_template.md), reviewed by claude[bot]. Claude
+Code users get this flow as skills, reviewer agents and hooks in [`.claude/`](.claude/); see
+[`CLAUDE.md`](CLAUDE.md). Other tools: the skills are plain Markdown and can be followed as they are.

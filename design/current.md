@@ -255,8 +255,13 @@ it applies emotion and intensity in `capabilities.expressive`.
   variable (unset or not a folder: `ConfigError`), which is also the default `cwd`. Capabilities `max_references`, `sizes`,
   `max_duration_s`, `durations_s`, `word_timestamps`, `commercial_use` (information only, copied onto
   results and spans) and `features`; `price.per_image` / `per_output_second`; `max_timeout_s` defaults
-  by kind (image 600 s, music 1800 s, video 3600 s, transcription 600 s). A ComfyUI catalog entry without
-  a `workflow` yet raises `ConfigError` "no workflow yet for '<id>'" when called; `command`, `cwd` and
+  by kind (image 600 s, music 1800 s, video 3600 s, transcription 600 s). A file input (`image`,
+  `source`) mapped to a list of slots is optional like `references` (left out, its nodes are removed with
+  their links); mapped to one path it is required. The packaged catalog ships a workflow
+  (`hone_models/data/workflows/<id>.json`) for every ComfyUI model installed on the reference machine, with
+  `vram_gb` measured by `hone-models models check <id>` (a tiny job in a session, the peak of the whole
+  card; D-070, D-072); a ComfyUI catalog entry without a `workflow` yet raises `ConfigError` "no workflow
+  yet for '<id>'" when called; `command`, `cwd` and
   `env` are for the `command` provider. Registry files are trusted configuration: a `command` entry
   runs the program it names.
 - **Common formats and prompt inputs** (0015 §3a). `lyrics` has one common format (section tags such as
@@ -438,8 +443,10 @@ probabilities over unknown options or summing above 1 become that question's `er
     released at once, `None` when the file cannot be opened, not held when it does not exist; `mine` from
     `HONE_GPU_LOCK_HELD=1`; `holder` from `<lock>.holder`, read only when held); `leases` (the ledger:
     `{name, pid, vram_gb, mine}`).
-  - ComfyUI servers checked: the distinct `base_url`s of the registry's `comfyui` entries (default
-    `HONE_COMFYUI_URL`, else `http://127.0.0.1:8188`) plus `HONE_COMFYUI_URL` when set; none otherwise.
+  - ComfyUI servers checked: the distinct `base_url`s of the registry's `comfyui` entries that have a
+    workflow (default `HONE_COMFYUI_URL`, else `http://127.0.0.1:8188`) plus `HONE_COMFYUI_URL` when set;
+    none otherwise. The packaged catalog has such entries, so the local server is checked on every machine
+    (not running where there is none; D-074).
     The loaded-models file is `${HONE_HOME}/models/comfyui-loaded.json` (`{url: [{model_id, job_id, pid,
     time}]}`, guarded by `flock`).
   - `prepare(needed, *, if_busy="block")` resolves the ids (`ConfigError` for an unknown id or `if_busy`),
@@ -665,15 +672,15 @@ models in `tests/gpu/`.
 | AC-20 | Examples | every `examples/*.py` runs offline, opens with a What / How / Why docstring, uses only the public API and is listed in `examples/README.md` |
 | AC-21 **[real]** | Speech: a minutes-long script with `FakeSpeech`; one sentence with `kokoro-82m` | one WAV of the right length and one `hone.models.speech` span, text hashed with capture off; the real WAV is non-silent and the GPU is freed afterwards |
 | AC-22 **[real]** | Expressive speech: paragraphs with an emotion and intensity each in one session (`FakeSpeech(expressive=True)`); one line calm and excited with `chatterbox` in one session | the span records emotion, intensity, `expressive`, `session` and paragraph count, a paragraph that fits is one chunk, and the session loads the model once; the real takes are non-silent, the excited one varies more in pitch and is louder and higher, and the GPU is freed afterwards |
+| AC-23 | A lease inside another in the same thread; a lease no one can grant (fake memory) | the nested lease reserves only what the outer one does not cover and never waits for it; the impossible one raises `CapabilityError` after `stall_s`, naming the holders |
 | AC-24 | An image through `FakeComfyUI` with a reference used twice; a song with `duration_s` mapped to two nodes; a video with seconds converted to frames | inputs land on the mapped nodes; the reference is uploaded once by hash; outputs written to `out` with hash, size and dimensions or duration; one span each with inputs, outputs and the workflow hash; a lease with the registry's `vram_gb`; `/free` after a plain call, once after a session |
 | AC-25 | Failures: unknown input; `node_errors`; `execution_error` (out of memory); a job that never ends; `KeyboardInterrupt` while waiting | `ConfigError` before any request; `ConfigError` naming the node; `result.error` with `error_kind = "out_of_memory"` and status `error`; the job cancelled and `ModelTimeout`; the job cancelled and the interrupt re-raised |
 | AC-26 | Hosted images (generation, edit with references, b64 and url) and video (polled, then downloaded; `failed`; timeout) through respx | files written, no bytes in the SQLite file, cost from `per_image` / `per_output_second`, `failed` as `result.error`, `DELETE` sent on timeout, the planted `OPENAI_API_KEY` never stored; a size or duration the model does not declare raises before any request |
 | AC-27 | `command` provider with the fake project: success, `result.json` error, non-zero exit, hang | files collected; `result.error`; `ProviderError` with the stderr tail; the process group killed on timeout |
 | AC-28 | `mk.session("comfyui")` with no server and a fake start command; again with a running server; a plain call with no server | started once, reused by two clients, stopped at the end; a running server is never stopped; the plain call raises `ProviderError` saying to start ComfyUI or use a session, and starts nothing |
-  and hosted OpenAI-compatible images and video and `command` projects (SongGeneration) so far
-  (transcription runs in-process through faster-whisper); hosted transcription is a later step of
-  [0015](changes/0015-generation-models.md). ComfyUI jobs report no progress (its HTTP API has none).
-| AC-23 | A lease inside another in the same thread; a lease no one can grant (fake memory) | the nested lease reserves only what the outer one does not cover and never waits for it; the impossible one raises `CapabilityError` after `stall_s`, naming the holders |
+| AC-29 | Transcription with the fake module, capture on and off | words with times on the result; one span; text and words hashed with capture off |
+| AC-30 **[real]** | Under `scripts/gpu-lock.sh`: a 512×512 `z-image-turbo` image and 10 s of `ace-step-1.5-turbo` through the real ComfyUI; a Kokoro sentence transcribed by `faster-whisper-large-v3-turbo`; by hand (`slow`), the tiny job of every installed ComfyUI entry | non-empty outputs of the right size and length; the transcript contains the sentence's words in order; GPU memory back to where it started; ComfyUI started only if the test started it, and stopped; each tiny job writes a file of its kind within the entry's `vram_gb` |
+| AC-31 | Guides, formats and the catalog: installed status from fakes, `models install`, a call to a model not installed, a kind with no client, lyrics for a `sections` and a `levo` entry, `camera_angle`, `mk.guide`, `models guide --json`, `--feature`, `require={"features": [...]}` | each entry gets its own lyric form; the phrase in the prompt, an unknown choice a `ConfigError` listing the choices; guides list inputs, features, examples and source; `installed` is `yes` / `no` / `unknown` as the fakes say; `install` downloads nothing |
 | AC-32 **[real]** | `mk.machine.snapshot()` with a fake NVML (8 GB, one foreign process), FakeOllama with a model partly on the CPU, ComfyUI (fake) after a job, after `/free`, after a job hone-models did not run, and refused; no NVML and no `nvidia-smi`; Ollama answering 500; the lock held by another process, by our own `gpu-lock.sh`, and free | GB values and `vram_gb < size_gb` as scripted; ComfyUI named by registry id, dropped after `/free`, unnamed for a foreign job; a registry without `comfyui` entries checks none; `gpus` is `None`; Ollama `running: None` with an error and no entries; `held` / `mine` / `holder` right; the real card is reported |
 | AC-33 **[real]** | `prepare(["a"])` with Ollama holding `a` and `b` and ComfyUI a model not needed; with ComfyUI holding only needed models; with another process's lease (`if_busy` `"block"` and `"unload"`); with the lock held elsewhere; with the unload of `b` failing | `b` unloaded, ComfyUI freed, span recorded; ComfyUI kept; blocked: nothing sent, `blocked_by` names the holder; `"unload"`: `b` unloaded, `blocked_by` still reported; failure: in `errors`, span status `error`, `b` still loaded; on the real machine `prepare([])` leaves nothing loaded |
 | AC-34 | `load("a")` on FakeOllama; a model partly on the CPU; a server timing out; a `comfyui` entry; `GpuScheduler(unload_others=True, if_busy="block")` short of memory while another process holds a lease | an empty-prompt `/api/generate` with `keep_alive`, `loaded: True` with seconds; `vram_gb < size_gb`; `loaded: False` with the error; `loaded: None`, "not supported", no request; the other process's models are not unloaded and the lease times out as before |
@@ -732,16 +739,16 @@ copies an entry.
   neither shows only in `gpus[].processes` and does not block `prepare`. Between `prepare`'s read and its
   unloads another process can load a model or take a lease (the state after is read again).
   `FileLockGpuLease` writes no `.holder` file, so a Python holder of the lock shows as `holder: None`.
-- No streaming, async clients or `hone.models.timing.*` attributes. Generation runs through ComfyUI
-  and hosted OpenAI-compatible images and video and `command` projects (SongGeneration) so far
-  (transcription runs in-process through faster-whisper): hosted transcription, model guides, common input
-  formats and the catalog are later steps of [0015](changes/0015-generation-models.md). ComfyUI jobs
-  report no progress (its HTTP API has none).
-  only so far: hosted images and video, `command` projects and transcription are later steps of
+- No streaming, async clients or `hone.models.timing.*` attributes. Generation runs through ComfyUI,
+  hosted OpenAI-compatible images and video and `command` projects (SongGeneration); transcription runs
+  in-process through faster-whisper; hosted transcription is a later step of
   [0015](changes/0015-generation-models.md). ComfyUI jobs report no progress (its HTTP API has none).
-- The catalog's ComfyUI entries have no workflows yet (each is exported and proven with `models check`
-  when the model is installed), so calling them says so; `vram_gb` is unmeasured for most entries, and a
-  few catalog facts are unverified (D-067). Guides are checked by hand (`models guide --stale`).
+- Only the ComfyUI models installed on the reference machine have packaged workflows (D-070); the other
+  catalog entries say "no workflow yet" until theirs is written and proven with `models check`. HeartMuLa's
+  workflows fail inside its custom node with ComfyUI's transformers 5, so its `vram_gb` is not measured
+  (D-073). `vram_gb` is measured on one 8 GB card with ComfyUI's `--reserve-vram 1.5`, where the large
+  models fill the card and offload; the tiny checks prove that a workflow runs, not how well. A few catalog
+  facts are unverified (D-067). Guides are checked by hand (`models guide --stale`).
 - The `speech` extra (Kokoro) needs Python < 3.13 and loads the model on every call (about a second)
   outside a session.
 - The `expressive` extra (Chatterbox) needs Python < 3.13, uv overrides of its exact torch / numpy pins

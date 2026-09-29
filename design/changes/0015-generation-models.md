@@ -2,9 +2,11 @@
 
 ## Status
 
-`accepted` (2026-09-29, owner: "start implementing"; open questions take the proposed answers).
-Step 1 (media client, records, `comfyui` provider, `FakeComfyUI`, `mk.session("comfyui")`) implemented
-in 0.1.0; small choices in [decisions.md](../decisions.md) D-024 to D-027.
+`implemented in 0.1.0` (accepted 2026-09-29, owner: "start implementing"; open questions take the proposed
+answers; implementation choices in [decisions.md](../decisions.md) D-024 to D-027, D-030 to D-032, D-040,
+D-041, D-050, D-051 and D-060 to D-074). All six steps are in, with the packaged workflows of every ComfyUI
+model installed on the reference machine proven by `hone-models models check` and AC-30 run on the real
+machine; HeartMuLa's node does not load in ComfyUI's environment there (D-073, awaiting owner review).
 
 ## Context
 

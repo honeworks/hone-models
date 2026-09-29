@@ -147,8 +147,10 @@ one line why the model is in the catalog.
 The scorers and tools (reward models, DINOv2, MuQ, Demucs, SeedVR2, RIFE, ...) are catalog entries of kind
 `scoring` with provider `none`: they have `install`, a licence and a guide, and every client refuses them
 with `ConfigError` "no client for kind 'scoring' yet". A ComfyUI entry whose workflow is not written yet
-says "no workflow yet for '<id>'" when called: a workflow is exported from ComfyUI with "Export (API)",
-set as `workflow` and proven with `hone-models models check <id>` once the model is installed.
+(the models not installed on the reference machine) says "no workflow yet for '<id>'" when called: a
+workflow is exported from ComfyUI with "Export (API)", set as `workflow` and proven with
+`hone-models models check <id>` once the model is installed. The installed ones have packaged workflows,
+listed with their measured VRAM in [generation.md](generation.md#packaged-comfyui-models).
 
 ```python
 import hone_models as mk

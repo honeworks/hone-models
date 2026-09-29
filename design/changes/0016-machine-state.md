@@ -3,7 +3,8 @@
 ## Status
 
 `implemented in 0.1.0` (accepted 2026-09-29, owner: "start implementing"; open questions take the
-proposed answers; details in [decisions.md](../decisions.md) D-023)
+proposed answers; details in [decisions.md](../decisions.md) D-023), adapted to ComfyUI models as registry
+entries as [0015](0015-generation-models.md) §7 describes (D-066, D-074)
 
 ## Context
 

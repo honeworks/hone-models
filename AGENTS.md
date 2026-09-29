@@ -29,11 +29,13 @@ src/hone_models/       public API in __init__.py (explicit __all__)
   decision/            decision questions: emulation on LLMs, question / answer shapes
   embeddings.py        embedder
   speech.py            text to speech (kokoro: extra `speech`; chatterbox: extra `expressive`)
-  media.py             images, music, video (`MediaClient`); _media_files.py measures outputs
+  media.py             images, music, video (`MediaClient`); _media_files.py measures outputs;
+                       _media_check.py: `models check` for media (a tiny job, peak GPU memory)
   transcribe.py        transcription with word timestamps (faster_whisper: extra `transcribe`)
   providers/           one module per provider (Ollama, OpenAI-compatible, Jev, LiteLLM extra, ComfyUI, command);
                        openai_media.py: OpenAI-compatible images and video
-  registry.py data/    model registry; the packaged catalog in data/models/<kind>.toml; _registry_shapes.py:
+  registry.py data/    model registry; the packaged catalog in data/models/<kind>.toml, ComfyUI workflows in
+                       data/workflows/<id>.json; _registry_shapes.py:
                        an entry's tables; _registry_select.py: requirements and orderings
   guide.py formats.py catalog.py   model guides; lyrics formats and prompt inputs; installed / install
   gpu.py runtime/      GPU leases; Ollama and ComfyUI sessions and unload; _comfyui_loaded.py

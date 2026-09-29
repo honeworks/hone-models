@@ -16,6 +16,8 @@ saying what was decided.
 | [D-016](#d-016-sibling-packages-as-development-only-path-sources) | Remove the `[tool.uv.sources]` path sources once the sibling packages are published, before hone-models is published. |
 | [D-019](#d-019-the-jev-api-mapping-is-unverified) | Verify the Jev API mapping against the real API (endpoint, auth, field names, token counts). |
 | [D-022](#d-022-the-packaged-gemma4-12b-entry-and-its-ollama-tag) | Before publishing, point the packaged `gemma4-12b` entry at the public Ollama tag `gemma4:12b` (and keep the local tag through a user registry alias). |
+| [D-073](#d-073-heartmulas-node-does-not-load-on-the-reference-machine) | HeartMuLa's ComfyUI node fails with transformers 5 in ComfyUI's environment: pin transformers 4.x for it, wait for a node release, or drop the entries? |
+| [D-074](#d-074-the-machine-snapshot-now-asks-the-local-comfyui-wherever-the-catalog-is-loaded) | The snapshot now reports a local ComfyUI server (not running) on machines without one: keep it, or check only servers whose entries' files are installed? |
 
 ## D-001: `records.py` is a public module
 The span sinks live in one public module, `hone_models.records` (with `read_spans`, `add_secret` and
@@ -451,3 +453,76 @@ folder, so the base and RL entries share it. Not verified: the Ollama `hf.co` ta
 predictor and RIFE, where MuLaCover's node expects its folder, and every `vram_gb` (to be measured).
 Part of [0015](changes/0015-generation-models.md).
 No review needed.
+
+## D-070: the packaged ComfyUI workflows, and how they differ from ComfyUI's templates
+Every ComfyUI entry whose files were installed on the reference machine (RTX 4060 Laptop 8 GB, 30 GB RAM,
+ComfyUI 0.37 started with `--reserve-vram 1.5`) has a workflow in `hone_models/data/workflows/<id>.json`
+(0015 §3b). They were written by hand in API format from ComfyUI's own templates
+(`comfyui_workflow_templates_json` 0.1.95), the old app's exports (z-image-turbo, ACE-Step: the node ids of
+0015 §3 are kept) and the HeartMuLa node's example, keeping the templates' node ids and settings, with:
+subgraphs flattened; frontend-only nodes (`PrimitiveNode`, `ComfySwitchNode`) replaced by the value or the
+branch they select; one save node per workflow writing under `hone/<id>` (`SaveImage`, `SaveAudioAdvanced`
+as FLAC, `SaveVideo` as MP4) in place of previews and MP3; the model files that are installed here
+(MiniMax-Music3's int8 DiT where the template names the fp16 one). Per model: Wan 2.2 I2V-14B runs with
+the lightx2v LoRAs on (4 steps, 2 on each expert; the template's switch is off, 20 steps);
+MiniMax-Music3 decodes with the tiled VAE decoder (the template's switch for low memory); YuE2 keeps the
+ABC stage; LTX-Video's `LTXVImgToVideo.strength` is 1.0 (the node's default: the start frame is kept; the
+template has 0.15) and both its conditioning frame rate and its video run at 24 fps (the template mixes 25
+and 24), so `duration_s` maps to `24 * s + 1` frames, a valid `8n + 1`; Stable Audio's default length is
+47 s (the template's 47.6 is above the entry's `max_duration_s`). `defaults` hold the templates' sizes,
+steps and lengths. `vram_gb` is the peak of the whole card measured during `models check` (D-072); the
+large models all sit near 6.3-6.4 GB because ComfyUI fills what `--reserve-vram 1.5` leaves and offloads
+the rest, so a larger job takes about the same. The two light models were also measured at full
+length: Stable Audio needs 5.6 GB for 47 s (3.3 GB for the tiny 10 s), so its `vram_gb` is 5.7; YuE2's
+57 s song peaked lower than its tiny job (2.7 GB against 3.9 GB). Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-071: a file input mapped to a list of slots is optional; the random seed is below 2^31
+0015 §2 removes an unused `references` slot with its links. The same now holds for any file input
+(`image`, `source`) mapped to a list: left out, its slot nodes are removed, so Wan 2.2 TI2V-5B
+(`image = ["56.image"]`) makes a video from the prompt alone. Mapped to one path the input stays required:
+the workflow's value is a placeholder (`hone/start-frame.png`) that ComfyUI refuses, so Wan 14B and LTX,
+which need a start frame, fail at `/prompt` with a `ConfigError` naming the node. A seed hone-models picks
+(`seed=None`, no `defaults.seed`) is now below 2^31 instead of 2^32: the HeartMuLa sampler takes at most
+2^31 - 1, and a random seed must never be a value the model refuses. Part of
+[0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-072: `models check` for image, music and video entries
+0015 §3b proves a workflow with `hone-models models check <id>` "a tiny job". For a media entry the command
+runs one job in `client.session()` (so it starts ComfyUI from `HONE_COMFYUI_START` when nothing answers,
+and stops it after) with the smallest inputs every packaged model accepts: 256x256 for images, 10 s of
+audio (HeartMuLa's sampler takes at least 10 s), 1 s at 256x256 for video, from a generated gradient PNG
+when the entry takes `image`; a line of lyrics when it takes `lyrics`; seed 1. Only the inputs the entry
+takes are passed. The file goes to `--out` (default `$HONE_HOME/models/checks/<id>/tiny.<suffix>`: the
+provider's suffix, because ids such as `ace-step-1.5-turbo` look like they have one). It prints the time,
+the measured file and `peak_vram_gb`: GPU 0's used memory sampled every 0.25 s (NVML, else `nvidia-smi`)
+minus the memory in use at the start; the whole card, because ComfyUI is another process. Unlike the chat
+check it saves nothing to the user registry: the value is for the entry's `vram_gb`, which a person sets.
+A job that fails prints its error and exits 1. The default test suite also moves the default ComfyUI URL
+to a closed port (`tests/conftest.py`), so no offline test can reach a real server on the machine. Part
+of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-073: HeartMuLa's node does not load on the reference machine
+The `heartmula-3b` and `heartmula-rl-3b` workflows are written and accepted by ComfyUI's validation, but
+the tiny job fails inside the custom node's loader (`FL_HeartMuLa_ModelLoader`): ComfyUI's environment has
+transformers 5.17, which refuses HeartCodec's checkpoint (`_codebook.initted` buffers of shape `[1]` where
+the model declares `[]`, raised because `ignore_mismatched_sizes` is off). That is a problem between the
+node (`transformers>=4.45`) and ComfyUI's environment, outside hone-models; it was not changed here (the
+environment is the owner's). The call is a failed result (`error_kind = "failed"`), the slow real test
+marks both entries as expected failures, and their `vram_gb` (6.0) is the node's own figure for its
+"ultra" memory mode, not a measurement. The node also reads one folder for both entries
+(`models/heartmula/HeartMuLa-oss-3B`, a link to the RL weights here), so `heartmula-3b` runs the RL
+weights on this machine. Fix: a transformers 4.x for the node, or a node release that loads HeartCodec
+with transformers 5. Part of [0015](changes/0015-generation-models.md).
+Awaiting owner review (how to fix ComfyUI's environment for HeartMuLa).
+
+## D-074: the machine snapshot now asks the local ComfyUI wherever the catalog is loaded
+D-066 checked only servers of `comfyui` entries with a workflow, so machines without ComfyUI reported
+none while the catalog had no workflows. Now that the packaged catalog has workflows, `snapshot()` asks
+`HONE_COMFYUI_URL` (default `http://127.0.0.1:8188`) on every machine; without ComfyUI it reports that
+server as `running: False` with the connection error, which is true and costs one refused connection.
+A registry that should not look (a machine without ComfyUI) can point `HONE_COMFYUI_URL` elsewhere or
+override the entries. Part of [0015](changes/0015-generation-models.md).
+Awaiting owner review (keep the row, or skip servers whose entries' files are not installed).

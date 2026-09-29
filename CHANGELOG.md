@@ -14,9 +14,20 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
 ### Changed
 - `gemma4-12b`'s packaged licence is Apache-2.0 (Gemma 4's model card), not "Gemma Terms of Use". The
   machine snapshot checks only ComfyUI servers of entries that have a workflow
-  ([decisions.md](design/decisions.md) D-066, D-067).
+  ([decisions.md](design/decisions.md) D-066, D-067). With the packaged workflows it now checks the local
+  ComfyUI on every machine (D-074). A seed hone-models picks is below 2^31 (D-071).
 
 ### Added
+- Packaged ComfyUI workflows (`hone_models/data/workflows/<id>.json`) for every ComfyUI model installed on
+  the reference machine: `z-image-turbo`, `ace-step-1.5-turbo` / `-xl-turbo` / `-xl-sft`,
+  `minimax-music3`, `yue2-3b`, `heartmula-3b`, `heartmula-rl-3b`, `stable-audio-open-1.0`,
+  `wan2.2-i2v-14b` (lightx2v, 4 steps), `wan2.2-ti2v-5b` and `ltx-video-2b-0.9.5`, each entry with its
+  `inputs`, `outputs`, `defaults` and a measured `vram_gb` (D-070; HeartMuLa's node fails in ComfyUI's
+  environment here, D-073). A file input mapped to a list of slots is optional (D-071).
+  `hone-models models check <id> [--out DIR]` runs a tiny job for image, music and video entries in a
+  session and reports the file and the peak GPU memory (D-072). AC-30 runs for real: an image and a song
+  through ComfyUI and a transcription; a slow real test runs every installed entry's tiny job
+  ([0015](design/changes/0015-generation-models.md) §3b, §9).
 - Transcription: `mk.transcriber(model_id)` returns a `Transcriber` whose `transcribe(audio, *,
   language=None, prompt=None, words=True, timeout_s=None, trace=None)` returns a `Transcript` (text,
   language, duration, `TranscriptSegment`s and timed `Word`s); one `hone.models.transcribe` span per call
@@ -139,6 +150,9 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
 - Docs (`docs/`) and a real-model test suite (`tests/gpu/`, run through `scripts/gpu-lock.sh`).
 
 ### Fixed (before release)
+- ComfyUI video results are fetched: a `SaveVideo` history entry lists `"animated": [true]` next to its
+  files, which made the output reader fail.
+- The default test suite never reaches a real ComfyUI on the machine (it freed the local server).
 - `hone.models.cost_usd` is recorded when a reply omits a token count whose price is 0 (Jev reports
   input tokens only).
 - `hone-models calls list` never shortens span ids in narrow terminals (they are what `calls show` takes).

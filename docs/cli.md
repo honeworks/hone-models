@@ -6,7 +6,8 @@ hone-models models show <id> [--json]
 hone-models models guide <id> [--json]      what the model takes: guide, inputs, features, limits, licence
 hone-models models guide [<id>] --stale 90  guides not checked for 90 days
 hone-models models install <id> [--run]     prints the commands that fetch the model; downloads nothing
-hone-models models check <id> [--json]      smoke call; saves measured tokens/s as speed_tok_s
+hone-models models check <id> [--json] [--out DIR]  chat: saves measured tokens/s as speed_tok_s;
+                                            image/music/video: a tiny job, its file and peak GPU memory
 hone-models calls list [--since 1d] [--model ID] [--db PATH] [--json]
 hone-models calls show <span_id> [--db PATH]
 hone-models calls stats [--by model|provider|tag] [--since 1d] [--db PATH] [--json]
@@ -16,6 +17,9 @@ hone-models calls stats [--by model|provider|tag] [--since 1d] [--db PATH] [--js
   not answer or an unset variable is `unknown`); `--feature` keeps the models whose guide declares every
   given feature; `--tier` is the catalog's tier (1 test first, 2 worth a try, 3 the ceiling). See
   [models-and-guides.md](models-and-guides.md).
+- `models check` on an image, music or video entry runs one tiny job in a session (starting ComfyUI
+  from `HONE_COMFYUI_START` if nothing answers) and prints the file and `peak_vram_gb`; see
+  [generation.md](generation.md#packaged-comfyui-models).
 - `models install` prints `ollama pull`, `hf download ... --local-dir <ComfyUI>/models/<folder>` or the
   clone and setup steps, with the size and the free disk space; `--run` runs them (for the owner of the
   machine).

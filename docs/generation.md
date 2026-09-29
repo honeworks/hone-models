@@ -27,11 +27,12 @@ clip = mk.video("wan2.2-i2v-14b")
 clip.generate("slow push-in, candle flicker", image=Path("shots/01.png"), duration_s=5, out="clips/01.mp4")
 ```
 
-The packaged catalog lists these models with their install tables and guides, but their ComfyUI
-workflows are not written yet: calling one says "no workflow yet for '<id>'" until its workflow is
-exported and proven (`hone-models models check <id>`). Until then, add your own entries (below). Lyrics are
-written once in a common format and converted per model, and inputs such as `camera_angle` become the
-model's own phrases: see [models-and-guides.md](models-and-guides.md).
+The packaged catalog ships a workflow for every ComfyUI model that was installed on the reference machine
+([below](#packaged-comfyui-models)); the other ComfyUI entries say "no workflow yet for '<id>'" when
+called, until their workflow is written and proven with `hone-models models check <id>`. Your own entries
+work the same way ([ComfyUI entries](#comfyui-entries)). Lyrics are written once in a common format and
+converted per model, and inputs such as `camera_angle` become the model's own phrases: see
+[models-and-guides.md](models-and-guides.md).
 
 ## Calling
 
@@ -143,6 +144,7 @@ steps = "3.steps"
 width = "13.width"                              # `size` fills width and height
 height = "13.height"
 references = ["78.image", "106.image"]          # slots, in order; an unused slot is removed with its links
+image = ["56.image"]                            # a slot: optional; `image = "56.image"` would be required
 [models."my-image".capabilities]
 vram_gb = 7.0
 max_references = 2
@@ -153,6 +155,10 @@ commercial_use = true
 duration_s = { path = "50.length", per_second = 16, add = 1 }   # seconds to frames: 5 s -> 81
 ```
 
+- `references` is always a list of slots. Another file input (`image`, `source`) mapped to a list is a
+  slot too, so it is optional: a call without it removes the node and the links to it (Wan 2.2 TI2V-5B
+  makes a video from the prompt alone then). Mapped to one path it is required: the workflow's own value
+  is a placeholder file, which ComfyUI refuses.
 - A file input is uploaded with `POST /upload/image` into `input/hone/` under its SHA-256 name, once per
   process and server, so a reference used for 40 shots is sent once; this also works with a ComfyUI on
   another host.
@@ -202,6 +208,54 @@ with FakeComfyUI() as server:
 print(r.path, r.files[0].width, r.files[0].height, r.seed)
 assert server.submitted[0]["6"]["inputs"]["text"] == "a harbour"
 assert (r.files[0].width, r.files[0].height) == (96, 64)
+```
+
+## Packaged ComfyUI models
+
+Every ComfyUI model that was installed on the reference machine (RTX 4060 Laptop, 8 GB; ComfyUI 0.37 with
+`--reserve-vram 1.5`) has a workflow in `hone_models/data/workflows/<id>.json`, written from ComfyUI's own
+templates and proven there with a tiny job. `vram_gb` is the peak that job measured on the whole card; the
+large models all reach about 6.4 GB because ComfyUI fills what `--reserve-vram` leaves and offloads the
+rest to system RAM, so a full-size job takes about the same (Stable Audio's figure is from its longest,
+47 s job). Times are for the tiny job with the weights already in the page cache; a cold first load of a
+large model takes minutes.
+
+| Entry | Takes besides `prompt`, `seed` | Defaults | Tiny job | Time | Peak VRAM |
+|---|---|---|---|---|---|
+| `z-image-turbo` | `size`, `steps` | 1024x1024, 8 steps | 256x256 image | 13 s | 6.3 GB |
+| `ace-step-1.5-turbo` | `lyrics`, `duration_s`, `bpm`, `key`, `time_signature`, `language`, `steps` | 120 s, 8 steps | 10 s song | 28 s | 6.3 GB |
+| `ace-step-1.5-xl-turbo` | as above | 120 s, 8 steps | 10 s song | 32 s | 6.4 GB |
+| `ace-step-1.5-xl-sft` | as above | 120 s, 50 steps | 10 s song | 57 s | 6.3 GB |
+| `minimax-music3` | `lyrics`, `duration_s` (the longest it may be), `steps` | 60 s, 30 steps | 10 s song | 66 s | 6.2 GB |
+| `yue2-3b` | `lyrics`, `duration_s`, `steps` | 120 s, 32 steps | 10 s song | 16 s | 3.9 GB |
+| `stable-audio-open-1.0` | `negative`, `duration_s`, `steps` | 30 s, 50 steps | 10 s clip | 5 s | 3.3 GB (5.6 GB for 47 s) |
+| `heartmula-3b`, `heartmula-rl-3b` | `lyrics`, `duration_s` | 60 s | fails in the node's loader here (below) | | not measured |
+| `wan2.2-i2v-14b` | `image` (required), `negative`, `size`, `duration_s` (16 fps) | 640x640, 5 s | 1 s, 256x256 | 25 s | 6.4 GB |
+| `wan2.2-ti2v-5b` | `image` (optional), `negative`, `size`, `duration_s` (24 fps), `steps` | 1280x704, 5 s, 20 steps | 1 s, 256x256 | 19 s | 6.4 GB |
+| `ltx-video-2b-0.9.5` | `image` (required), `negative`, `size`, `duration_s` (24 fps), `steps` | 768x512, 4 s, 30 steps | 1 s, 256x256 | 10 s | 6.3 GB |
+
+- Wan 2.2 I2V-14B runs with the lightx2v LoRAs (4 steps); its two 14 GB experts are offloaded to system
+  RAM, so do not run it next to another large job.
+- HeartMuLa: the workflows are in place and ComfyUI accepts them, but the custom node's loader fails in
+  ComfyUI's own environment (transformers 5 refuses HeartCodec's checkpoint), so a call returns a failed
+  result; the node also reads one model folder for both entries. See D-073 in
+  [decisions.md](../design/decisions.md).
+- Differences from ComfyUI's templates (LTX's start-frame strength and frame rate, the save nodes, and
+  more) are listed in D-070.
+
+**Proving a workflow: `hone-models models check <id>`.** For an image, music or video entry the command
+runs one tiny job in a session (so with `HONE_COMFYUI_START` set it starts ComfyUI when nothing answers,
+and stops it afterwards): a 256x256 image, 10 s of audio, or a 1 s 256x256 clip from a generated start
+frame, passing only the inputs the entry takes. It prints the time, the measured file and `peak_vram_gb`
+(the whole card's used memory, sampled while the job runs, minus what was in use before), and exits 1
+with the error when the job fails. The file goes to `--out` (default `$HONE_HOME/models/checks/<id>/`).
+Put the peak into the entry's `capabilities.vram_gb`; the command saves nothing itself.
+
+```text
+$ hone-models models check z-image-turbo --json
+{"id": "z-image-turbo", "kind": "image", "seconds": 13.1, "inputs": {"size": "256x256"}, "error": null,
+ "path": ".hone/models/checks/z-image-turbo/tiny.png", "mime": "image/png", "width": 256, "height": 256,
+ "peak_vram_gb": 6.29, ...}
 ```
 
 ## Hosted images and video
@@ -391,9 +445,8 @@ Each call records one span, `hone.models.image`, `hone.models.music` or `hone.mo
 (`hone.models.media.inputs`: files as `{"path", "sha256", "bytes"}`, texts such as lyrics are content),
 the outputs (`hone.models.media.outputs`), the job id, the workflow hash, whether the call was in a
 session, loaded the model, freed it or started the server, the time it queued, the error and its kind,
-the license, `commercial_use`, and the naive cost; a hosted image model's `revised_prompt` (content) and a
-hosted video job's `progress` events. See [records-and-replay.md](records-and-replay.md).
-the license, `commercial_use`, the naive cost, and for `command` entries the end of stderr
+the license, `commercial_use`, the naive cost, a hosted image model's `revised_prompt` (content), a
+hosted video job's `progress` events, and for `command` entries the end of stderr
 (`hone.models.media.log_tail`). See [records-and-replay.md](records-and-replay.md).
 
 ## Testing

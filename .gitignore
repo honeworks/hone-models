@@ -35,6 +35,7 @@ runs/
 *.flac
 !src/hone_models/data/voices/*.flac
 *.mp4
+!src/hone_models/testing/data/tiny.mp4
 *.png
 *.jpg
 *.log

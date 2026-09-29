@@ -75,6 +75,9 @@ hone_models = "hone_models.gpu:GPU"
 [project.entry-points."hone.replayers"]
 hone_models = "hone_models.replay:Replayer"
 
+[project.entry-points."hone.machine_probes"]
+hone_models = "hone_models.machine:Machine"
+
 [build-system]
 requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"

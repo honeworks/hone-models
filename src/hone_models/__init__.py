@@ -7,7 +7,7 @@ r = llm.complete([{"role": "user", "content": "Write a haiku about rain."}])
 
 __version__ = "0.1.0"
 
-from . import errors, gpu, records, registry, replay
+from . import errors, gpu, machine, records, registry, replay
 from ._tracing import current_trace
 from .decision import Choice, DecisionClient, ScoreQ, YesNo, decision
 from .embeddings import Embedder, embedder
@@ -38,6 +38,7 @@ __all__ = [
     "embedder",
     "errors",
     "gpu",
+    "machine",
     "records",
     "registry",
     "replay",

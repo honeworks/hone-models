@@ -10,7 +10,7 @@ from hone_lens.testing.contracts import check_replayer
 
 import hone_models as mk
 from hone_models.testing import FakeOllama, check_record_sink
-from select_contracts import check_decision_client, check_embedder, check_text_client
+from select_contracts import check_decision_client, check_embedder, check_machine_probe, check_text_client
 
 pytestmark = pytest.mark.e2e
 OLLAMA = "http://127.0.0.1:11434"
@@ -91,6 +91,20 @@ def test_ac17_gpu_leases(isolated, monkeypatch: pytest.MonkeyPatch) -> None:
     check_gpu_lease(mk.gpu.FileLockGpuLease(isolated / "gpu.lock"))
 
 
+def test_ac17_machine_probe(isolated, monkeypatch: pytest.MonkeyPatch) -> None:
+    """hone-select's `MachineProbe` checker against `mk.machine.MACHINE` and the entry point's factory."""
+    monkeypatch.setenv("HONE_GPU_LOCK", str(isolated / "gpu.lock"))  # never the machine-wide lock
+    gpu = {"index": 0, "name": "Fake GPU", "memory_total_mb": 8192, "memory_used_mb": 0, "utilization_pct": 0}
+    monkeypatch.setattr(mk.machine.MACHINE, "gpus", lambda: [gpu])  # no real GPU readings
+    monkeypatch.setattr(mk.machine.MACHINE, "processes", dict)
+    monkeypatch.setattr(mk.gpu.GPU, "memory", lambda: None)
+    loaded = {"models": [{"name": "x:latest", "size": 1, "size_vram": 1}]}
+    with FakeOllama(responder=lambda path, body: loaded if path == "/api/ps" else None):
+        check_machine_probe(mk.machine.MACHINE)
+        (ep,) = [ep for ep in entry_points(group="hone.machine_probes") if ep.name == "hone_models"]
+        check_machine_probe(ep.load()(gpus=lambda: None, processes=dict, sink=mk.records.NullSink()))
+
+
 def test_ac17_record_sinks(isolated) -> None:
     sqlite = mk.records.SqliteSpanSink(isolated / "s.db")
     check_record_sink(sqlite, lambda: mk.records.read_spans(isolated / "s.db"))
@@ -119,6 +133,7 @@ def test_ac17_replayer() -> None:
         ("hone.embedders", mk.embedder),
         ("hone.gpu_leases", mk.gpu.GPU),
         ("hone.replayers", mk.replay.Replayer),
+        ("hone.machine_probes", mk.machine.Machine),
     ],
 )
 def test_ac17_entry_points(group, expected) -> None:

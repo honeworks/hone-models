@@ -11,10 +11,12 @@ import gc
 import importlib
 import os
 from collections.abc import Callable
+from typing import Any
 
 import httpx
 
-from .errors import CapabilityError, ProviderError
+from ._gpu_locks import machine_lock_path, probe_lock
+from .errors import CapabilityError, ConfigError, ProviderError
 from .providers import ollama
 from .records import log
 
@@ -61,6 +63,24 @@ def torch_empty_cache() -> None:
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+
+
+IF_BUSY = ("block", "unload")
+
+
+def check_if_busy(if_busy: str) -> str:
+    """`if_busy` itself, or `ConfigError` for a value other than "block" and "unload"."""
+    if if_busy not in IF_BUSY:
+        raise ConfigError(f"if_busy must be one of {list(IF_BUSY)}, not {if_busy!r}")
+    return if_busy
+
+
+def busy_elsewhere(leases: list[dict[str, Any]]) -> bool:
+    """True when another process holds one of `leases` or the machine-wide GPU lock (change 0016)."""
+    if any(int(e["pid"]) != os.getpid() for e in leases):
+        return True
+    lock = probe_lock(machine_lock_path())
+    return bool(lock["held"]) and not lock["mine"]
 
 
 def unload_idle(unload_others: bool) -> list[str]:

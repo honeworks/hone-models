@@ -1,14 +1,49 @@
-"""The two simple GPU lease shapes (design/current.md §7): one that never waits, one exclusive lock."""
+"""The two simple GPU lease shapes (design/current.md §7): one that never waits, one exclusive lock; and
+a look at the machine-wide lock of `scripts/gpu-lock.sh` (change 0016)."""
 
 from __future__ import annotations
 
+import contextlib
 import fcntl
+import os
 import threading
 import time
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager, nullcontext
 from pathlib import Path
-from typing import IO
+from typing import IO, Any
+
+MACHINE_LOCK = "/tmp/honeworks-gpu.lock"  # noqa: S108 - the machine-wide lock of scripts/gpu-lock.sh
+
+
+def machine_lock_path() -> Path:
+    """The machine-wide GPU lock file: `HONE_GPU_LOCK`, else `/tmp/honeworks-gpu.lock` (as gpu-lock.sh)."""
+    return Path(os.environ.get("HONE_GPU_LOCK") or MACHINE_LOCK)
+
+
+def probe_lock(path: Path) -> dict[str, Any]:
+    """`{"path", "held", "mine", "holder"}` for the lock file at `path`, without keeping it.
+
+    `held` comes from a non-blocking `flock` released at once (`None` when the file cannot be opened; a
+    missing file is not held); `mine` from `HONE_GPU_LOCK_HELD=1` (our own gpu-lock.sh holds it); `holder`
+    from `<path>.holder`, read only when held because a killed run can leave it behind."""
+    state: dict[str, Any] = {"path": str(path), "held": False, "mine": False, "holder": None}
+    try:
+        with path.open("rb") as fh:
+            try:
+                fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fh, fcntl.LOCK_UN)
+                return state
+            except BlockingIOError:
+                state["held"] = True
+    except FileNotFoundError:
+        return state
+    except OSError:
+        return {**state, "held": None, "mine": None}
+    state["mine"] = os.environ.get("HONE_GPU_LOCK_HELD") == "1"
+    with contextlib.suppress(OSError):  # no holder file: the holder is unknown
+        state["holder"] = Path(f"{path}.holder").read_text(encoding="utf-8").strip() or None
+    return state
 
 
 class NullGpuLease:

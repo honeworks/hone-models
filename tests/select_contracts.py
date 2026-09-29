@@ -58,6 +58,20 @@ def check_embedder(e: Any) -> None:
     assert e.embed([]) == []
 
 
+def check_machine_probe(probe: Any) -> None:
+    """hone-select 0010's `MachineProbe`: `snapshot()` returns a mapping of the documented shape and
+    `prepare([])` returns a mapping."""
+    snap = probe.snapshot()
+    assert isinstance(snap, _Mapping)
+    assert {"gpus", "servers", "loaded_models"} <= set(snap)
+    assert snap["gpus"] is None or all(
+        "memory_total_gb" in g and "utilization_pct" in g for g in snap["gpus"]
+    )
+    assert all(s["running"] in (True, False, None) for s in snap["servers"])
+    assert all({"server", "name", "model_id", "size_gb", "vram_gb"} <= set(m) for m in snap["loaded_models"])
+    assert isinstance(probe.prepare([]), _Mapping)
+
+
 # Prefer the owner's checkers when hone-select is installed.
 try:
     _owner: Any = importlib.import_module("hone_select.testing.contracts")
@@ -67,5 +81,6 @@ if _owner is not None:
     check_text_client = _owner.check_text_client
     check_decision_client = _owner.check_decision_client
     check_embedder = _owner.check_embedder
+    check_machine_probe = getattr(_owner, "check_machine_probe", check_machine_probe)
 
-__all__ = ["check_decision_client", "check_embedder", "check_text_client"]
+__all__ = ["check_decision_client", "check_embedder", "check_machine_probe", "check_text_client"]

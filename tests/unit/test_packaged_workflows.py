@@ -20,8 +20,6 @@ PROVEN = {
     "ace-step-1.5-xl-sft",
     "minimax-music3",
     "yue2-3b",
-    "heartmula-3b",
-    "heartmula-rl-3b",
     "stable-audio-open-1.0",
     "wan2.2-i2v-14b",
     "wan2.2-ti2v-5b",

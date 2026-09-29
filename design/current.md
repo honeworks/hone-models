@@ -266,8 +266,8 @@ it applies emotion and intensity in `capabilities.expressive`.
   runs the program it names.
 - **Common formats and prompt inputs** (0015 §3a). `lyrics` has one common format (section tags such as
   `[verse]`, `[chorus]` on their own line, then one sung line per line); `lyrics_format` names how an entry
-  gets it: `sections` (as is), `levo` (SongGeneration's `[verse] line. line. ; [chorus] ...`) or `plain`
-  (tags removed), converted by the media client before the provider sees it (`hone_models.formats`).
+  gets it: `sections` (as is), `levo` (SongGeneration's `[verse] line. line. ; [chorus] ...`), `heartmula`
+  (HeartMuLa's `[Verse]`, `[Prechorus]` markers, a blank line between sections) or `plain` (tags removed), converted by the media client before the provider sees it (`hone_models.formats`).
   `prompt_inputs.<name>` (`place` `append` / `prepend`, `choices` value -> phrase) are named inputs the
   entry accepts that end up as words in the prompt; an unknown value raises `ConfigError` listing the
   choices.
@@ -740,13 +740,12 @@ copies an entry.
   unloads another process can load a model or take a lease (the state after is read again).
   `FileLockGpuLease` writes no `.holder` file, so a Python holder of the lock shows as `holder: None`.
 - No streaming, async clients or `hone.models.timing.*` attributes. Generation runs through ComfyUI,
-  hosted OpenAI-compatible images and video and `command` projects (SongGeneration); transcription runs
+  hosted OpenAI-compatible images and video and `command` projects (SongGeneration, HeartMuLa); transcription runs
   in-process through faster-whisper; hosted transcription is a later step of
   [0015](changes/0015-generation-models.md). ComfyUI jobs report no progress (its HTTP API has none).
 - Only the ComfyUI models installed on the reference machine have packaged workflows (D-070); the other
-  catalog entries say "no workflow yet" until theirs is written and proven with `models check`. HeartMuLa's
-  workflows fail inside its custom node with ComfyUI's transformers 5, so its `vram_gb` is not measured
-  (D-073). `vram_gb` is measured on one 8 GB card with ComfyUI's `--reserve-vram 1.5`, where the large
+  catalog entries say "no workflow yet" until theirs is written and proven with `models check`. HeartMuLa
+  runs through heartlib in its own environment (`command`), not its ComfyUI node (D-073). `vram_gb` is measured on one 8 GB card with ComfyUI's `--reserve-vram 1.5`, where the large
   models fill the card and offload; the tiny checks prove that a workflow runs, not how well. A few catalog
   facts are unverified (D-067). Guides are checked by hand (`models guide --stale`).
 - The `speech` extra (Kokoro) needs Python < 3.13 and loads the model on every call (about a second)

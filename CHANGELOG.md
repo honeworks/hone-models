@@ -16,14 +16,18 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
   machine snapshot checks only ComfyUI servers of entries that have a workflow
   ([decisions.md](design/decisions.md) D-066, D-067). With the packaged workflows it now checks the local
   ComfyUI on every machine (D-074). A seed hone-models picks is below 2^31 (D-071).
+- `heartmula-3b` and `heartmula-rl-3b` run through the `command` provider with heartlib in its own
+  Python 3.10 environment (`HONE_HEARTLIB_DIR`) and the new `heartmula` adapter, instead of the ComfyUI
+  node that fails with transformers 5; their workflows are removed. The checkpoints stay in ComfyUI's
+  model folder (`defaults.checkpoints`); `low_mem` (4-bit HeartMuLa, HeartCodec's flow matching off the
+  GPU before decoding) fits an 8 GB card; new lyrics format `heartmula` (D-073, D-076).
 
 ### Added
 - Packaged ComfyUI workflows (`hone_models/data/workflows/<id>.json`) for every ComfyUI model installed on
   the reference machine: `z-image-turbo`, `ace-step-1.5-turbo` / `-xl-turbo` / `-xl-sft`,
-  `minimax-music3`, `yue2-3b`, `heartmula-3b`, `heartmula-rl-3b`, `stable-audio-open-1.0`,
+  `minimax-music3`, `yue2-3b`, `stable-audio-open-1.0`,
   `wan2.2-i2v-14b` (lightx2v, 4 steps), `wan2.2-ti2v-5b` and `ltx-video-2b-0.9.5`, each entry with its
-  `inputs`, `outputs`, `defaults` and a measured `vram_gb` (D-070; HeartMuLa's node fails in ComfyUI's
-  environment here, D-073). A file input mapped to a list of slots is optional (D-071).
+  `inputs`, `outputs`, `defaults` and a measured `vram_gb` (D-070). A file input mapped to a list of slots is optional (D-071).
   `hone-models models check <id> [--out DIR]` runs a tiny job for image, music and video entries in a
   session and reports the file and the peak GPU memory (D-072). AC-30 runs for real: an image and a song
   through ComfyUI and a transcription; a slow real test runs every installed entry's tiny job

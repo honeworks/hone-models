@@ -218,81 +218,81 @@ examples = ["[verse]\nNeon on the water\n[chorus]\nWe run until the morning"]
 source = "https://huggingface.co/m-a-p/YuE2-3B"
 
 [models."heartmula-3b"]
-provider = "comfyui"
+provider = "command"
 kind = "music"
-workflow = "workflows/heartmula-3b.json"
-outputs = ["5"]
-defaults = { duration_s = 60 }
-lyrics_format = "sections"
-[models."heartmula-3b".inputs]
-prompt = "9.tags"
-lyrics = "9.lyrics"
-seed = "7.seed"
-duration_s = "7.max_duration_sec"
+command = ["$HONE_HEARTLIB_DIR/.venv/bin/python", "{adapter:heartmula}", "{request}"]
+# checkpoints: heartlib's ckpt folder, relative to ComfyUI's model folder ($HONE_COMFYUI_DIR, else ~/ComfyUI)
+defaults = { duration_s = 60, checkpoints = "HeartMuLa", checkpoint = "HeartMuLa-oss-3B", codec = "HeartCodec-oss-20260123", low_mem = true }
+lyrics_format = "heartmula"
 [models."heartmula-3b".capabilities]
-vram_gb = 6.0  # not measured: the node's ultra mode; its loader fails here (D-073)
+vram_gb = 6.7
+max_duration_s = 240
 license = "Apache-2.0"
 commercial_use = true
 [models."heartmula-3b".install]
 source = "https://huggingface.co/HeartMuLa/HeartMuLa-oss-3B"
+repo = "https://github.com/HeartMuLa/heartlib"
+setup = ["python3.10 -m venv .venv", ".venv/bin/pip install -e ."]
 files = [
-  { repo = "HeartMuLa/HeartMuLa-oss-3B", to = "heartmula/HeartMuLa-oss-3B" },
-  { repo = "HeartMuLa/HeartCodec-oss-20260123", to = "heartmula/HeartCodec-oss" },
-  { repo = "HeartMuLa/HeartMuLaGen", to = "heartmula" },
+  { repo = "HeartMuLa/HeartMuLaGen", to = "HeartMuLa" },
+  { repo = "HeartMuLa/HeartMuLa-oss-3B", to = "HeartMuLa/HeartMuLa-oss-3B" },
+  { repo = "HeartMuLa/HeartCodec-oss-20260123", to = "HeartMuLa/HeartCodec-oss-20260123" },
 ]
+dir_env = "HONE_HEARTLIB_DIR"
+check = "test -x .venv/bin/python"
 size_gb = 22.4
 tier = 2
-note = "custom node ComfyUI_FL-HeartMuLa, which reads one 3B folder (heartmula/HeartMuLa-oss-3B): whichever of the base and RL weights is there is the model that runs"
+note = "heartlib in its own Python 3.10 environment; the weights go into ComfyUI's model folder (where the ComfyUI node kept them); low_mem: 4-bit HeartMuLa for 8 GB cards"
 [models."heartmula-3b".guide]
-summary = "Songs with vocals from lyrics and style tags (HeartMuLa 3B, custom node). Its ComfyUI node does not load with transformers 5 (D-073)."
-prompt = "Comma-separated style tags: genre, vocal, mood, tempo, instruments (e.g. 'indie rock, male vocal, melancholic, slow, acoustic guitar')."
-inputs = { lyrics = "section tags; the node's own markers are [Intro], [Verse], [Prechorus], [Chorus], [Bridge], [Outro], [Instrumental]" }
+summary = "Songs with vocals from lyrics and style tags (HeartMuLa 3B, the first release), run by heartlib in its own environment."
+prompt = "Comma-separated style tags: genre, vocal, mood, tempo, instruments (e.g. 'indie rock, male vocal, melancholic, slow, acoustic guitar'); spaces after the commas are removed, as heartlib wants."
+inputs = { lyrics = "the common format; [pre-chorus] becomes HeartMuLa's [Prechorus] and [inst] [Instrumental], a blank line between sections", duration_s = "the longest the song may be; it ends earlier when the model ends the song" }
 source = "https://github.com/HeartMuLa/heartlib"
 checked = 2026-09-29
 [[models."heartmula-3b".guide.features]]
 name = "lyrics"
 how = "Sings the lyrics input with section markers."
 input = "lyrics"
-examples = ["[Verse]\nWalking down the empty street\n[Chorus]\nWe belong together"]
+examples = ["[intro]\n[verse]\nWalking down the empty street\n[chorus]\nWe belong together\n[outro]"]
 source = "https://github.com/HeartMuLa/heartlib"
 
 [models."heartmula-rl-3b"]
-provider = "comfyui"
+provider = "command"
 kind = "music"
-workflow = "workflows/heartmula-rl-3b.json"
-outputs = ["5"]
-defaults = { duration_s = 60 }
-lyrics_format = "sections"
-[models."heartmula-rl-3b".inputs]
-prompt = "9.tags"
-lyrics = "9.lyrics"
-seed = "7.seed"
-duration_s = "7.max_duration_sec"
+command = ["$HONE_HEARTLIB_DIR/.venv/bin/python", "{adapter:heartmula}", "{request}"]
+# checkpoints: heartlib's ckpt folder, relative to ComfyUI's model folder ($HONE_COMFYUI_DIR, else ~/ComfyUI)
+defaults = { duration_s = 60, checkpoints = "HeartMuLa", checkpoint = "HeartMuLa-RL-oss-3B-20260123", codec = "HeartCodec-oss-20260123", low_mem = true }
+lyrics_format = "heartmula"
 [models."heartmula-rl-3b".capabilities]
-vram_gb = 6.0  # not measured: the node's ultra mode; its loader fails here (D-073)
+vram_gb = 6.7
+max_duration_s = 240
 license = "Apache-2.0"
 commercial_use = true
 [models."heartmula-rl-3b".install]
 source = "https://huggingface.co/HeartMuLa/HeartMuLa-RL-oss-3B-20260123"
+repo = "https://github.com/HeartMuLa/heartlib"
+setup = ["python3.10 -m venv .venv", ".venv/bin/pip install -e ."]
 files = [
-  { repo = "HeartMuLa/HeartMuLa-RL-oss-3B-20260123", to = "heartmula/HeartMuLa-oss-3B" },
-  { repo = "HeartMuLa/HeartCodec-oss-20260123", to = "heartmula/HeartCodec-oss" },
-  { repo = "HeartMuLa/HeartMuLaGen", to = "heartmula" },
+  { repo = "HeartMuLa/HeartMuLaGen", to = "HeartMuLa" },
+  { repo = "HeartMuLa/HeartMuLa-RL-oss-3B-20260123", to = "HeartMuLa/HeartMuLa-RL-oss-3B-20260123" },
+  { repo = "HeartMuLa/HeartCodec-oss-20260123", to = "HeartMuLa/HeartCodec-oss-20260123" },
 ]
+dir_env = "HONE_HEARTLIB_DIR"
+check = "test -x .venv/bin/python"
 size_gb = 22.4
 tier = 1
-note = "the RL-tuned HeartMuLa; the custom node reads it from heartmula/HeartMuLa-oss-3B (a link to it on this machine)"
+note = "the RL-tuned HeartMuLa (closer to the style tags); heartlib in its own Python 3.10 environment; low_mem: 4-bit HeartMuLa for 8 GB cards"
 [models."heartmula-rl-3b".guide]
-summary = "HeartMuLa 3B after reinforcement learning: songs with vocals from lyrics and style tags. Its ComfyUI node does not load with transformers 5 (D-073)."
-prompt = "Comma-separated style tags: genre, vocal, mood, tempo, instruments."
-inputs = { lyrics = "section tags; the node's own markers are [Intro], [Verse], [Prechorus], [Chorus], [Bridge], [Outro], [Instrumental]" }
+summary = "HeartMuLa 3B after reinforcement learning: songs with vocals from lyrics and style tags, run by heartlib in its own environment."
+prompt = "Comma-separated style tags: genre, vocal, mood, tempo, instruments (e.g. 'indie rock, male vocal, melancholic, slow, acoustic guitar'); spaces after the commas are removed, as heartlib wants."
+inputs = { lyrics = "the common format; [pre-chorus] becomes HeartMuLa's [Prechorus] and [inst] [Instrumental], a blank line between sections", duration_s = "the longest the song may be; it ends earlier when the model ends the song" }
 source = "https://github.com/HeartMuLa/heartlib"
 checked = 2026-09-29
 [[models."heartmula-rl-3b".guide.features]]
 name = "lyrics"
 how = "Sings the lyrics input with section markers."
 input = "lyrics"
-examples = ["[Verse]\nWalking down the empty street\n[Chorus]\nWe belong together"]
+examples = ["[intro]\n[verse]\nWalking down the empty street\n[chorus]\nWe belong together\n[outro]"]
 source = "https://github.com/HeartMuLa/heartlib"
 
 [models."stable-audio-open-1.0"]

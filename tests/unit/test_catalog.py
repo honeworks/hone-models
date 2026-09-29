@@ -202,6 +202,32 @@ def test_packaged_catalog_has_no_machine_paths_and_marks_non_commercial_models()
     ]
 
 
+def test_heartmula_runs_in_heartlibs_own_environment(isolated: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    reg = mk.registry.load()
+    checkpoints = {"heartmula-3b": "HeartMuLa-oss-3B", "heartmula-rl-3b": "HeartMuLa-RL-oss-3B-20260123"}
+    for model_id, checkpoint in checkpoints.items():
+        cfg = reg.models[model_id]
+        assert (cfg.provider, cfg.workflow, cfg.lyrics_format) == ("command", None, "heartmula")
+        assert cfg.command == ["$HONE_HEARTLIB_DIR/.venv/bin/python", "{adapter:heartmula}", "{request}"]
+        assert cfg.defaults["checkpoint"] == checkpoint
+        assert cfg.install is not None
+        assert cfg.install.dir_env == "HONE_HEARTLIB_DIR"
+    project = isolated / "heartlib"
+    monkeypatch.setenv("HONE_HEARTLIB_DIR", str(project))
+    commands = catalog.install_commands(reg.models["heartmula-rl-3b"])
+    assert commands[-3:] == [
+        f"git clone https://github.com/HeartMuLa/heartlib {project}",
+        f"cd {project} && python3.10 -m venv .venv",
+        f"cd {project} && .venv/bin/pip install -e .",
+    ]
+    assert any("HeartMuLa-RL-oss-3B-20260123 --local-dir" in c for c in commands)
+    assert catalog.installed(reg.models["heartmula-rl-3b"]) == "no"
+    (project / ".venv" / "bin").mkdir(parents=True)
+    (project / ".venv" / "bin" / "python").write_text("#!/bin/sh\n")
+    (project / ".venv" / "bin" / "python").chmod(0o755)
+    assert catalog.installed(reg.models["heartmula-rl-3b"]) == "yes"
+
+
 def test_scoring_entries_cannot_be_called() -> None:
     with pytest.raises(ConfigError, match="no client for kind 'scoring' yet"):
         mk.speech("htdemucs")

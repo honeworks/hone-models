@@ -1,6 +1,7 @@
 # Test entries for the `command` provider (tests/e2e/test_ac27_command_provider.py). The variables are
 # set by the tests: HONE_TEST_PYTHON (the test interpreter), HONE_FAKE_PROJECT_DIR (this folder),
-# HONE_FAKE_SEEN (where the fake project reports what it saw), HONE_FAKE_LEVO_DIR (a fake LeVo project).
+# HONE_FAKE_SEEN (where the fake project reports what it saw), HONE_FAKE_LEVO_DIR (a fake LeVo project),
+# HONE_FAKE_HEARTLIB_DIR (a fake heartlib), HONE_FAKE_COMFYUI_DIR (a folder with fake checkpoints).
 
 [models."test-song"]
 provider = "command"
@@ -26,3 +27,15 @@ defaults = { generate_type = "mixed", low_mem = true }
 dir_env = "HONE_FAKE_LEVO_DIR"
 [models."test-levo".capabilities]
 vram_gb = 7.5
+
+[models."test-heartmula"]
+provider = "command"
+kind = "music"
+command = ["$HONE_TEST_PYTHON", "{adapter:heartmula}", "{request}"]
+env = { PYTHONPATH = "${HONE_FAKE_HEARTLIB_DIR}", HONE_COMFYUI_DIR = "${HONE_FAKE_COMFYUI_DIR}" }
+defaults = { duration_s = 60, checkpoints = "HeartMuLa", checkpoint = "HeartMuLa-RL-oss-3B-20260123", codec = "HeartCodec-oss-20260123", low_mem = true }
+lyrics_format = "heartmula"
+[models."test-heartmula".install]
+dir_env = "HONE_FAKE_HEARTLIB_DIR"
+[models."test-heartmula".capabilities]
+vram_gb = 6.8

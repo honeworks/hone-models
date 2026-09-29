@@ -1,10 +1,11 @@
-"""Every installed ComfyUI entry of the packaged catalog runs its tiny job (`hone-models models check`):
-an output of the right kind, and the GPU memory given back afterwards. Slow (the video models take
-minutes); run by hand when ComfyUI, a workflow or the catalog changes.
+"""Every installed ComfyUI and `command` entry of the packaged catalog runs its tiny job (`hone-models
+models check`): an output of the right kind, and the GPU memory given back afterwards. Slow (the video
+models take minutes); run by hand when ComfyUI, a workflow, an adapter or the catalog changes.
 
 Run: scripts/gpu-lock.sh uv run pytest -m "gpu and slow" tests/gpu/test_real_comfyui_models.py
 ComfyUI as for AC-30 (tests/gpu/test_ac30_real_generation.py): a running server is used and freed, else
-`HONE_COMFYUI_START` starts one per entry and stops it afterwards.
+`HONE_COMFYUI_START` starts one per entry and stops it afterwards. A `command` entry runs when its project
+variable is set (HeartMuLa: `HONE_HEARTLIB_DIR`) and needs no ComfyUI.
 """
 
 from pathlib import Path
@@ -18,33 +19,25 @@ from hone_models import _media_check
 pytestmark = [pytest.mark.gpu, pytest.mark.comfyui, pytest.mark.slow]
 MIMES = {"image": "image/", "music": "audio/", "video": "video/"}
 MARGIN_MB = 512
-# Entries whose ComfyUI node fails on the reference machine for a reason outside hone-models (D-073).
-KNOWN_FAILURES = {
-    "heartmula-3b": "the HeartMuLa node's loader fails with transformers 5 (HeartCodec buffer shapes)",
-    "heartmula-rl-3b": "the HeartMuLa node's loader fails with transformers 5 (HeartCodec buffer shapes)",
-}
 
 
-def installed_entries() -> list[object]:
-    """The packaged ComfyUI entries with a workflow whose files are on this machine."""
+def installed_entries() -> list[str]:
+    """The packaged ComfyUI entries with a workflow, and the `command` entries, installed on this machine."""
     reg = mk.registry.load()
     with pytest.MonkeyPatch.context() as patch:
         patch.setenv("HONE_COMFYUI_DIR", COMFYUI_DIR)
         checker = mk.catalog.Checker()
-        found = [m.id for m in reg.models.values() if m.provider == "comfyui" and m.workflow]
-        ids = sorted(m for m in found if checker.installed(reg.get(m)) == "yes")
-    return [
-        pytest.param(m, marks=pytest.mark.xfail(reason=KNOWN_FAILURES[m], strict=False))
-        if m in KNOWN_FAILURES
-        else m
-        for m in ids
-    ]
+        found = [m.id for m in reg.models.values() if m.workflow or (m.provider == "command" and m.command)]
+        return sorted(m for m in found if checker.installed(reg.get(m)) == "yes")
 
 
 @pytest.mark.parametrize("model_id", installed_entries())
 def test_tiny_job(model_id: str, gpu_lock, real_out: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    use_real_comfyui(monkeypatch)
     cfg = mk.registry.load().get(model_id)
+    if cfg.provider == "comfyui":
+        use_real_comfyui(monkeypatch)
+    else:
+        monkeypatch.setenv("HONE_COMFYUI_DIR", COMFYUI_DIR)  # where HeartMuLa's checkpoints are
     client = {"image": mk.image, "music": mk.music, "video": mk.video}[cfg.kind](
         model_id, sink=mk.records.NullSink()
     )

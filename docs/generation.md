@@ -231,19 +231,27 @@ large model takes minutes.
 | `minimax-music3` | `lyrics`, `duration_s` (the longest it may be), `steps` | 60 s, 30 steps | 10 s song | 66 s | 6.2 GB |
 | `yue2-3b` | `lyrics`, `duration_s`, `steps` | 120 s, 32 steps | 10 s song | 16 s | 3.9 GB |
 | `stable-audio-open-1.0` | `negative`, `duration_s`, `steps` | 30 s, 50 steps | 10 s clip | 5 s | 3.3 GB (5.6 GB for 47 s) |
-| `heartmula-3b`, `heartmula-rl-3b` | `lyrics`, `duration_s` | 60 s | fails in the node's loader here (below) | | not measured |
 | `wan2.2-i2v-14b` | `image` (required), `negative`, `size`, `duration_s` (16 fps) | 640x640, 5 s | 1 s, 256x256 | 25 s | 6.4 GB |
 | `wan2.2-ti2v-5b` | `image` (optional), `negative`, `size`, `duration_s` (24 fps), `steps` | 1280x704, 5 s, 20 steps | 1 s, 256x256 | 19 s | 6.4 GB |
 | `ltx-video-2b-0.9.5` | `image` (required), `negative`, `size`, `duration_s` (24 fps), `steps` | 768x512, 4 s, 30 steps | 1 s, 256x256 | 10 s | 6.3 GB |
 
 - Wan 2.2 I2V-14B runs with the lightx2v LoRAs (4 steps); its two 14 GB experts are offloaded to system
   RAM, so do not run it next to another large job.
-- HeartMuLa: the workflows are in place and ComfyUI accepts them, but the custom node's loader fails in
-  ComfyUI's own environment (transformers 5 refuses HeartCodec's checkpoint), so a call returns a failed
-  result; the node also reads one model folder for both entries. See D-073 in
-  [decisions.md](../design/decisions.md).
+- HeartMuLa no longer runs through ComfyUI: its node fails with ComfyUI's transformers 5 (D-073), so
+  both entries are `command` entries (below).
 - Differences from ComfyUI's templates (LTX's start-frame strength and frame rate, the save nodes, and
   more) are listed in D-070.
+
+The packaged `command` models, proven the same way on the same card (without ComfyUI; the whole card's
+peak, with the model loaded from the page cache):
+
+| Entry | Takes besides `prompt`, `seed` | Defaults | Tiny job | Time | Peak VRAM |
+|---|---|---|---|---|---|
+| `heartmula-3b`, `heartmula-rl-3b` | `lyrics`, `duration_s` (the longest it may be) | 60 s, `low_mem` | 10 s song | 38-39 s | 6.7 GB |
+
+- HeartMuLa runs through heartlib in its own environment (`HONE_HEARTLIB_DIR`); with `low_mem` HeartMuLa
+  is 4-bit and the peak is HeartCodec's fp32 decoding. On the reference machine only the RL weights are
+  installed and `HeartMuLa-oss-3B` links to them, so both entries made the same file there (D-076).
 
 **Proving a workflow: `hone-models models check <id>`.** For an image, music or video entry the command
 runs one tiny job in a session (so with `HONE_COMFYUI_START` set it starts ComfyUI when nothing answers,
@@ -327,7 +335,8 @@ r.job_id, r.cost_usd, r.cost_estimated  # 'video_...', 0.8, True
 
 ## Standalone projects (`command` entries)
 
-Some models ship as research code with their own Python, torch and scripts (SongGeneration, DiffRhythm2):
+Some models ship as research code with their own Python, torch and scripts (SongGeneration, HeartMuLa,
+DiffRhythm2):
 importing them would break the caller's environment. A `command` entry runs one job as a subprocess in
 the project's own environment instead, through a small file protocol. The process exit frees the GPU
 memory, so there is no unload step; the call holds a GPU lease for the entry's `vram_gb` while it runs.
@@ -346,7 +355,7 @@ vram_gb = 7.5
 ```
 
 - `command` is a list. `{request}` is the path of the job's `request.json`, `{out_dir}` the folder the
-  program writes into, `{adapter:<name>}` a script shipped in `hone_models/data/adapters/` (`levo2`).
+  program writes into, `{adapter:<name>}` a script shipped in `hone_models/data/adapters/` (`levo2`, `heartmula`).
   `~`, `$VAR` and `${VAR}` are expanded in `command`, `cwd` and the `env` values; an unset variable is a
   `ConfigError` naming it.
 - `install.dir_env` names the project folder variable: when it is unset or not a folder the call raises
@@ -405,6 +414,18 @@ and `low_mem`, `flash_attn` (default off) and `checkpoint` (default `songgenerat
 `defaults`, and runs the same generation as `generate.sh <checkpoint> <jsonl> <out_dir> --low_mem
 --not_use_flash_attn`. Test an adapter's conversion by calling its functions directly, and the whole
 chain with a fake project folder (see `tests/integration/test_levo2_command.py`).
+
+`heartmula.py` runs HeartMuLa with heartlib (`HONE_HEARTLIB_DIR`, a clone with its own Python 3.10
+`.venv`): the prompt becomes heartlib's tags (comma-separated, without spaces), `lyrics` arrives in
+HeartMuLa's section form, `duration_s` is the longest the song may be (`max_audio_length_ms`; the model may
+end it earlier), and `topk`, `temperature`, `cfg_scale` come from `defaults` (heartlib's 50, 1.0, 1.5).
+The checkpoints are heartlib's `ckpt` layout (`tokenizer.json`, `gen_config.json`, the HeartMuLa and
+HeartCodec folders named by `defaults.checkpoint` and `defaults.codec`) in `defaults.checkpoints`: an
+absolute path, or a path relative to ComfyUI's model folder (`$HONE_COMFYUI_DIR/models`, else
+`~/ComfyUI/models`, where the ComfyUI node kept the same files), `HeartMuLa` by default. `low_mem` (on in
+the catalog) fits an 8 GB card: HeartMuLa in 4-bit (NF4) and HeartCodec's flow-matching part moved to the
+CPU before the waveform is decoded. It writes a 48 kHz stereo FLAC itself (heartlib's own save needs
+`torchcodec` with torchaudio 2.9 and later).
 
 A command entry run end to end, with a tiny program in place of a project:
 

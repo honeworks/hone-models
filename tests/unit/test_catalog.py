@@ -31,6 +31,7 @@ FILES = {"files": [{"repo": "org/r", "file": "a/b/x.safetensors", "to": "diffusi
 def test_comfyui_answer_comes_from_the_server_without_a_folder(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("HONE_COMFYUI_DIR")  # ~/ComfyUI does not exist in the test HOME
     monkeypatch.delenv("HONE_COMFYUI_URL", raising=False)
+    monkeypatch.setattr("hone_models.registry.COMFYUI_URL", COMFY)  # the real default (respx answers)
     cfg = entry(install=FILES)
     info = {"UNETLoader": {"input": {"required": {"unet_name": [["x.safetensors", "y.gguf"], {}]}}}}
     with respx.mock(base_url=COMFY) as mock:

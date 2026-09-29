@@ -92,6 +92,7 @@ def test_comfyui_url_and_local(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     text = (
         '[models.a]\nprovider = "comfyui"\nkind = "image"\n[models.b]\nprovider = "comfyui"\nkind = "image"\n'
     )
+    monkeypatch.setattr("hone_models.registry.COMFYUI_URL", "http://127.0.0.1:8188")  # the real default
     reg = registry(tmp_path, text + 'base_url = "http://gpu-box:8188/"\n')
     assert reg.get("a").comfyui_url == "http://127.0.0.1:8188"
     assert (reg.get("b").comfyui_url, reg.get("b").local) == ("http://gpu-box:8188", False)

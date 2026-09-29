@@ -43,6 +43,7 @@ def isolated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.delenv("HONE_CAPTURE_CONTENT", raising=False)
     monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    monkeypatch.delenv("HONE_ENV_FILE", raising=False)
     monkeypatch.setenv("HONE_COMFYUI_DIR", str(tmp_path / "no-comfyui"))  # installed checks stay offline
     for module in ("registry", "providers._comfyui_server", "_machine_read"):  # never a real ComfyUI
         monkeypatch.setattr(f"hone_models.{module}.COMFYUI_URL", "http://127.0.0.1:9")  # port 9: discard

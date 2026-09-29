@@ -39,10 +39,11 @@ has `POST /prompt` (queue a job, validation errors come back as `node_errors`), 
 `POST /upload/image` (store an input file), `POST /free` and `GET /system_stats`. It has no endpoint that
 names its loaded models.
 
-Two parallel pieces of work depend on this one: [0016](0016-machine-state.md) (machine state, on its own
-branch) treats ComfyUI as one opaque server named `"comfyui"` because its models are not registry entries,
-and hone-select's experiments ([hone-select 0009](https://github.com/honeworks/hone-select/blob/main/design/changes/0009-experiments.md))
-want generation subjects that work like its prompt subject (`client = "hone_models:text"`).
+Two pieces of work build on this one: [0016](0016-machine-state.md) (machine state) names ComfyUI's models
+by registry id once they are registry entries, and hone-select's experiments
+([hone-select 0009](https://github.com/honeworks/hone-select/blob/main/design/changes/0009-experiments.md))
+want generation subjects that work like its prompt subject (`client = "hone_models:text"`) and need to
+know what each model can take (hone-select 0011).
 
 ## Problem
 
@@ -57,6 +58,11 @@ want generation subjects that work like its prompt subject (`client = "hone_mode
   source audio) or outputs that are files.
 - The inputs differ by model: a workflow node's name for "the prompt", lyrics formats, frame counts
   instead of seconds, fixed sizes and durations on hosted video.
+- What a model can do beyond the common inputs is written nowhere a program can read: the trigger phrases
+  of an add-on (the Multiple-Angles LoRA changes the camera angle only when the prompt holds one of its
+  phrases), a model's prompt style (ACE-Step wants comma-separated tags), its lyric section format, the
+  prompt recipes a hosted model is known for. The code that writes prompts, and the person or experiment
+  comparing models, have to guess.
 
 ## Options
 
@@ -100,7 +106,14 @@ client later.
 
 Proposed: API option 2, ComfyUI option 2, projects option 2, in-process faster-whisper. The design reuses
 what speech introduced (a kind, a provider table, a loaded engine, a lease per call or per session, a span
-per call, a fake) and adds one idea: **named inputs mapped onto a workflow**.
+per call, a fake) and adds two ideas: **named inputs mapped onto a workflow**, and **a guide per model**
+in the registry that says what the model can take (§3a).
+
+The principle (owner, 2026-09-29): everything about calling a model (its inputs and their formats, the
+adapters that reach it, starting and stopping what serves it, its GPU memory) belongs in hone-models.
+What to ask a model for (the story, the style, the camera angle, the words of a prompt) belongs to the app.
+Where one input can be written the same way for several models, hone-models converts it; where it cannot,
+the model's guide says how that model wants it.
 
 ### 1. Public API
 
@@ -150,7 +163,14 @@ with mk.session("comfyui"):                             # keep one ComfyUI serve
   `<stem>_1<suffix>`, `<stem>_2<suffix>`, ...; without a suffix, the provider's is used. Parent folders are
   created.
 - `MediaResult`: `files: list[MediaFile]`, `path` (the first file, or `None`), `model`, `seed`,
-  `error`, `span_id`, `job_id` (the provider's), `cost_usd` (`None` when unknown), `elapsed_s`.
+  `error`, `error_kind`, `span_id`, `job_id` (the provider's), `cost_usd` (`None` when unknown),
+  `cost_estimated`, `elapsed_s`, `license`, `commercial_use` (both from the registry, `None` when not
+  declared).
+- **A failed result says enough to decide what to do next** (owner): `error_kind` is one of
+  `out_of_memory` (retry later, smaller, or after freeing memory), `refused` (moderation or policy: change
+  the prompt), `invalid_input` (a value the model rejected while running: change the input), `no_output`
+  (the job finished without files) or `failed` (anything else), with the provider's message in `error`
+  and the job id kept, so a script can retry, fall back to another model or give up on its own terms.
   `MediaFile`: `path`, `sha256`, `bytes`, `mime`, `width`, `height`, `duration_s` (each `None` when
   unknown or not applicable, never 0). Images are measured with the header reader from 0013, WAV with
   `wave`, FLAC from its STREAMINFO block, anything else with `ffprobe` when it is on `PATH`.
@@ -165,6 +185,8 @@ with mk.session("comfyui"):                             # keep one ComfyUI serve
 - `mk.session("comfyui")` joins `mk.session("ollama")`: use the running server, else start it, stop on exit
   only what it started. `mk.unload(model_id)` for a ComfyUI entry sends `POST /free` (ComfyUI can only
   free everything at once; documented).
+- `mk.guide(model_id)` returns the model's `ModelGuide` (§3a); `mk.select(kind="image",
+  require={"features": ["camera angle"]})` finds the models that declare a feature.
 
 ### 2. Providers
 
@@ -189,22 +211,23 @@ with mk.session("comfyui"):                             # keep one ComfyUI serve
   into the subfolder `hone/` under their SHA-256 name, so a reference used for 40 shots is uploaded once,
   and this also works for a ComfyUI on another host. `references` maps to a list of slots (`LoadImage`
   nodes); a slot without a reference is removed from the copy of the workflow with the links to it, and
-  if a required input is then missing ComfyUI's own validation says so. Values are passed as given: the
-  model's vocabulary (ACE-Step's `keyscale`, LeVo's lyric tags) is the caller's.
+  if a required input is then missing ComfyUI's own validation says so. Inputs with a common format
+  (`lyrics`, prompt inputs such as `camera_angle`) are converted first (§3a); the rest are passed as given,
+  and the model's guide says what values it takes (ACE-Step's `keyscale`, for example).
 - *Outputs.* `outputs` lists the node ids whose files are the result (default: every file in the job's
   history). Each file is fetched with `GET /view` and written to `out`; nothing is moved inside ComfyUI.
 - *Job.* `POST /prompt` with a client id. A `400` with `node_errors` (missing node class, missing model
   file, a bad value) raises `ConfigError` naming the node and the input. Then `GET /history/{id}` is
   polled (1 s, then 2 s after the first minute; `/api/jobs/{id}` adds progress where the server has it)
   until the job is done. There is no websocket client, so no new dependency.
-- *Server.* A call uses the server at `base_url` if `GET /system_stats` answers. Otherwise, if
-  `HONE_COMFYUI_START` is set (a command line, e.g. `~/ai-stack/start_comfyui.sh --port 8188`), it is
-  started in the foreground as a child in its own process group, with the clean environment of
-  `mk.session("ollama")` (no `VIRTUAL_ENV`, `LD_LIBRARY_PATH`, `PYTHONPATH`, `PYTHONHOME`), and
-  waited on for up to `HONE_COMFYUI_START_S` (default 300 s). A server started by a call is stopped at the
-  end of the call; one started by `client.session()` or `mk.session("comfyui")` at the end of the block;
-  a server that was already running is never stopped. Without a server and without a start command, a
-  call raises `ProviderError` saying which variable to set. A remote `base_url` is never started.
+- *Server.* A call uses the server at `base_url` if `GET /system_stats` answers. **Only a session starts
+  one** (owner): `client.session()` or `mk.session("comfyui")`, when no server answers and
+  `HONE_COMFYUI_START` is set (a command line, e.g. `~/ai-stack/start_comfyui.sh --port 8188`), starts it
+  in the foreground as a child in its own process group, with the clean environment of
+  `mk.session("ollama")` (no `VIRTUAL_ENV`, `LD_LIBRARY_PATH`, `PYTHONPATH`, `PYTHONHOME`), waits up to
+  `HONE_COMFYUI_START_S` (default 300 s), and stops it at the end of the block. A plain call without a
+  running server raises `ProviderError` saying to start ComfyUI or to wrap the calls in a session. A
+  server that was already running is never stopped; a remote `base_url` is never started.
 - *Memory.* Outside a session a call ends with `POST /free`, as a speech call frees its model; inside a
   session the model stays loaded and is freed once at the end. When a client is first used, it registers
   the release hook `on_short("comfyui:<url>", comfyui_free(url))` ([0005](0005-release-hooks-for-other-gpu-servers.md)),
@@ -231,7 +254,9 @@ with mk.session("comfyui"):                             # keep one ComfyUI serve
   again** automatically: polling tolerates transient errors (up to 5 in a row, then `ProviderError` with
   the job id, so the caller can fetch it later), and a hosted job costs money.
 - Cost: the registry `price` gains `per_image` and `per_output_second`; `cost_usd` = images × `per_image`
-  or seconds × `per_output_second`; `None` without a price.
+  or seconds × `per_output_second`; `None` without a price. This is a **naive estimate** (owner: enough
+  for now): one flat price per entry, although hosted prices vary by size and quality. The result and the
+  span carry `cost_estimated = True`, and the code and docs say the estimate is naive.
 
 **`command`** (subprocess in the project's environment).
 
@@ -246,7 +271,8 @@ with mk.session("comfyui"):                             # keep one ComfyUI serve
 - hone-models ships one adapter script per project in `hone_models/data/adapters/` (`levo2.py` now,
   `diffrhythm2.py` later), each run with the project's own Python and importing only the standard library
   before handing over to the project: it converts `request.json` to the project's input (LeVo's JSONL
-  with `idx`, `gt_lyric`, `descriptions`; `--low_mem --not_use_flash_attn` from the entry's defaults), sets
+  with `idx`, `gt_lyric`, `descriptions`, the lyrics already converted to LeVo's section format by §3a;
+  `--low_mem --not_use_flash_attn` from the entry's defaults), sets
   the seeds the project does not take as options (Python, NumPy, torch), and writes `result.json`.
 - On timeout or cancellation the process group gets `SIGTERM`, then `SIGKILL` after 10 s. The process's
   exit frees its GPU memory; no unload step is needed.
@@ -265,8 +291,11 @@ wheels (how they are found is an implementation note for decisions.md, as for Ko
 `faster_whisper`. New entry keys: `workflow`, `inputs` (for `comfyui` a table of node paths; for the others
 a list of extra input names passed through as request fields), `outputs` (`comfyui`), `command`, `cwd`,
 `env` (`command`). New capabilities, all `None` when not declared (D-002): `max_references`, `sizes`,
-`max_duration_s`, `durations_s`, `word_timestamps`, `commercial_use` (so `require={"commercial_use": True}`
-keeps non-commercial models such as YuE2 out of published work; `license` stays the text). `vram_gb` is the
+`max_duration_s`, `durations_s`, `word_timestamps`, `commercial_use`, and `features` (the names of the
+guide's features, §3a, filled from the guide so selection can match them). `commercial_use` never blocks a
+call (owner): it is information, copied onto every result and span, and `require={"commercial_use": True}`
+keeps non-commercial models such as YuE2 out when a caller asks for that; `license` stays the text.
+A `guide` table and `lyrics_format` / `prompt_inputs` keys are new too (§3a). `vram_gb` is the
 peak measured on the 8 GB card with ComfyUI's offloading, not the file size. `max_timeout_s` defaults by
 kind: image 600 s, music 1800 s, video 3600 s, transcription 600 s. `local` is true for `comfyui` and
 `command` on a local host and for `faster_whisper`.
@@ -303,12 +332,27 @@ max_references = 3
 vram_gb = 7.5
 license = "Apache-2.0"
 commercial_use = true
+[models."qwen-image-edit-2511".prompt_inputs.camera_angle]   # a named input written into the prompt
+place = "append"
+choices = { left_45 = "<LoRA phrase>", right_45 = "<LoRA phrase>", top_down = "<LoRA phrase>", close_up = "<LoRA phrase>" }
+[models."qwen-image-edit-2511".guide]
+summary = "Edits or re-renders up to three reference images; keeps a character's identity."
+prompt = "Plain sentences saying what to change; call the references 'image 1', 'image 2', 'image 3'."
+source = "https://huggingface.co/Qwen/Qwen-Image-Edit-2511"
+checked = 2026-09-29
+[[models."qwen-image-edit-2511".guide.features]]
+name = "camera angle"
+how = "The Multiple-Angles LoRA moves the camera when the prompt holds one of its phrases; the camera_angle input writes it."
+input = "camera_angle"
+examples = ["<LoRA phrase for 45 degrees left>", "<LoRA phrase for a top-down view>"]
+source = "<the LoRA's model card>"                   # the phrases are copied from here when the entry is written
 
 [models."ace-step-1.5-xl-turbo"]
 provider = "comfyui"
 kind = "music"
 workflow = "workflows/ace-step-1.5-xl-turbo.json"
 outputs = ["111"]
+lyrics_format = "sections"                         # the common format as is (§3a)
 [models."ace-step-1.5-xl-turbo".inputs]
 prompt = "94.tags"
 lyrics = "94.lyrics"
@@ -321,6 +365,12 @@ language = "94.language"
 [models."ace-step-1.5-xl-turbo".capabilities]
 max_duration_s = 600
 vram_gb = 7.0
+[models."ace-step-1.5-xl-turbo".guide]
+summary = "Full songs with vocals up to 10 minutes; fast; follows genre and instrument tags well."
+prompt = "Comma-separated tags: genre, mood, instruments, vocal type, tempo (e.g. 'dark trap, 95 bpm, female vocals, 808')."
+inputs = { key = "e.g. 'C minor', 'F# major'", time_signature = "'4' or '3'", language = "ISO code of the sung language" }
+source = "https://github.com/ace-step/ACE-Step-1.5"
+checked = 2026-09-29
 
 [models."wan2.2-i2v-14b"]
 provider = "comfyui"
@@ -347,6 +397,7 @@ command = ["~/ai-stack/levo2/.venv/bin/python", "{adapter:levo2}", "{request}"]
 cwd = "~/ai-stack/levo2"
 inputs = ["generate_type"]                         # mixed | vocal | bgm | separate
 defaults = { generate_type = "mixed", low_mem = true }
+lyrics_format = "levo"                             # converted from the common format (§3a)
 [models."songgeneration-v2-medium".capabilities]
 vram_gb = 7.5
 
@@ -371,6 +422,16 @@ api_key_env = "OPENAI_API_KEY"
 inputs = ["quality", "background"]
 [models."gpt-image-1.5".capabilities]
 sizes = ["1024x1024", "1536x1024", "1024x1536"]
+[models."gpt-image-1.5".guide]
+summary = "Follows long, precise instructions; renders text in images; edits with reference images."
+prompt = "Full sentences; say what to keep from each reference."
+source = "https://platform.openai.com/docs/guides/image-generation"
+checked = 2026-09-29
+[[models."gpt-image-1.5".guide.features]]
+name = "restyle a reference"
+how = "Give the picture as a reference and name the target form in the prompt; there are no commands in the API, only instructions."
+examples = ["Turn image 1 into a detailed technical blueprint: white lines on blue, labelled dimensions."]
+source = "https://platform.openai.com/docs/guides/image-generation"
 
 [models."faster-whisper-large-v3-turbo"]
 provider = "faster_whisper"
@@ -384,13 +445,87 @@ license = "MIT"
 commercial_use = true
 ```
 
-(Node ids above are illustrative except ACE-Step's, which are those of the workflow in use today.)
+(Node ids above are illustrative except ACE-Step's, which are those of the workflow in use today. The
+`<LoRA phrase>` values are placeholders: the real phrases are copied from the LoRA's model card when the
+entry is written.)
 
-**Packaged vs workspace.** The packaged registry gains only portable entries whose workflows use
-ComfyUI's official model file names: `z-image-turbo`, `ace-step-1.5-turbo`, `wan2.2-ti2v-5b`, plus
-`faster-whisper-large-v3-turbo`. Everything machine-specific (the GGUF edit model, HeartMuLa's custom node,
-the standalone projects, the hosted entries with their prices) goes into the workspace's
-`hone-models.toml`, with its workflow files next to it; docs/generation.md shows each pattern once.
+**What ships in the package** (owner: "more; make sure every model we have is included"). The packaged
+registry gets an entry, a workflow and a guide for every generation model on this machine, checked on
+2026-09-29. Every one of these uses ComfyUI's official file names, so the entries work on any machine that
+has the same files:
+
+| Kind | Packaged entries (ComfyUI unless noted) |
+|---|---|
+| image | `z-image-turbo`; `flux.2-klein-4b` and `qwen-image-edit-2511` (+ Multiple-Angles LoRA) once downloaded |
+| music | `ace-step-1.5-turbo`, `ace-step-1.5-xl-turbo`, `ace-step-1.5-xl-sft`, `minimax-music3`, `yue2-3b` (non-commercial), `heartmula-3b`, `heartmula-rl-3b` (custom node `ComfyUI_FL-HeartMuLa`), `stable-audio-open-1.0` (downloaded; sound effects and loops, 47 s max); `songgeneration-v2-medium` (`command`) |
+| video | `wan2.2-i2v-14b` (lightx2v 4-step), `wan2.2-ti2v-5b`, `ltx-video-2b-0.9.5` |
+| transcription | `faster-whisper-large-v3-turbo`, `faster-whisper-large-v3`, `faster-whisper-medium` (all in the HF cache) |
+| hosted (`openai_compatible`) | `gpt-image-1.5`, `sora-2`, `sora-2-pro` against OpenAI's endpoint; other gateways by a user or project entry that overrides `base_url` and `api_key_env` |
+
+Machine paths are not in the package: a `command` entry reads its project folder from a variable
+(`HONE_LEVO2_DIR` for SongGeneration), and a missing folder or variable is a `ConfigError` naming it. An
+entry whose ComfyUI model file or custom node is missing fails at `/prompt` validation with a message naming
+the file, like any other `node_errors`. `hone-models models check <id>` for a generation entry runs a tiny
+job (a 256×256 image, 5 s of audio, a short clip) to prove the entry works on this machine. The
+workspace's `hone-models.toml` only overrides (prices, another gateway, measured `vram_gb`).
+
+Models on this machine that are not generation models are listed for completeness: the Ollama chat
+models and `nomic-embed-text` (already reachable as `ollama:` ids or entries), Kokoro and Chatterbox
+(speech, already entries), and the scoring models hone-taste loads itself (DINOv2, audiobox-aesthetics,
+MuQ, Demucs, Mel-Band RoFormer, Depth Anything, two reward models). Whether those scoring models move
+behind hone-models too is open question 1.
+
+### 3a. Model guides: what each model can take
+
+Two things, both in the registry, so a program, a person and an experiment read the same facts:
+
+**Common formats, converted by hone-models where one format fits many models.**
+
+- `lyrics` has one common format: section tags on their own line (`[intro]`, `[verse]`, `[pre-chorus]`,
+  `[chorus]`, `[bridge]`, `[inst]`, `[outro]`), then one sung line per line. An entry's `lyrics_format`
+  names the converter: `sections` (passed as is; ACE-Step, HeartMuLa, YuE2 read these tags), `levo`
+  (SongGeneration's own form: its tag names, lines joined with `.`, sections with ` ; `), `plain` (tags
+  removed). A new format is a small function in `hone_models/formats.py`, tested with the entry.
+- `duration_s` and `size` are converted already (frames per second, width and height).
+- `prompt_inputs` are named inputs that end up as words in the prompt, for models that are steered by
+  fixed phrases: `camera_angle = "left_45"` appends the phrase the entry maps `left_45` to. The choices
+  are the entry's; an unknown choice raises `ConfigError` listing them. The call site says what it wants;
+  the phrase is the model's business.
+
+**A guide where no common format fits.** An entry's `guide` table is documentation for whoever writes the
+prompt (a person, the app's prompt-writing code, an LLM that is given the guide), never used by the call
+itself:
+
+| Key | Content |
+|---|---|
+| `summary` | one line: what the model is good at |
+| `prompt` | how to write its prompt (tags, sentences, what to avoid) |
+| `inputs` | a short note per model-specific input (`key = "e.g. 'C minor'"`) |
+| `features` | special abilities, each with `name`, `how`, `input` (the named input that does it, if any), a few `examples`, and a `source` |
+| `source`, `checked` | where current tips and samples live (the model card, the provider's guide), and the date the guide was last compared with it |
+
+Features are samples, not catalogues (owner): the guide says the model *can* do something, shows a few
+examples, and points to the source for the full, current list. `hone-models models guide --stale 90`
+lists the guides not checked for 90 days.
+
+Reading a guide:
+
+```python
+g = mk.guide("qwen-image-edit-2511")
+g.summary, g.prompt, g.features[0].name, g.features[0].examples, g.source
+g.inputs            # every input the model takes: common ones, its own, prompt inputs with their choices
+g.as_text()         # one block of plain text, for a person or for an LLM prompt
+```
+
+```bash
+hone-models models guide qwen-image-edit-2511          # the same, printed
+hone-models models guide qwen-image-edit-2511 --json
+hone-models models list --kind music --feature "lyrics"   # which models can do it
+```
+
+`ModelGuide` also carries the entry's `kind`, `license`, `commercial_use`, `sizes`, `durations_s`,
+`max_duration_s` and `max_references`, so one object answers "what can I ask this model for". An entry
+without a `guide` still has one, built from its inputs and capabilities, with `summary = None`.
 
 ### 4. GPU
 
@@ -424,7 +559,8 @@ seed used.
 | `hone.models.media.{job_id,workflow_sha256,revised_prompt}` | the provider's job id; the ComfyUI workflow's hash; the hosted model's rewrite (content) |
 | `hone.models.media.{queue_wait_ms,session,loaded,freed,server_started}` | time queued before running; in a session; this call loaded the model / freed it / started the server |
 | `hone.models.media.log_tail` | `command`: the last 40 lines of stderr, capped at 4 KiB; content |
-| `hone.models.media.error` | the error that is also on the result |
+| `hone.models.media.{error,error_kind}` | the error and its kind, as on the result |
+| `hone.models.media.{license,commercial_use,cost_estimated}` | from the registry; `cost_estimated` true when the cost is the naive flat-price estimate |
 | `hone.models.transcribe.{audio,language,duration_s,words_count}` | the audio as `{"path", "sha256", "bytes"}` |
 | `hone.models.transcribe.{text,words}` | content; long word lists go to the blob table as today |
 | `hone.models.cost_usd`, `hone.models.gpu.*`, the trace context | as today |
@@ -445,7 +581,7 @@ or fetched is an exception**.
 | unknown input, file input missing, size or duration not declared by the model | `ConfigError` / `CapabilityError` before any request or lease |
 | ComfyUI `node_errors` (missing node, model file, bad value) | `ConfigError` naming node and input |
 | no server, transport or HTTP failure, `command` non-zero exit | `ProviderError` |
-| ComfyUI `execution_error` (including CUDA out of memory), hosted status `failed`, a moderation refusal, a finished job without files | `result.error` with the provider's message |
+| ComfyUI `execution_error` (including CUDA out of memory), hosted status `failed`, a moderation refusal, a finished job without files | `result.error` with the provider's message and `result.error_kind` (`out_of_memory`, `refused`, `invalid_input`, `no_output`, `failed`) |
 | no result within `timeout_s` (default: the entry's `max_timeout_s`) | the job is cancelled at the provider, then `ModelTimeout` |
 
 Cancelling a job: ComfyUI `POST /api/jobs/{id}/cancel` (older servers: remove it from `/queue`, or
@@ -474,8 +610,9 @@ question 2 and most of 3):
   refused connection.
 - `command` jobs show up as GPU processes (`gpus[].processes`) and hold a lease while they run, so
   `prepare` is already blocked by them; `faster_whisper` in a session is this process's own lease.
-- The owner's answer to 0016's question 5 (a warm-up `mk.machine.load(id)`) applies to Ollama models; for
-  `comfyui` and `command` entries loading means running a job, so `load` reports "not supported" there.
+- 0016's warm-up `mk.machine.load(id)` (accepted by the owner) loads Ollama models; for `comfyui` and
+  `command` entries loading means running a job, so `load` reports "not supported" there, and a caller
+  that wants a warm model runs one small job in a session.
 
 ### 8. Shapes for other packages
 
@@ -484,10 +621,14 @@ design/current.md §10 gains rows for `mk.image(...)` / `mk.music(...)` / `mk.vi
 MediaResult`; and `mk.transcriber(...)`: `transcribe(audio, *, language=None, prompt=None, words=True,
 timeout_s=None, trace=None) -> Transcript`. Entry points: `hone.image_clients`, `hone.music_clients`,
 `hone.video_clients`, `hone.transcribers`, each `hone_models = "hone_models:<factory>"`, as for text.
-`mk.PORTS_VERSION` stays `"1"` (additive). hone-select can then offer a generation subject next to its
-prompt subject, e.g. `[generate] client = "hone_models:music"` with inputs filled from the case and setup
-and files written into the sample's `workdir`; `result.error` is a failed sample. That is hone-select's
-change record; this one promises the shape.
+`mk.guide(model_id) -> ModelGuide` (§3a) is a shape too: `id`, `kind`, `summary`, `prompt`, `inputs`
+(name → note, choices for prompt inputs), `features` (name, how, input, examples, source), `source`,
+`checked`, `license`, `commercial_use`, and the size and duration limits; `as_text()` and a JSON form.
+Entry point `hone.model_guides` / `hone_models = "hone_models:guide"` exposes `mk.guide` the same way.
+`mk.PORTS_VERSION` stays `"1"` (additive). hone-select uses these in its change record 0011: a generation
+subject (`[generate] client = "hone_models:music"`, inputs filled from the case and the setup, files
+written into the sample's `workdir`, `result.error` and `error_kind` as a failed sample), and the guides
+to plan per-model prompts and to mark cases a model cannot do as "not applicable" instead of failed.
 
 ### 9. Testing without a GPU
 
@@ -505,17 +646,18 @@ change record; this one promises the shape.
 - `faster_whisper`: a fake `faster_whisper` module, as the speech tests fake `kokoro`.
 - Server start and stop: a fake start executable, as for Ollama.
 
-Acceptance cases (0016 takes AC-31 and AC-32):
+Acceptance cases (0016 takes AC-32 and AC-33):
 
 | AC | Scenario | Expected |
 |---|---|---|
 | AC-24 | An image through `FakeComfyUI` with a reference used twice; a song with `duration_s` mapped to two nodes; a video with seconds converted to frames | inputs land on the mapped nodes; the reference is uploaded once by hash; outputs written to `out` with hash, size and dimensions or duration; one span each with inputs, outputs and the workflow hash; a lease with the registry's `vram_gb`; `/free` after a plain call, once after a session |
-| AC-25 | Failures: unknown input; `node_errors`; `execution_error` (out of memory); a job that never ends; `KeyboardInterrupt` while waiting | `ConfigError` before any request; `ConfigError` naming the node; `result.error` with status `error`; the job cancelled and `ModelTimeout`; the job cancelled and the interrupt re-raised |
+| AC-25 | Failures: unknown input; `node_errors`; `execution_error` (out of memory); a job that never ends; `KeyboardInterrupt` while waiting | `ConfigError` before any request; `ConfigError` naming the node; `result.error` with `error_kind = "out_of_memory"` and status `error`; the job cancelled and `ModelTimeout`; the job cancelled and the interrupt re-raised |
 | AC-26 | Hosted images (generation, edit with references, b64 and url) and video (polled, then downloaded; `failed`; timeout) through respx | files written, no bytes in the SQLite file, cost from `per_image` / `per_output_second`, `failed` as `result.error`, `DELETE` sent on timeout, the planted `OPENAI_API_KEY` never stored; a size or duration the model does not declare raises before any request |
 | AC-27 | `command` provider with the fake project: success, `result.json` error, non-zero exit, hang | files collected; `result.error`; `ProviderError` with the stderr tail; the process group killed on timeout |
-| AC-28 | `mk.session("comfyui")` with no server and a fake start command; again with a running server | started once, reused by two clients, stopped at the end; a running server is never stopped |
+| AC-28 | `mk.session("comfyui")` with no server and a fake start command; again with a running server; a plain call with no server | started once, reused by two clients, stopped at the end; a running server is never stopped; the plain call raises `ProviderError` saying to start ComfyUI or use a session, and starts nothing |
 | AC-29 | Transcription with the fake module, capture on and off | words with times on the result; one span; text and words hashed with capture off |
 | AC-30 **[real]** | Under `scripts/gpu-lock.sh`: a 512×512 `z-image-turbo` image, 10 s of `ace-step-1.5-turbo`, a Kokoro sentence transcribed by `faster-whisper-large-v3-turbo` | non-empty outputs; the transcript contains the sentence's words in order; GPU memory back to where it started; ComfyUI started only if the test started it, and stopped |
+| AC-31 | Guides and formats: lyrics in the common format sent to a `sections` and a `levo` entry; `camera_angle` with a known and an unknown choice; `mk.guide`, `as_text()`, `models guide --json`, `models list --feature`; `require={"features": [...]}`; an entry without a guide | the two entries receive their own lyric forms; the phrase appended to the prompt, the unknown choice a `ConfigError` listing the choices; the guide lists every accepted input with its note, features with examples and source; selection returns only the models declaring the feature; the bare entry's guide is built from its inputs |
 
 Video and the standalone projects get `gpu` tests marked `slow`, run by hand.
 
@@ -524,17 +666,20 @@ Video and the standalone projects get `gpu` tests marked `slow`, run by hand.
 | Now (this change) | Later, same pattern, no API change |
 |---|---|
 | kinds image, music, video, transcription; `MediaClient`, `Transcriber`, sessions | image masks for edits; video remix (`/videos/{id}/remix`) as named inputs |
-| `comfyui`: z-image-turbo, ACE-Step 1.5 (turbo, XL turbo, XL sft), MiniMax-Music3, YuE2 (non-commercial, testing only), HeartMuLa (custom node), Wan 2.2 I2V-14B + lightx2v, Wan 2.2 TI2V-5B, LTX-Video 2B; FLUX.2-klein-4B and Qwen-Image-Edit-2511 as entries once downloaded | Stable Audio Open (gated, not downloaded), MiniMax-H3, LTX-2.5: new entries and workflows |
+| `comfyui`: every model on this machine (§3 table), each with a workflow and a guide; FLUX.2-klein-4B and Qwen-Image-Edit-2511 as entries once downloaded | MiniMax-H3, LTX-2.5 and later downloads: new entries, workflows and guides |
 | ACE-Step cover / repaint (`source`, `strength`) as its own entry with its own workflow | |
 | `openai_compatible` images and video: gpt-image and Sora 2 on OpenAI; gemini image, FLUX, Qwen image, Seedream, Veo 3.1 and Runway wherever a gateway serves them with the same endpoints | hosted transcription (`/audio/transcriptions` with word timestamps) as an `openai_compatible` transcription entry |
 | `command` with the SongGeneration v2 adapter | DiffRhythm2: an adapter once its environment exists (it needs `espeak-ng`, which may need a user-space build: no sudo) |
-| `faster_whisper` (extra `transcribe`) | |
+| `faster_whisper` (extra `transcribe`) | the scoring models, if open question 1 says so |
+| guides, `lyrics_format` (`sections`, `levo`, `plain`), `prompt_inputs`, `mk.guide`, `models guide`, `--feature` | more converters when a second model shares a format |
 | 0016 adapted as in §7 | media replay; per-call RAM scheduling |
 
 Suggested order of work (each step its own pull request, `scripts/check.sh` green): (1) media client,
 records, `comfyui` provider, `FakeComfyUI`, `mk.session("comfyui")`; (2) hosted images and video; (3)
-`faster_whisper` and the `Transcriber`; (4) the `command` provider and the LeVo adapter; (5) the §7 hooks
-for 0016. Size: about 1,200 lines of source in new modules (`media.py`, `transcribe.py`,
+`faster_whisper` and the `Transcriber`; (4) the `command` provider and the LeVo adapter; (5) guides,
+formats and prompt inputs, then the packaged entries with their workflows (each proven by
+`models check` on this machine); (6) the §7 hooks for 0016. Size: about 1,400 lines of source in new
+modules (`media.py`, `transcribe.py`, `guide.py`, `formats.py`,
 `providers/comfyui.py`, `providers/openai_media.py`, `providers/command.py`,
 `providers/faster_whisper.py`, `testing/fake_comfyui.py`), each under the 300-line limit; no new core
 dependency.
@@ -543,15 +688,16 @@ dependency.
 
 - Apps and experiments call every model the same way: a registry id, a call, a file, a span, a lease.
   OneShotStudio's D-004 is closed without an app adapter.
-- Adding a ComfyUI model is a registry entry plus an exported workflow file, no code; adding a standalone
-  project is an entry plus a short adapter script.
+- Adding a ComfyUI model is a registry entry, an exported workflow file and a guide, no code; adding a
+  standalone project is an entry plus a short adapter script.
 - Every generated file is traceable: prompt, inputs, seed, workflow hash, output hash, time, cost.
 - Outside a session each ComfyUI call reloads its model (seconds to a minute for the large ones), as a
   speech call does; batches use `session()`. The ComfyUI output folder keeps its own copies of outputs
   (ComfyUI has no delete endpoint); workflows save under a `hone/` prefix so they are easy to clean.
-- Callers use each model's own vocabulary for model-specific inputs (ACE-Step keys, lyric tag formats);
-  only the common inputs are shared. Comparing models in an experiment may need a small mapping in the
-  experiment's code.
+- Callers write the common inputs once (lyrics, duration, size, prompt inputs such as a camera angle) and
+  hone-models converts them per model. For what cannot be shared, each model's guide says what it takes,
+  with samples and a source, so prompt-writing code and experiments stop guessing. Guides go stale as
+  models and providers change; `checked` and `models guide --stale` make that visible, nothing more.
 - Workflows are tied to ComfyUI's node names and the model files on disk; a ComfyUI update that renames a
   node shows up as a `ConfigError` from `/prompt` validation, and the packaged workflows need an update.
 - The `command` provider runs programs named in a registry file. Registry files are already trusted
@@ -561,8 +707,9 @@ dependency.
 
 ## Migration and compatibility
 
-Additive: new factories (`mk.image`, `mk.music`, `mk.video`, `mk.transcriber`), result types, registry
-kinds, providers, capabilities and keys, `price` fields (defaulting to 0 as the existing ones do), span
+Additive: new factories (`mk.image`, `mk.music`, `mk.video`, `mk.transcriber`), `mk.guide`, result types,
+registry kinds, providers, capabilities and keys (`guide`, `lyrics_format`, `prompt_inputs`), the
+`models guide` command and `--kind` / `--feature` filters, `price` fields (defaulting to 0 as the existing ones do), span
 names and attributes, entry-point groups, the `transcribe` extra, fakes and acceptance cases. Existing
 registries, spans, clients and the lease are unchanged; `mk.session` and `mk.unload` accept one more
 provider. `mk.gpu.comfyui_free` stays.
@@ -574,29 +721,31 @@ calling the image and video APIs, running Whisper, and most hand-placed `release
 JSON files move next to its `hone-models.toml`. The UI-format templates it converted with
 `comfy run --print-prompt` are exported once in API format instead.
 
+## Owner answers (2026-09-29)
+
+1. Clients per kind (`mk.image`, `mk.music`, `mk.video`, `mk.transcriber`): **yes**.
+2. An input the model does not accept raises `ConfigError`: **yes**.
+3. Starting ComfyUI: **only sessions start it**; a plain call without a running server fails and says how
+   to start one (§2).
+4. Free after each call: **yes** for a plain call; a session keeps the model loaded until it ends (§2).
+5. Accepted jobs that fail are results, out of memory included: **yes**, and the result must say enough
+   for the caller to decide what to do: `error_kind` (§1).
+6. What ships: **more; every model on the machine** (§3 table), with machine paths from variables.
+7. Standalone-project adapters: **in hone-models**. Everything about calling a model with the inputs it
+   takes, and managing its resources, belongs in hone-models (Decision).
+8. `commercial_use`: **yes**, as information that never blocks a call, on every result and span, and
+   usable in `require=` (§3).
+9. Hosted prices: **a naive estimate is enough for now**, marked `cost_estimated` and documented as naive
+   (§2).
+10. (Added in review) Model-specific abilities, formats and trigger phrases go into the registry: common
+    formats are converted where one fits, and every model has a guide with samples and a source (§3a).
+
 ## Open questions for the owner
 
-1. **Clients per kind.** `mk.image` / `mk.music` / `mk.video` (one shared class) and `mk.transcriber`,
-   rather than one `mk.generate`. Agreed?
-2. **Unknown inputs raise.** A generation call with an input its model does not accept raises
-   `ConfigError`, although text calls ignore unknown params. Agreed?
-3. **Starting ComfyUI.** A configured start command (`HONE_COMFYUI_START`, e.g. `start_comfyui.sh`)
-   instead of comfy-cli; a plain call may start a server and stop it afterwards. Or should only sessions
-   start it, and a plain call without a running server fail?
-4. **Free after each call.** Outside a session a ComfyUI call ends with `/free`, like speech. Or keep the
-   model loaded and rely on the release hook and 0016's `prepare` to free it when someone else needs the
-   memory (faster for single calls, but leaves memory held)?
-5. **Accepted jobs that fail are results.** ComfyUI execution errors (including out of memory), hosted
-   `failed` and moderation refusals go on `result.error`, not exceptions. Agreed, including out of
-   memory?
-6. **What ships in the package.** Only the four portable entries (z-image-turbo, ace-step-1.5-turbo,
-   wan2.2-ti2v-5b, faster-whisper) and their workflows; hosted and machine-specific entries in the
-   workspace's `hone-models.toml`. Or none, or more (an ad-hoc prefix for another gateway, like `openai:`)?
-7. **Standalone projects.** SongGeneration through the `command` provider now, with its adapter shipped in
-   hone-models; DiffRhythm2 once its environment is set up. Should the adapters live in hone-models (tested
-   against a fake project) or with the app?
-8. **`commercial_use` capability.** A declared yes/no next to `license`, so a selection can exclude
-   non-commercial models (YuE2, the FLUX.2 9B family) from published work. Worth adding now?
-9. **Hosted prices.** Hosted image prices vary by size and quality; the proposal takes one `per_image`
-   per registry entry (set for the size used most). Enough, or should cost come from the gateway's answer
-   where it reports one?
+1. **Scoring models.** hone-taste loads its own models (DINOv2, audiobox-aesthetics, MuQ, Demucs,
+   Mel-Band RoFormer, Depth Anything, two reward models). By the rule "every model through hone-models"
+   they belong here too, as new kinds (`image_embedding`, `audio_score`, `separation`, ...). That is a
+   separate change record after this one; agreed, or are scorers hone-taste's own business?
+2. **Guides for hosted models that change often.** The proposal keeps a few samples and the source link,
+   checked by hand. Enough, or should `models guide --refresh` fetch the source page and show what
+   changed (network, and a page format that breaks)? Recommended: by hand for now.

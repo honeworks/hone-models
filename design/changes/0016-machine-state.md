@@ -24,6 +24,10 @@ state**: which models are loaded in which server, how much GPU memory is used an
 the needed models are loaded, and the machine-wide GPU lock and leases. hone-select measures CPU load and
 free RAM itself with the standard library.
 
+This record builds on [0015](0015-generation-models.md): ComfyUI's models are registry entries there, and
+hone-models keeps a small file of the ComfyUI models it has run since the last `/free`, so this record can
+name them.
+
 hone-select's core cannot import hone-models, so hone-select defines a port, `MachineProbe`, and reaches
 hone-models through its optional extra `hone-select[models]` and an entry point, the same way it loads
 judges (`hone.decision_clients`, hone-select D-002).
@@ -83,8 +87,9 @@ run should stop.
 import hone_models as mk
 
 mk.machine.snapshot() -> dict              # what the machine holds now (shape below)
-mk.machine.prepare(needed) -> dict         # make sure only `needed` models are loaded (registry ids)
-mk.machine.Machine(*, comfyui_url=..., lock_path=None, registry=None, sink=None)   # the probe object
+mk.machine.prepare(needed, *, if_busy="block") -> dict   # make sure only `needed` models are loaded
+mk.machine.load(model_id) -> dict          # warm a model up so the first real call does not pay for loading
+mk.machine.Machine(*, lock_path=None, registry=None, sink=None)   # the probe object
 mk.machine.MACHINE                         # the default instance; snapshot / prepare are its methods
 ```
 
@@ -96,15 +101,15 @@ is one name for one operation.
 
 Constructor arguments, all optional:
 
-- `comfyui_url`: the ComfyUI server to check; default `HONE_COMFYUI_URL`, else `http://127.0.0.1:8188`;
-  `None` means "this machine runs no ComfyUI, do not check" (and the snapshot says so, see below).
 - `lock_path`: the machine-wide lock file; default `HONE_GPU_LOCK`, else `/tmp/honeworks-gpu.lock`, the
   same rule as `scripts/gpu-lock.sh`.
 - `registry`, `sink`: as for the clients.
 - For tests, the readers are injectable like `GpuScheduler`'s (`gpus=`, `processes=`, `scheduler=`).
 
 The Ollama server is `ollama.base_url()` (`OLLAMA_HOST`), the same one `ollama.running()` and the lease
-use. One Ollama server and one ComfyUI server per machine is what exists today; lists can come later.
+use. The ComfyUI servers checked are the distinct `base_url`s of the registry's `comfyui` entries, plus
+`HONE_COMFYUI_URL` when set (0015 §7): a registry without `comfyui` entries checks none, so a machine
+without ComfyUI reports nothing about it rather than a refused connection.
 
 ### `snapshot()`
 
@@ -122,12 +127,14 @@ Sizes are GB with two decimals, as in the port; `None` always means unknown, nev
   ],
   "servers": [
     {"server": "ollama",  "url": "http://127.0.0.1:11434", "running": True,  "error": None},
-    {"server": "comfyui", "url": "http://127.0.0.1:8188",  "running": False, "error": None}
+    {"server": "comfyui", "url": "http://127.0.0.1:8188",  "running": True,  "error": None,
+     "vram_gb": 6.8}                          # torch_vram_total from /system_stats
   ],
   "loaded_models": [
     {"server": "ollama", "name": "gemma4-12b:latest", "model_id": "gemma4-12b",
      "size_gb": 9.1, "vram_gb": 6.9},        # vram_gb < size_gb: partly on the CPU
-    {"server": "comfyui", "name": None, "model_id": None, "size_gb": None, "vram_gb": 3.4}
+    {"server": "comfyui", "name": "z-image-turbo.json", "model_id": "z-image-turbo",
+     "size_gb": None, "vram_gb": None}       # ComfyUI reports only its total, on the server entry
   ],
   "gpu_lock": {"path": "/tmp/honeworks-gpu.lock", "held": True, "mine": False,
                "holder": "hone-flow 91822 2026-09-29T09:58:12+02:00"},
@@ -156,7 +163,7 @@ How each fact is read:
 | GPUs, memory, utilization | NVML (extra `gpu`): device count, name, `MemoryInfo`, `UtilizationRates`; else one `nvidia-smi --query-gpu=index,name,memory.total,memory.used,utilization.gpu` | both fail: `gpus` is `None` (not `[]`: without a reader we cannot tell "no GPU" from "unknown") |
 | GPU memory per process | `read_processes()` (existing) | it returns `None`: `processes` is `None` |
 | Ollama models | `GET /api/ps`: `name`, `size`, `size_vram` (bytes) | timeout or error status: `running: None` |
-| ComfyUI memory | `GET /system_stats`: `devices[].torch_vram_total` is what its torch holds; it does not list its models, so one entry with `name: None` when that is above 0 | as for Ollama; `comfyui_url=None`: the server is left out of `servers` entirely, which the snapshot shows |
+| ComfyUI models and memory | `GET /system_stats`: `devices[].torch_vram_total` on the server entry; the models from 0015's loaded-models file (registry ids run since the last `/free`), dropped when the server holds no torch memory; an entry with `model_id: None` when the newest job in `/history` is not one hone-models ran | as for Ollama |
 | lock | open the lock file and try `flock(LOCK_EX \| LOCK_NB)`, releasing at once; `holder` from `<lock>.holder`, read only when held (the file can be stale after a killed run); `mine` from `HONE_GPU_LOCK_HELD=1` | the file cannot be opened: `held: None` |
 | leases | the lease ledger (existing) | never (an empty ledger is a known empty) |
 
@@ -170,24 +177,30 @@ only for programming errors.
 
 ### `prepare(needed)`
 
-`needed` is a sequence of registry ids. `prepare` makes the model servers hold only those models, if it
-is safe to do so, and reports what it did and what is true afterwards. It does not load the needed
-models (the first call does, and whether to warm up is hone-select's policy), and it never waits.
+`needed` is a sequence of registry ids (ComfyUI models included, 0015). `prepare` makes the model servers
+hold only those models and reports what it did and what is true afterwards. It does not load the needed
+models (that is `load`, below), and it never waits.
+
+`if_busy` (owner: the caller decides) says what to do when another process is using the GPU:
+
+- `"block"` (default): unload nothing, report `blocked_by`. Safe: nothing is taken from a running job.
+- `"unload"`: report `blocked_by` as well, but unload the models that are not needed anyway. For a caller
+  that knows the other holder is stale or does not matter; it may break that other run.
 
 1. Resolve each id through the registry (`ConfigError` for an unknown id, as everywhere; a call problem
    is an exception, rule 3). For Ollama models, the provider name with `:latest` added when it has no
    tag, which is how `/api/ps` names them.
-2. **Check that nobody else is using the GPU.** If the machine-wide lock is held and not `mine`, or the
-   ledger has a live lease of another process, `prepare` unloads nothing and returns
-   `blocked_by` naming the holder(s). The reason: a lease or the lock means some run is doing GPU work
+2. **Check whether anybody else is using the GPU.** If the machine-wide lock is held and not `mine`, or
+   the ledger has a live lease of another process, `blocked_by` names the holder(s), and with
+   `if_busy="block"` `prepare` unloads nothing. The reason: a lease or the lock means some run is doing GPU work
    right now, and the only models we could unload are the ones it may be using. Unloading them would
-   corrupt that run; waiting is the right answer, and whether and how long to wait is the caller's
-   policy. This process's own leases and a lock held by our own `gpu-lock.sh` do not block.
-3. Otherwise unload every loaded Ollama model that is not needed (`keep_alive: 0`, the existing
-   `ollama.unload`), whoever loaded it: with no lease and no lock held elsewhere, a loaded model is a
-   leftover, which is exactly the problem. If ComfyUI holds memory and is not needed, call its `/free`
-   (the existing `comfyui_free`). A ComfyUI server is kept by putting the name `"comfyui"` in `needed`
-   (it has no registry ids for its models; see the open questions).
+   corrupt that run; waiting is the safe answer, and whether and how long to wait is the caller's
+   policy. This process's own leases and a lock held by our own `gpu-lock.sh` do not count.
+3. Otherwise (or with `if_busy="unload"`) unload every loaded Ollama model that is not needed
+   (`keep_alive: 0`, the existing `ollama.unload`), whoever loaded it: with no lease and no lock held
+   elsewhere, a loaded model is a leftover, which is exactly the problem. ComfyUI can only free
+   everything, so `prepare` sends `/free` when the server holds any model not in `needed` or memory it
+   cannot name, keeps it when every model it holds is needed, and clears the loaded-models file.
 4. Read `/api/ps` and ComfyUI again and report the state afterwards.
 
 Returned (JSON-able):
@@ -198,6 +211,7 @@ Returned (JSON-able):
   "blocked_by": None,              # or ["gpu lock held by hone-flow 91822 ...", "lease 'gpu:tts' (pid 91830, 5.0 GB)"]
   "unloaded": [{"server": "ollama", "name": "qwen2.5vl:7b"}],
   "released": ["comfyui"],         # servers asked to free their memory
+  "if_busy": "block",
   "errors": [],                    # [{"server", "name", "error"}]: an unload that failed, a server that did not answer
   "missing": ["gemma4-12b"],       # needed but not loaded (normal before the first call)
   "loaded_models": [...],          # as in snapshot(), read after the unloads
@@ -208,7 +222,28 @@ Returned (JSON-able):
 A failed unload or an unreachable server is an entry in `errors`, never skipped silently and never an
 exception: the caller decides what an incomplete cleanup means. A server with `running: None` also
 appears in `errors`, because `prepare` cannot know what it holds. `need_gb` lets the caller compare with
-`memory_total_gb`: models that together do not fit will be offloaded whatever `prepare` does.
+`memory_total_gb`: models that together do not fit will be offloaded whatever `prepare` does. It
+includes the ComfyUI and `command` entries' `vram_gb`.
+
+### `load(model_id)`
+
+Warm-up (owner: yes). `load` makes the model resident so the first measured call does not include loading:
+
+- Ollama: `POST /api/generate` with the model, an empty prompt and the registry's `keep_alive` (Ollama's
+  documented way to load a model without generating), then reads `/api/ps` to report where it landed.
+- `comfyui`, `command`, hosted entries: loading means running a job, so `load` does nothing and returns
+  `loaded: None` with `error: "not supported for <provider>: run one small job in a session instead"`.
+- Speech and `faster_whisper` entries load in-process and only stay loaded inside a session, so `load`
+  says the same and points at `session()`.
+
+```python
+{"model_id": "gemma4-12b", "loaded": True, "seconds": 6.2, "size_gb": 9.1, "vram_gb": 6.9, "error": None}
+```
+
+`loaded: False` with `error` when the server refused or timed out. `load` takes no lease: a caller loads
+inside its own lease, as with `prepare`. It has no `if_busy`, because loading takes nothing from anyone
+(if memory is short, Ollama offloads, and the answer shows it). `vram_gb < size_gb` in the answer is the "partly on the CPU" warning, before the
+first sample instead of after it.
 
 There is a race `prepare` cannot close: between its read and its unloads another process can load a
 model or take a lease. The state after is read again and returned, and the next `snapshot()` shows any
@@ -222,8 +257,11 @@ change; a daemon (option 4) would be the only full fix and is not worth it.
 - The lease keeps its current behaviour (unload this process's models when short, all with
   `unload_others=True`, then the hooks). `prepare` is the explicit, lease-aware version for callers who
   want the machine clean before they start, not only when memory runs out.
-- The rule "do not unload while another process holds a lease or the lock" is new and applies to
-  `prepare` only. Whether `GpuScheduler(unload_others=True)` should follow it too is an open question.
+- The lease's own "unload everything" gets the same choice (owner: the caller decides):
+  `GpuScheduler(unload_others=True, if_busy="unload")`. `"unload"` is the default and today's behaviour,
+  so nothing changes for existing callers; `if_busy="block"` makes a short lease leave other processes'
+  models alone while another process holds a lease or the lock, and wait or fail as leases do today.
+  The same parameter name and values as `prepare`, with the default that keeps each API compatible.
 
 ### The adapter for hone-select
 
@@ -239,14 +277,16 @@ Two registrations, the same pair as for decision clients today:
   its change record; this record only promises the shape it relies on.
 
 design/current.md §10 gains a row: `mk.machine.Machine()`, `mk.machine.MACHINE`: `snapshot() -> dict`,
-`prepare(needed) -> dict`, with the keys above. `mk.PORTS_VERSION` stays `"1"`: the change is additive.
+`prepare(needed, *, if_busy="block") -> dict`, `load(model_id) -> dict`, with the keys above. hone-select's
+port takes `load` as optional (its 0010). `mk.PORTS_VERSION` stays `"1"`: the change is additive.
 
 ### Records
 
 - `prepare` emits one span, `hone.models.machine.prepare` (kind `internal`), with
-  `hone.models.machine.{needed,unloaded,released,blocked_by,errors,missing}`; status `error` when
+  `hone.models.machine.{needed,if_busy,unloaded,released,blocked_by,errors,missing}`; status `error` when
   `errors` is not empty. A model yanked from under someone is then visible in the call store, next to
   the calls that follow it. It carries the trace context as every span does (`hone.run_id`, ...).
+- `load` emits `hone.models.machine.load` with `hone.models.machine.{model_id,loaded,seconds,vram_gb}`.
 - `snapshot` emits no span: it is a read, called before every sample, and hone-select stores the result
   in its own sample record.
 - The existing warning log style is used when `prepare` is blocked or an unload fails.
@@ -257,16 +297,16 @@ design/current.md §10 gains a row: `mk.machine.Machine()`, `mk.machine.MACHINE`
 
 | AC | Scenario | Expected |
 |---|---|---|
-| AC-31 | `snapshot()` with fake readers: NVML fake reporting 8 GB and one foreign process; FakeOllama `/api/ps` scripted with a model partly on the CPU; ComfyUI refused; then no NVML and no `nvidia-smi`; then Ollama answering 500 | GB values and `vram_gb < size_gb` as scripted; ComfyUI `running: False` with no entries; `gpus` is `None` (not `[]`, no zeros); Ollama `running: None` with an error and no entries; the lock `held` / `mine` / `holder` correct for a lock held by another process, by this one (`HONE_GPU_LOCK_HELD=1`) and free |
-| AC-32 | `prepare(["a"])` with FakeOllama running `a` and `b`, and ComfyUI (fake) holding memory; again with another process's lease in the ledger; again with the lock held by another process; again with the unload of `b` failing | first: `b` unloaded, ComfyUI `/free` called, span recorded; with a foreign lease or the lock: nothing unloaded, no request sent, `blocked_by` names the holder; failing unload: listed in `errors`, span status `error`, `b` still in `loaded_models` |
+| AC-32 | `snapshot()` with fake readers: NVML fake reporting 8 GB and one foreign process; FakeOllama `/api/ps` scripted with a model partly on the CPU; ComfyUI refused; then no NVML and no `nvidia-smi`; then Ollama answering 500 | GB values and `vram_gb < size_gb` as scripted; ComfyUI (`FakeComfyUI`, 0015) named by registry id after a job, dropped after `/free`, and an unnamed entry after a job hone-models did not run; a registry without `comfyui` entries checks no ComfyUI; `gpus` is `None` (not `[]`, no zeros); Ollama `running: None` with an error and no entries; the lock `held` / `mine` / `holder` correct for a lock held by another process, by this one (`HONE_GPU_LOCK_HELD=1`) and free |
+| AC-33 | `prepare(["a"])` with FakeOllama running `a` and `b`, and ComfyUI (fake) holding a model not needed; `prepare(["a", "z-image-turbo"])` with ComfyUI holding only `z-image-turbo`; again with another process's lease in the ledger, with `if_busy` `"block"` and `"unload"`; again with the lock held by another process; again with the unload of `b` failing | first: `b` unloaded, ComfyUI `/free` called, span recorded; second: ComfyUI kept; foreign lease or lock with `"block"`: nothing unloaded, no request sent, `blocked_by` names the holder; with `"unload"`: `b` unloaded and `blocked_by` still reported; failing unload: listed in `errors`, span status `error`, `b` still in `loaded_models` |
+| AC-34 | `load("a")` on FakeOllama; the model loaded partly on the CPU; the server timing out; `load` of a `comfyui` entry; `GpuScheduler(unload_others=True, if_busy="block")` short of memory while another process holds a lease | `/api/generate` with an empty prompt and `keep_alive`, `loaded: True` with seconds; `vram_gb < size_gb` reported; `loaded: False` with the error; `loaded: None`, "not supported", no request; the other process's models are not unloaded and the lease waits or fails as today |
 
 AC-17 (contract checks) adds `mk.machine.MACHINE` against the shape in §10.
 
 ### Tests
 
 - Everything offline with existing tools: FakeOllama's `queue("/api/ps", ...)` and its request log
-  (the unloads are `/api/generate` with `keep_alive: 0`), respx for ComfyUI's `/system_stats` and
-  `/free` (a public `FakeComfyUI` is not needed), a fake `pynvml` module and a fake `nvidia-smi`
+  (the unloads are `/api/generate` with `keep_alive: 0`), 0015's `FakeComfyUI`, a fake `pynvml` module and a fake `nvidia-smi`
   as the existing `_gpu_memory` tests do, a temporary lock file held by a child process for the lock
   cases, and a second process's ledger entry as in AC-12.
 - Unit tests for the tag rule (`name` vs `name:latest`), the GB rounding, and "unknown is `None`" for
@@ -282,36 +322,34 @@ AC-17 (contract checks) adds `mk.machine.MACHINE` against the shape in §10.
   another run.
 - "Unknown" is explicit everywhere (`None`, `running: None`, `errors`), so a policy can refuse to start
   on an unknown state instead of reading it as idle.
-- Cost: one module of about 150 lines on top of the existing readers, one new reader (`read_gpus`,
+- Cost: one module of about 200 lines on top of the existing readers, one new reader (`read_gpus`,
   all devices with names and utilization) next to `read_memory`, one span name, two acceptance cases.
   No new dependency.
 - Limits: the lock check sees only `flock` users of the same file; a process that uses the GPU with no
   lease and no lock is visible only as a GPU process in `gpus[].processes`, and `prepare` does not stop
-  it (hone-models never kills processes). ComfyUI's models are not named. The race above remains.
+  it (hone-models never kills processes). ComfyUI's models are named only when hone-models ran them;
+  a job from ComfyUI's own UI shows as an unnamed entry. The race above remains.
 - `FileLockGpuLease(path)` does not write a `.holder` file, so a Python holder of the machine lock shows
   as `holder: None`; making it write one is a small follow-up if wanted.
 
 ## Migration and compatibility
 
-Additive. New module `hone_models.machine`, new name `machine` in `hone_models.__all__`, a new
+Additive. `GpuScheduler` gains `if_busy` with a default that keeps today's behaviour. New module `hone_models.machine`, new name `machine` in `hone_models.__all__`, a new
 entry-point group, a new span name and attributes in design/current.md §8. Existing APIs, the lease, the
 ledger format, `gpu-lock.sh` and the lock file are unchanged. hone-select's adapter needs this version
 of hone-models; hone-select's `models` extra gets the new minimum when both are released.
 
-## Open questions for the owner
+## Owner answers (2026-09-29)
 
-1. **Blocked, or unload anyway?** The proposal makes `prepare` unload nothing while another process holds
-   a lease or the lock (and report it). The alternative is to unload the models no lease names and keep
-   only those a lease names; lease names are often not model names (`gpu:tts`), so that would guess.
-   Is "blocked, the caller waits" right?
-2. **ComfyUI in `needed`.** ComfyUI's models have no registry ids, so the proposal uses the plain name
-   `"comfyui"` in `needed` to keep that server's memory. Fine, or should the registry get entries for
-   ComfyUI models (a `comfyui` provider with `vram_gb`)?
-3. **Check ComfyUI when not configured?** The proposal checks `http://127.0.0.1:8188` by default because
-   this machine runs ComfyUI; on other machines that is a refused connection, reported as
-   `running: False`. Or check it only when `HONE_COMFYUI_URL` is set?
-4. **`unload_others=True`.** Should the lease's own "unload everything" also stop at another process's
-   lease or lock, like `prepare`? Safer, but it changes existing behaviour (a separate small change).
-5. **Warm-up.** `prepare` does not load the needed models. Should hone-models offer `mk.machine.load(id)`
-   (a zero-token request with `keep_alive`) so the first sample's time does not include loading, or is
-   warm-up hone-select's job through a normal call?
+1. Blocked or unload anyway: **a parameter, the caller decides**: `prepare(..., if_busy="block" | "unload")`,
+   default `"block"`.
+2. ComfyUI in `needed`: **solved by 0015**: ComfyUI models are registry entries, `needed` takes registry
+   ids only, and the pseudo-name `"comfyui"` is gone.
+3. Which ComfyUI to check: **solved by 0015**: the servers the registry's `comfyui` entries name (plus
+   `HONE_COMFYUI_URL`). One correction to the question: comfy-cli is not what starts ComfyUI here; a
+   session starts it with `HONE_COMFYUI_START` (0015 §2).
+4. `unload_others=True` stopping at other processes: **optional, the caller decides**:
+   `GpuScheduler(..., if_busy=...)`, default `"unload"` (today's behaviour).
+5. Warm-up: **yes**: `mk.machine.load(model_id)`.
+
+No open questions remain.

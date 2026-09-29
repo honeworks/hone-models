@@ -44,9 +44,11 @@ def default_out_dir() -> Path:
 def check(client: MediaClient, out_dir: Path, *, seed: int = 1) -> dict[str, Any]:
     """Run the tiny job for `client` and return what it made: time, file, measures, peak GPU memory."""
     inputs = {k: v for k, v in TINY[client.kind].items() if k in client.inputs}
-    if "lyrics" in client.inputs:
+    # A `command` entry takes the whole shared vocabulary: lyrics only for songs, a start frame only for
+    # pictures and clips.
+    if "lyrics" in client.inputs and client.kind == "music":
         inputs["lyrics"] = LYRICS
-    if "image" in client.inputs:
+    if "image" in client.inputs and client.kind != "music":
         inputs["image"] = start_frame(out_dir / "start-frame.png", 256, 256)
     started = time.monotonic()
     with peak_gpu_mb() as peak, client.session():

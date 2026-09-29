@@ -491,9 +491,11 @@ No review needed.
 runs one job in `client.session()` (so it starts ComfyUI from `HONE_COMFYUI_START` when nothing answers,
 and stops it after) with the smallest inputs every packaged model accepts: 256x256 for images, 10 s of
 audio (HeartMuLa's sampler takes at least 10 s), 1 s at 256x256 for video, from a generated gradient PNG
-when the entry takes `image`; a line of lyrics when it takes `lyrics`; seed 1. Only the inputs the entry
-takes are passed. The file goes to `--out` (default `$HONE_HOME/models/checks/`) as `<id>.<suffix>`, the provider's suffix
-(a dot in an id such as `ace-step-1.5-turbo` is not taken for one, D-075). It prints the time,
+when an image or video entry takes `image`; a line of lyrics when a music entry takes `lyrics`; seed 1.
+Only the inputs the entry takes are passed (a `command` entry takes the whole shared vocabulary, so a
+song never gets the start frame). The file goes to `--out` (default `$HONE_HOME/models/checks/`) as
+`<id>.<suffix>`, the provider's suffix (a dot in an id such as `ace-step-1.5-turbo` is not taken for one,
+D-075). It prints the time,
 the measured file and `peak_vram_gb`: GPU 0's used memory sampled every 0.25 s (NVML, else `nvidia-smi`)
 minus the memory in use at the start; the whole card, because ComfyUI is another process. Unlike the chat
 check it saves nothing to the user registry: the value is for the entry's `vram_gb`, which a person sets.

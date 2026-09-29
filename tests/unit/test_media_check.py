@@ -10,7 +10,7 @@ from typer.testing import CliRunner
 import hone_models as mk
 from hone_models import _media_check, _media_files
 from hone_models.cli import app
-from hone_models.testing import FakeComfyUI
+from hone_models.testing import FakeComfyUI, FakeMedia
 from media_fixtures import COMFYUI_FIXTURES, LeaseRecorder
 
 runner = CliRunner()
@@ -73,6 +73,15 @@ def test_music_and_video_checks_pass_only_what_the_entry_takes(
     frame = tmp_path / "start-frame.png"
     assert _media_files.measure(frame).width == 256
     assert frame.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_music_check_sends_no_start_frame_to_an_entry_that_takes_every_shared_input(tmp_path: Path) -> None:
+    song = FakeMedia.like("songgeneration-v2-medium")  # a command entry: it takes the whole vocabulary
+    assert "image" in song.inputs
+    found = _media_check.check(song, tmp_path)
+    assert found["inputs"] == {"duration_s": "10", "lyrics": _media_check.LYRICS}
+    assert "image" not in song.calls[0][1]
+    assert not (tmp_path / "start-frame.png").exists()
 
 
 def test_a_failed_tiny_job_exits_1(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

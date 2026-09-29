@@ -2,7 +2,7 @@
 
 ## Status
 
-`proposed`
+`accepted` (2026-09-29, owner: "start implementing"; open questions take the proposed answers)
 
 ## Context
 

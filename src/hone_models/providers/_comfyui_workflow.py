@@ -3,7 +3,9 @@
 The entry's `inputs` table maps each named input to one or more `"<node id>.<input>"` paths; `size`
 fills the `width` and `height` mappings; a `{ path, per_second, add }` mapping converts seconds to
 frames; `references` maps to a list of slots, and a slot without a reference is removed with every link
-to it.
+to it. Another file input (`image`, `source`) mapped to a list of slots is optional in the same way: when
+the call leaves it out, its slot nodes are removed; mapped to one path, the workflow's own value stays (a
+placeholder file ComfyUI refuses, so the input is required).
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ from typing import Any
 from .._registry_shapes import NodeInput, node_targets
 from ..errors import CapabilityError, ConfigError
 from ..registry import ModelConfig
+from .common import FILE_INPUTS
 
 Workflow = dict[str, dict[str, Any]]
 SIZE_TARGETS = ("width", "height")
@@ -75,6 +78,9 @@ def fill(workflow: Workflow, cfg: ModelConfig, values: dict[str, Any]) -> Workfl
             _set(filled, target, _converted(value, target), cfg, name)
     if "references" in mapping:
         _fill_slots(filled, node_targets(mapping["references"]), references or [], cfg)
+    for name in FILE_INPUTS:  # an optional file input left out: its slots go
+        if name != "references" and name not in values and isinstance(mapping.get(name), list):
+            _fill_slots(filled, node_targets(mapping[name]), [], cfg)
     return filled
 
 

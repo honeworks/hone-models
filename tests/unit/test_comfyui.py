@@ -67,6 +67,23 @@ def test_more_references_than_slots(tmp_path: Path) -> None:
         _comfyui_workflow.fill(flow, cfg, {"references": ["a", "b"]})
 
 
+def test_a_file_input_mapped_to_slots_is_optional(tmp_path: Path) -> None:
+    flow = {
+        "1": {"class_type": "LoadImage", "inputs": {"image": "placeholder.png"}},
+        "2": {"class_type": "LoadImage", "inputs": {"image": "placeholder.png"}},
+        "3": {"class_type": "Latent", "inputs": {"start_image": ["1", 0], "end_image": ["2", 0]}},
+    }
+    inputs = 'inputs = { image = ["1.image"], source = "2.image" }'
+    cfg = entry(tmp_path, f'workflow = "wf.json"\n{inputs}', flow).get("m")
+    left_out = _comfyui_workflow.fill(flow, cfg, {})
+    assert "1" not in left_out  # a slot: removed, with the link to it
+    assert left_out["3"]["inputs"] == {"end_image": ["2", 0]}
+    assert left_out["2"]["inputs"]["image"] == "placeholder.png"  # one path: required, kept as it is
+    given = _comfyui_workflow.fill(flow, cfg, {"image": "hone/a.png"})
+    assert given["1"]["inputs"]["image"] == "hone/a.png"
+    assert given["3"] == flow["3"]
+
+
 def test_video_outputs_carry_flags_next_to_the_files() -> None:
     # SaveVideo's history entry: {"images": [...files], "animated": [true]}
     video = {"filename": "clip_00001_.mp4", "subfolder": "hone", "type": "output"}

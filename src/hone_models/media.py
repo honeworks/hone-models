@@ -113,7 +113,7 @@ class MediaClient:
         named = self._checked(provider, inputs)
         prompt, job_inputs = formats.apply(cfg, prompt, named)  # prompt inputs written in, lyrics converted
         self._require_installed()
-        seed = seed if seed is not None else int(cfg.defaults.get("seed", secrets.randbelow(2**32)))
+        seed = seed if seed is not None else int(cfg.defaults.get("seed", secrets.randbelow(2**31)))
         caps = cfg.capabilities
         attrs = _attributes(cfg, prompt, {**named, **job_inputs}, seed, in_session=self._state is not None)
         started = time.monotonic()

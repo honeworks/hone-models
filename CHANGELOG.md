@@ -44,6 +44,12 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
   timeout or interrupt and never submitted twice; moderation refusals and failed jobs as `result.error`
   (`refused` / `failed`); naive cost from `per_image` / `per_output_second`
   ([0015](design/changes/0015-generation-models.md), step 2).
+- The `command` provider runs a standalone project (its own Python and torch) as a subprocess per job:
+  `request.json` in a job folder next to `out`, files and an optional `result.json` back, the stderr
+  tail on the span (`hone.models.media.log_tail`), the process group killed on timeout or interrupt. The
+  SongGeneration (LeVo 2) adapter `levo2.py` ships in the package; registry entries name the project
+  folder with `install.dir_env` (`HONE_LEVO2_DIR`) ([0015](design/changes/0015-generation-models.md),
+  step 4).
 - `THIRD_PARTY_NOTICES.md` (the Kokoro-rendered voice clips; copyleft dependencies of the optional
   speech extras), shipped in the wheel and sdist.
 - The context budget counts images (capabilities `image_tokens` / `image_patch_px`, else 1024 per

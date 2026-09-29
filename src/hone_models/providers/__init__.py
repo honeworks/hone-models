@@ -8,7 +8,17 @@ from typing import Any, TypeVar
 from .._transcript import TranscribeEngine
 from ..errors import ConfigError
 from ..registry import Capabilities, ModelConfig
-from . import chatterbox, comfyui, faster_whisper, kokoro, litellm, ollama, openai_compat, openai_media
+from . import (
+    chatterbox,
+    comfyui,
+    command,
+    faster_whisper,
+    kokoro,
+    litellm,
+    ollama,
+    openai_compat,
+    openai_media,
+)
 from .common import ChatReply, ChatRequest, MediaProvider, SpeechEngine
 
 CHAT: dict[str, Callable[[ModelConfig, ChatRequest], ChatReply]] = {
@@ -32,6 +42,7 @@ SPEECH_READY: dict[str, Callable[[str], None]] = {"kokoro": kokoro.check_ready}
 # Images, music and video (change 0015): which inputs an entry takes, one job, a session (common.py).
 MEDIA: dict[str, MediaProvider] = {
     "comfyui": comfyui.PROVIDER,
+    "command": command.PROVIDER,
     "openai_compatible": openai_media.PROVIDER,
 }
 # Transcription (change 0015): config -> a loaded engine; engine(audio, language, prompt, words, deadline)

@@ -10,7 +10,7 @@ TOML files are merged in this order (later ones override key by key):
 
 ```toml
 [models."gemma4-12b"]
-provider = "ollama"              # ollama | openai_compatible | litellm | jev | kokoro | chatterbox | comfyui
+provider = "ollama"              # ollama | openai_compatible | litellm | jev | kokoro | chatterbox | comfyui | command
 model    = "gemma4-12b:latest"   # the provider's name (defaults to the id)
 defaults = { temperature = 0.8 } # params used unless the call passes its own
 [models."gemma4-12b".capabilities]
@@ -86,13 +86,16 @@ measurement get 120 s.
 
 **Generation models.** `kind` is `chat` (default), `embedding`, `decision`, `speech`, `image`, `music`,
 `video` or `transcription`. A `comfyui` entry adds `workflow`, an `inputs` table of workflow paths and
-`outputs`; generation capabilities are `max_references`, `sizes`, `max_duration_s`, `durations_s`,
+`outputs`; a `command` entry adds `command`, `cwd`, `env` and its project folder variable
+`install.dir_env` (registry files are trusted configuration: a `command` entry runs the program it
+names); generation capabilities are `max_references`, `sizes`, `max_duration_s`, `durations_s`,
 `word_timestamps`, `commercial_use` (information only: it never blocks a call, and it is copied onto every
 result) and `features`; `price` also takes `per_image` and `per_output_second`. `max_timeout_s` defaults
 by kind: image 600 s, music 1800 s, video 3600 s, transcription 600 s. The keys `lyrics_format`,
 `prompt_inputs`, `guide`, `install`, `command`, `cwd` and `env` are checked when the registry loads. An
 `openai_compatible` entry of kind `image` or `video` calls a hosted images or video API; its `inputs` is a
 list of extra input names sent as request fields. See [generation.md](generation.md#comfyui-entries) and
-[hosted entries](generation.md#hosted-images-and-video).
+[hosted entries](generation.md#hosted-images-and-video) and
+[standalone projects](generation.md#standalone-projects-command-entries).
 
 **Runnable examples:** [registry.py](../examples/registry.py), [openai_compatible.py](../examples/openai_compatible.py), [litellm_provider.py](../examples/litellm_provider.py).

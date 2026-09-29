@@ -265,6 +265,121 @@ r.job_id, r.cost_usd, r.cost_estimated  # 'video_...', 0.8, True
 - **Cost** is naive: `per_image` times the images, or `per_output_second` times the seconds of video
   (measured with `ffprobe`, else the `duration_s` asked for); real prices vary by size and quality.
 
+## Standalone projects (`command` entries)
+
+Some models ship as research code with their own Python, torch and scripts (SongGeneration, DiffRhythm2):
+importing them would break the caller's environment. A `command` entry runs one job as a subprocess in
+the project's own environment instead, through a small file protocol. The process exit frees the GPU
+memory, so there is no unload step; the call holds a GPU lease for the entry's `vram_gb` while it runs.
+
+```toml
+[models."songgeneration-v2-medium"]
+provider = "command"
+kind = "music"
+command = ["$HONE_LEVO2_DIR/.venv/bin/python", "{adapter:levo2}", "{request}"]
+inputs = ["generate_type"]                         # mixed | vocal | bgm | separate
+defaults = { generate_type = "mixed", low_mem = true }
+[models."songgeneration-v2-medium".install]
+dir_env = "HONE_LEVO2_DIR"                         # the project folder; also the default cwd
+[models."songgeneration-v2-medium".capabilities]
+vram_gb = 7.5
+```
+
+- `command` is a list. `{request}` is the path of the job's `request.json`, `{out_dir}` the folder the
+  program writes into, `{adapter:<name>}` a script shipped in `hone_models/data/adapters/` (`levo2`).
+  `~`, `$VAR` and `${VAR}` are expanded in `command`, `cwd` and the `env` values; an unset variable is a
+  `ConfigError` naming it.
+- `install.dir_env` names the project folder variable: when it is unset or not a folder the call raises
+  `ConfigError` before the lease, and `cwd` defaults to that folder. No machine paths go into the
+  entry.
+- The program runs in its own process group with the clean environment of `mk.session("ollama")`
+  (without `VIRTUAL_ENV`, `LD_LIBRARY_PATH`, `PYTHONPATH`, `PYTHONHOME`) plus the entry's `env`. Its
+  stdin is empty.
+- **Registry files are trusted configuration.** A `command` entry runs the program it names with your
+  permissions, just as other entries name servers and key variables. Load only registry files you would
+  run as a script.
+
+**The protocol.** hone-models makes a fresh job folder next to `out` (`<out name>.job-<id>/`) and writes
+`request.json` there:
+
+```json
+{"model": "songgeneration-v2-medium", "prompt": "female, pop, piano", "seed": 7,
+ "out_dir": "/abs/takes/take.flac.job-3f2a9c1b04de/out",
+ "inputs": {"lyrics": "[verse] ...", "generate_type": "mixed", "source": "/abs/ref.wav"},
+ "defaults": {"generate_type": "mixed", "low_mem": true}}
+```
+
+`inputs` holds the checked inputs with the entry's defaults applied, file inputs as absolute paths;
+`defaults` is the entry's whole `defaults` table, for options that are not inputs (`low_mem`). The
+program writes its files into `out_dir` and may write `out_dir/result.json`:
+`{"files": ["audios/take.flac"], "error": null, "meta": {...}}` (files relative to `out_dir`).
+
+| The program | The call |
+|---|---|
+| `result.json` has an `error` (whatever the exit code) | `result.error`, `error_kind` from the message (`out_of_memory`, ...) |
+| exits 0 with files | the files listed in `result.json`, else every file in `out_dir` by name, moved to `out` |
+| exits 0 without files | `result.error`, `error_kind = "no_output"` |
+| exits with another code, or is killed by a signal | `ProviderError` with the last 40 lines of stderr |
+| runs past `timeout_s`, or the caller is interrupted | SIGTERM to the process group, SIGKILL 10 s later; `ModelTimeout` (or the interrupt re-raised) |
+
+The last 40 lines of stderr (4 KiB at most, content) are recorded as `hone.models.media.log_tail`. The
+job folder is removed after a success and kept after a failure, with `request.json`, `stdout.log` and
+`stderr.log`, for a look at what went wrong.
+
+**Writing an adapter.** An adapter is one script in `hone_models/data/adapters/<name>.py`, run with the
+project's own Python (which may be older than hone-models' own: `levo2.py` runs on 3.10). It imports
+only the standard library until the request is converted, so a bad request is reported without loading
+the project; then it hands over:
+
+1. Read `request.json`; convert it to the project's input. Report a request the project cannot take as
+   `{"error": "..."}` in `result.json` and exit 0.
+2. Set up what the project's own launch script sets (environment variables, `sys.path`, the working
+   folder), import the project, and set the seeds it does not take as options (Python, NumPy, torch).
+3. Run the generation; write `result.json` with the files, or with the error of a run that failed
+   (out of memory, no GPU) and exit 0. A failure to import the project is left to crash: a non-zero exit
+   with its traceback in stderr is a `ProviderError`, which is what it is.
+
+`levo2.py` writes LeVo's JSONL (`idx`, `gt_lyric` = the `lyrics` input as given, already in LeVo's
+section format; `descriptions` = the prompt, comma-separated tags), takes `generate_type` from the inputs
+and `low_mem`, `flash_attn` (default off) and `checkpoint` (default `songgeneration_v2_medium`) from
+`defaults`, and runs the same generation as `generate.sh <checkpoint> <jsonl> <out_dir> --low_mem
+--not_use_flash_attn`. Test an adapter's conversion by calling its functions directly, and the whole
+chain with a fake project folder (see `tests/integration/test_levo2_command.py`).
+
+A command entry run end to end, with a tiny program in place of a project:
+
+```python
+import os
+import sys
+from pathlib import Path
+
+import hone_models as mk
+
+Path("tone").mkdir(exist_ok=True)
+Path("tone/make.py").write_text("""
+import json, sys, wave
+from pathlib import Path
+request = json.loads(Path(sys.argv[1]).read_text())
+with wave.open(str(Path(request["out_dir"]) / "tone.wav"), "wb") as w:
+    w.setnchannels(1); w.setsampwidth(2); w.setframerate(8000)
+    w.writeframes(b"\\0\\0" * 8000 * int(request["inputs"]["duration_s"]))
+print("made a tone", file=sys.stderr)
+""")
+Path("tone/models.toml").write_text("""
+[models.tone]
+provider = "command"
+kind = "music"
+command = ["$TONE_PYTHON", "make.py", "{request}"]
+install = { dir_env = "TONE_DIR" }
+capabilities = { vram_gb = 0.5 }
+""")
+os.environ["TONE_PYTHON"], os.environ["TONE_DIR"] = sys.executable, str(Path("tone").resolve())
+song = mk.music("tone", registry=mk.registry.load(["tone/models.toml"]))
+r = song.generate("a test tone", duration_s=2, out="takes/tone.wav")
+print(r.path, r.files[0].duration_s, r.job_id)
+assert r.files[0].duration_s == 2.0
+```
+
 ## Records
 
 Each call records one span, `hone.models.image`, `hone.models.music` or `hone.models.video`, with
@@ -274,6 +389,8 @@ the outputs (`hone.models.media.outputs`), the job id, the workflow hash, whethe
 session, loaded the model, freed it or started the server, the time it queued, the error and its kind,
 the license, `commercial_use`, and the naive cost; a hosted image model's `revised_prompt` (content) and a
 hosted video job's `progress` events. See [records-and-replay.md](records-and-replay.md).
+the license, `commercial_use`, the naive cost, and for `command` entries the end of stderr
+(`hone.models.media.log_tail`). See [records-and-replay.md](records-and-replay.md).
 
 ## Testing
 

@@ -8,7 +8,8 @@ Lyrics have one common format: section tags on their own line, then one sung lin
     We run until the morning
 
 An entry's `lyrics_format` names the converter: `sections` (as is), `levo` (SongGeneration's
-`[verse] line. line. ; [chorus] ...`), `plain` (tags removed). `prompt_inputs` are named inputs written into
+`[verse] line. line. ; [chorus] ...`), `heartmula` (HeartMuLa's `[Verse]`, `[Prechorus]` markers, a blank
+line between sections), `plain` (tags removed). `prompt_inputs` are named inputs written into
 the prompt as the phrase the entry maps the chosen value to (`camera_angle="left_45"`).
 """
 
@@ -33,6 +34,7 @@ LEVO_INSTRUMENTAL = (
     *(f"{part}-{length}" for part in ("intro", "inst", "outro") for length in ("short", "medium", "long")),
     "silence",
 )
+_HEARTMULA_TAGS = {"pre-chorus": "prechorus", "inst": "instrumental"}
 _LEVO_TAGS = {"intro": "intro-short", "inst": "inst-short", "outro": "outro-short", "pre-chorus": "verse"}
 # `;` separates LeVo's sections and `.` its lines; full-width punctuation is not allowed (README).
 _LEVO_PUNCTUATION = str.maketrans({
@@ -57,13 +59,24 @@ def sections(text: str) -> list[Section]:
 
 
 def to_sections(text: str) -> str:
-    """The common format as is (ACE-Step, HeartMuLa and YuE2 read these tags)."""
+    """The common format as is (ACE-Step, MiniMax-Music3 and YuE2 read these tags)."""
     return text
 
 
 def to_plain(text: str) -> str:
     """Only the sung lines: tags removed, a blank line between sections."""
     return "\n\n".join("\n".join(lines) for _, lines in sections(text) if lines)
+
+
+def to_heartmula(text: str) -> str:
+    """HeartMuLa's form (heartlib's README): `[Intro]`, `[Verse]`, `[Prechorus]`, `[Chorus]`, `[Bridge]`,
+    `[Outro]` on their own line, a blank line between sections. `[pre-chorus]` becomes `[Prechorus]` and
+    `[inst]` `[Instrumental]` (the ComfyUI node's marker); other tags are capitalised as they are."""
+    parts: list[str] = []
+    for tag, lines in sections(text):
+        head = [f"[{_HEARTMULA_TAGS.get(tag, tag).capitalize()}]"] if tag else []
+        parts.append("\n".join(head + lines))
+    return "\n\n".join(parts)
 
 
 def to_levo(text: str) -> str:
@@ -108,7 +121,9 @@ def _levo_lines(lines: list[str]) -> str:
     return ". ".join(cleaned) + "."
 
 
-LYRICS: dict[str, Callable[[str], str]] = {"sections": to_sections, "levo": to_levo, "plain": to_plain}
+LYRICS: dict[str, Callable[[str], str]] = {
+    "sections": to_sections, "levo": to_levo, "heartmula": to_heartmula, "plain": to_plain,
+}  # fmt: skip
 
 
 def convert_lyrics(text: str, lyrics_format: str) -> str:

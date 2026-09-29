@@ -50,6 +50,14 @@ def test_levo_maps_common_tags_and_cleans_punctuation() -> None:
     )  # Chinese lines: joined with '.', no final period (LeVo's README)
 
 
+def test_heartmula_uses_its_readme_markers() -> None:
+    text = "untagged start\n[intro]\n[verse]\nOne\nTwo\n[pre-chorus]\nWait\n[inst]\n[chorus]\nHook\n[outro]"
+    assert formats.convert_lyrics(text, "heartmula") == (
+        "untagged start\n\n[Intro]\n\n[Verse]\nOne\nTwo\n\n[Prechorus]\nWait\n\n[Instrumental]\n\n"
+        "[Chorus]\nHook\n\n[Outro]"
+    )  # heartlib's README: [Intro], [Verse], [Prechorus], [Chorus], [Bridge], [Outro], a blank line between
+
+
 @pytest.mark.parametrize(
     ("text", "message"),
     [
@@ -81,6 +89,9 @@ def test_converters_keep_every_sung_line(song: list[tuple[str, list[str]]]) -> N
     text = "\n".join(f"[{tag}]\n" + "\n".join(lines) for tag, lines in song)
     assert formats.sections(formats.to_sections(text)) == [(tag, lines) for tag, lines in song]
     assert formats.to_plain(text).split() == [line for _, lines in song for line in lines]
+    assert formats.sections(formats.to_heartmula(text)) == [
+        ("prechorus" if tag == "pre-chorus" else tag, lines) for tag, lines in song
+    ]
     levo = formats.to_levo(text).split(" ; ")
     assert len(levo) == len(song)
     for part, (_, lines) in zip(levo, song, strict=True):

@@ -79,7 +79,7 @@ class ModelConfig(BaseModel):
     command: list[str] | None = None
     cwd: str | None = None
     env: dict[str, str] | None = None
-    lyrics_format: Literal["sections", "levo", "plain"] | None = None
+    lyrics_format: Literal["sections", "levo", "heartmula", "plain"] | None = None
     prompt_inputs: dict[str, PromptInput] | None = None
     guide: Guide | None = None
     install: Install | None = None

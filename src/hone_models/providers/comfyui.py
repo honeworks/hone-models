@@ -199,8 +199,9 @@ def _output_files(outputs: Any, nodes: list[str] | None) -> list[Any]:
     found: list[Any] = []
     for node in order:
         for items in outputs.get(node, {}).values():
-            listed = cast(list[Any], items) if isinstance(items, list) else []
-            found += [i for i in listed if "filename" in i and (nodes or i.get("type") != "temp")]
+            listed = cast(list[Any], items) if isinstance(items, list) else []  # files, or flags ("animated")
+            files: list[Any] = [i for i in listed if isinstance(i, dict) and "filename" in i]
+            found += [i for i in files if nodes or i.get("type") != "temp"]
     return found
 
 

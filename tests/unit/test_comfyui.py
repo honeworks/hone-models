@@ -67,6 +67,14 @@ def test_more_references_than_slots(tmp_path: Path) -> None:
         _comfyui_workflow.fill(flow, cfg, {"references": ["a", "b"]})
 
 
+def test_video_outputs_carry_flags_next_to_the_files() -> None:
+    # SaveVideo's history entry: {"images": [...files], "animated": [true]}
+    video = {"filename": "clip_00001_.mp4", "subfolder": "hone", "type": "output"}
+    outputs = {"58": {"images": [video], "animated": [True]}}
+    assert comfyui._output_files(outputs, ["58"]) == [video]
+    assert comfyui._output_files(outputs, None) == [video]
+
+
 def test_older_server_cancel_and_default_outputs(tmp_path: Path) -> None:
     img = mk.image("test-image", registry=registry())
     with FakeComfyUI(jobs_api=False) as server:

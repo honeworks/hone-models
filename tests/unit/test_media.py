@@ -1,11 +1,11 @@
 """The media client: input checks, seeds, cost, sessions, factories, records; and FakeMedia."""
 
-import shutil
 from pathlib import Path
 
 import pytest
 
 import hone_models as mk
+from hone_models import _media_files
 from hone_models.errors import CapabilityError, ConfigError
 from hone_models.providers.common import error_kind
 from hone_models.testing import FakeMedia
@@ -82,7 +82,9 @@ def test_seed_default_random_and_recorded(reg: mk.registry.Registry, tmp_path: P
     assert [s["attributes"]["gen_ai.request.seed"] for s in spans(fake)] == [c[2] for c in fake.calls]
 
 
-def test_naive_cost_per_image_and_per_second(reg: mk.registry.Registry, tmp_path: Path) -> None:
+def test_naive_cost_per_image_and_per_second(
+    reg: mk.registry.Registry, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     img = FakeMedia.like("test-gpt-image", registry=reg)
     r = img.generate("two cats", n=2, out=tmp_path / "cats.png")
     assert [f.path.name for f in r.files] == ["cats_1.png", "cats_2.png"]
@@ -90,10 +92,12 @@ def test_naive_cost_per_image_and_per_second(reg: mk.registry.Registry, tmp_path
     assert (r.cost_usd, r.cost_estimated, r.license, r.commercial_use) == (0.08, True, "proprietary", None)
     attrs = spans(img)[0]["attributes"]
     assert (attrs["hone.models.cost_usd"], attrs["hone.models.media.cost_estimated"]) == (0.08, True)
-    clip = FakeMedia.like("test-sora", registry=reg).generate("a wave", duration_s=4, out=tmp_path / "c.mp4")
-    # the packaged clip is 1 s when ffprobe reads it; without ffprobe the 4 s asked for are billed (D-031)
-    expected = 0.1 if shutil.which("ffprobe") else 0.4
-    assert clip.cost_usd == pytest.approx(expected)
+    monkeypatch.setattr(_media_files, "_ffprobe", lambda path: (None, None, 1.0))  # a 1 s clip
+    sora = FakeMedia.like("test-sora", registry=reg)
+    assert sora.generate("a wave", duration_s=4, out=tmp_path / "b.mp4").cost_usd == pytest.approx(0.1)
+    monkeypatch.setattr(_media_files, "_ffprobe", lambda path: (None, None, None))  # no ffprobe
+    clip = sora.generate("a wave", duration_s=4, out=tmp_path / "c.mp4")
+    assert clip.cost_usd == pytest.approx(0.4)  # ffprobe read nothing: the 4 s asked for are billed (D-031)
     song = FakeMedia(kind="music").generate("hum", duration_s=2, out=tmp_path / "s.wav")
     assert (song.cost_usd, song.cost_estimated) == (None, False)
 

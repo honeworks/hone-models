@@ -5,6 +5,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import shutil
 import urllib.request
 from collections.abc import Iterator
 from pathlib import Path
@@ -14,6 +15,9 @@ import pytest
 os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")  # no network fetch when LiteLLM is imported
 OLLAMA_URL = os.environ.get("HONE_TEST_OLLAMA_URL", "http://127.0.0.1:11434")
 FIXTURES = Path(__file__).parent / "fixtures" / "http"
+REAL_OUT = (
+    Path(__file__).resolve().parents[1] / ".hone" / "gpu-tests"
+)  # real disk: /tmp may be a small RAM disk
 
 
 def load_fixture(name: str) -> dict:
@@ -39,6 +43,9 @@ def isolated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.delenv("HONE_CAPTURE_CONTENT", raising=False)
     monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    monkeypatch.setenv("HONE_COMFYUI_DIR", str(tmp_path / "no-comfyui"))  # installed checks stay offline
+    for module in ("registry", "providers._comfyui_server", "_machine_read"):  # never a real ComfyUI
+        monkeypatch.setattr(f"hone_models.{module}.COMFYUI_URL", "http://127.0.0.1:9")  # port 9: discard
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("hone_models.records._SECRETS", set())
     monkeypatch.setattr("hone_models.providers.ollama.loaded", set())  # a short lease would unload these
@@ -96,3 +103,13 @@ def ollama_model(gpu_lock: None):
             urllib.request.urlopen(req, timeout=30).read()  # noqa: S310
         except OSError:
             pass
+
+
+@pytest.fixture
+def real_out(request: pytest.FixtureRequest) -> Iterator[Path]:
+    """A folder for the files a real model writes, under the repository's `.hone/`; removed afterwards."""
+    folder = REAL_OUT / request.node.name.replace("/", "_")
+    shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir(parents=True)
+    yield folder
+    shutil.rmtree(folder, ignore_errors=True)

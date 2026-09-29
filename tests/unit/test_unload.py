@@ -28,5 +28,5 @@ def test_unload_uses_the_model_server(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_hosted_models_cannot_be_unloaded() -> None:
-    with pytest.raises(ConfigError, match="only Ollama models"):
+    with pytest.raises(ConfigError, match="only Ollama and ComfyUI models"):
         mk.unload("gpt-4.1-mini")

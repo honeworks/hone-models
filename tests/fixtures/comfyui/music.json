@@ -1,0 +1,7 @@
+{
+  "3": {"class_type": "KSampler", "inputs": {"seed": ["109", 0], "steps": 8, "positive": ["94", 0], "latent_image": ["98", 0]}},
+  "94": {"class_type": "TextEncodeAceStepAudio", "inputs": {"tags": "", "lyrics": "", "duration": 120, "bpm": 120, "keyscale": "C major"}},
+  "98": {"class_type": "EmptyAceStepLatentAudio", "inputs": {"seconds": 120, "batch_size": 1}},
+  "109": {"class_type": "PrimitiveInt", "inputs": {"value": 0}},
+  "111": {"class_type": "SaveAudio", "inputs": {"filename_prefix": "hone/test-music", "audio": ["3", 0]}}
+}

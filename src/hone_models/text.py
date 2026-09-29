@@ -23,7 +23,7 @@ from .prompt import Prompt
 from .providers import CHAT, PROBE, lookup, model_attributes
 from .providers.common import ChatReply, ChatRequest, images_of
 from .records import default_sink
-from .registry import ModelConfig, Registry, load, unmet
+from .registry import ModelConfig, Registry, load, require_client, unmet
 from .structured import Outcome, Schema, run_structured, schema_dict, with_schema_instruction
 
 REQUEST_ATTRS = ("temperature", "top_p", "seed")
@@ -285,6 +285,7 @@ def text(
     missing = unmet(cfg, require or {}) if model_id else []
     if missing:
         raise CapabilityError(f"model {cfg.id!r} does not meet {', '.join(missing)}")
+    require_client(cfg)
     if cfg.kind != "chat":
         raise ConfigError(
             f"model {cfg.id!r} is a {cfg.kind} model; use mk.embedder(), mk.decision() or mk.speech()"

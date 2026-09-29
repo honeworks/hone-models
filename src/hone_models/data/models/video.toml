@@ -1,0 +1,233 @@
+# Packaged catalog: video (change 0015 §3b). ComfyUI entries have `workflow` and `inputs` once the workflow
+# is proven (`hone-models models check`, D-070); `vram_gb` is the peak that check measured. Wan and LTX count frames: an `inputs` mapping converts seconds
+# (`{ path = "<node>.length", per_second = 16, add = 1 }`).
+
+[models."wan2.2-i2v-14b"]
+provider = "comfyui"
+kind = "video"
+workflow = "workflows/wan2.2-i2v-14b.json"
+outputs = ["108"]
+defaults = { size = "640x640", duration_s = 5 }
+[models."wan2.2-i2v-14b".inputs]
+prompt = "93.text"
+negative = "89.text"
+seed = "86.noise_seed"
+image = "97.image"
+duration_s = { path = "98.length", per_second = 16, add = 1 }
+width = "98.width"
+height = "98.height"
+[models."wan2.2-i2v-14b".capabilities]
+vram_gb = 6.5
+max_duration_s = 5
+license = "Apache-2.0"
+commercial_use = true
+[models."wan2.2-i2v-14b".install]
+source = "https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B"
+files = [
+  { repo = "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", file = "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", file = "split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", file = "split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors", to = "loras" },
+  { repo = "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", file = "split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors", to = "loras" },
+  { repo = "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", file = "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", file = "split_files/vae/wan_2.1_vae.safetensors", to = "vae" },
+]
+size_gb = 38.0
+tier = 1
+note = "image to video, 4 steps with the lightx2v LoRAs; the two 14 GB experts are offloaded to RAM (do not run two such jobs at once)"
+[models."wan2.2-i2v-14b".guide]
+summary = "Animates a start frame into a short clip (about 5 s at 16 fps); strong motion and camera moves."
+prompt = "Describe the motion and the camera, not the picture: 'slow push-in, candle flicker, hair moves in the wind'."
+inputs = { image = "the start frame (required)", duration_s = "seconds at 16 fps, 81 frames for 5 s; 5 s at most" }
+source = "https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B"
+checked = 2026-09-29
+[[models."wan2.2-i2v-14b".guide.features]]
+name = "camera motion"
+how = "Name the camera move in the prompt."
+input = "image"
+examples = ["slow push-in", "orbit left around the subject", "handheld tracking shot"]
+source = "https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B"
+
+[models."wan2.2-ti2v-5b"]
+provider = "comfyui"
+kind = "video"
+workflow = "workflows/wan2.2-ti2v-5b.json"
+outputs = ["58"]
+defaults = { size = "1280x704", duration_s = 5, steps = 20 }
+[models."wan2.2-ti2v-5b".inputs]
+prompt = "6.text"
+negative = "7.text"
+seed = "3.seed"
+steps = "3.steps"
+image = ["56.image"]                                   # a slot: optional (text to video without it)
+duration_s = { path = "55.length", per_second = 24, add = 1 }
+width = "55.width"
+height = "55.height"
+[models."wan2.2-ti2v-5b".capabilities]
+vram_gb = 6.5
+license = "Apache-2.0"
+commercial_use = true
+[models."wan2.2-ti2v-5b".install]
+source = "https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B"
+files = [
+  { repo = "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", file = "split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", file = "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", file = "split_files/vae/wan2.2_vae.safetensors", to = "vae" },
+]
+size_gb = 18.2
+tier = 2
+note = "small Wan: text or image to video at 720p, 24 fps"
+[models."wan2.2-ti2v-5b".guide]
+summary = "Small Wan 2.2: text-to-video or image-to-video in one 5B model."
+prompt = "Describe the scene, the motion and the camera."
+inputs = { image = "an optional start frame; without it the clip comes from the prompt alone", duration_s = "seconds at 24 fps (121 frames for 5 s)" }
+source = "https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B"
+checked = 2026-09-29
+
+[models."ltx-video-2b-0.9.5"]
+provider = "comfyui"
+kind = "video"
+workflow = "workflows/ltx-video-2b-0.9.5.json"
+outputs = ["81"]
+defaults = { size = "768x512", duration_s = 4, steps = 30 }
+[models."ltx-video-2b-0.9.5".inputs]
+prompt = "6.text"
+negative = "7.text"
+seed = "72.noise_seed"
+steps = "71.steps"
+image = "78.image"
+duration_s = { path = "77.length", per_second = 24, add = 1 }
+width = "77.width"
+height = "77.height"
+[models."ltx-video-2b-0.9.5".capabilities]
+vram_gb = 6.4
+license = "LTX Video 2B 0.9.5 Open RAIL-M (use restrictions)"
+commercial_use = true
+[models."ltx-video-2b-0.9.5".install]
+source = "https://huggingface.co/Lightricks/LTX-Video"
+files = [
+  { repo = "Lightricks/LTX-Video", file = "ltx-video-2b-v0.9.5.safetensors", to = "checkpoints" },
+  { repo = "comfyanonymous/flux_text_encoders", file = "t5xxl_fp16.safetensors", to = "text_encoders" },
+]
+size_gb = 16.1
+tier = 3
+note = "older, fast LTX-Video (25 fps)"
+[models."ltx-video-2b-0.9.5".guide]
+summary = "Fast, older text- and image-to-video (LTX-Video 2B)."
+prompt = "Long, detailed, chronological description of the action, the camera and the light."
+inputs = { image = "the start frame (required), kept as the first frame", duration_s = "seconds at 24 fps (97 frames for 4 s)" }
+source = "https://huggingface.co/Lightricks/LTX-Video"
+checked = 2026-09-29
+
+[models."minimax-h3"]
+provider = "comfyui"
+kind = "video"
+[models."minimax-h3".capabilities]
+license = "MiniMax-H3 community license (credit; written authorization above 20 M USD yearly revenue)"
+commercial_use = true
+[models."minimax-h3".install]
+source = "https://huggingface.co/MiniMaxAI/MiniMax-H3"
+files = [
+  { repo = "Comfy-Org/MiniMax-H3", file = "diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/MiniMax-H3", file = "loras/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors", to = "loras" },
+  { repo = "Comfy-Org/MiniMax-H3", file = "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/MiniMax-H3", file = "vae/minimax_h3_video_vae_fp16.safetensors", to = "vae" },
+  { repo = "Comfy-Org/MiniMax-H3", file = "vae/minimax_h3_audio_vae_fp32.safetensors", to = "vae" },
+]
+size_gb = 44.4
+tier = 3
+note = "the trending open video model with audio (33B); heavy for 8 GB; files as in ComfyUI's image-to-video template"
+[models."minimax-h3".guide]
+summary = "Video with synchronized audio from a first (and last) frame and a prompt; very heavy here."
+prompt = "Describe the action, the camera and the sound."
+source = "https://huggingface.co/MiniMaxAI/MiniMax-H3"
+checked = 2026-09-29
+
+[models."ltx-2.5"]
+provider = "comfyui"
+kind = "video"
+[models."ltx-2.5".capabilities]
+license = "LTX-2 community license agreement"
+[models."ltx-2.5".install]
+source = "https://huggingface.co/Lightricks/LTX-2.5"
+files = [
+  { repo = "Lightricks/LTX-2.5", file = "diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", to = "diffusion_models" },
+  { repo = "Lightricks/LTX-2.5", file = "text_encoders/gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors", to = "text_encoders" },
+  { repo = "Lightricks/LTX-2.5", file = "vae/ltx-2.5-video-vae-bf16.safetensors", to = "vae" },
+  { repo = "Lightricks/LTX-2.5", file = "vae/ltx-2.5-audio-vae-bf16.safetensors", to = "vae" },
+  { repo = "Lightricks/LTX-2.5", file = "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors", to = "latent_upscale_models" },
+]
+size_gb = 40.3
+tier = 2
+note = "fast video with audio; gated on Hugging Face (accept the licence first); read the community licence before publishing"
+[models."ltx-2.5".guide]
+summary = "Fast text- and image-to-video with audio (LTX-2.5, distilled)."
+prompt = "Long, detailed, chronological description of the action, the camera, the light and the sound."
+source = "https://huggingface.co/Lightricks/LTX-2.5"
+checked = 2026-09-29
+
+[models."scail-2"]
+provider = "comfyui"
+kind = "video"
+[models."scail-2".capabilities]
+license = "MIT"
+commercial_use = true
+[models."scail-2".install]
+source = "https://huggingface.co/zai-org/SCAIL-2"
+files = [
+  { repo = "Comfy-Org/SCAIL-2", file = "diffusion_models/wan2.1_14B_SCAIL_2_fp8_scaled.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/SCAIL-2", file = "loras/wan2.1_SCAIL_2_DPO_lora_bf16.safetensors", to = "loras" },
+  { repo = "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", file = "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", file = "split_files/vae/wan_2.1_vae.safetensors", to = "vae" },
+]
+size_gb = 25.9
+tier = 2
+note = "character animation from a driving video (to check); ComfyUI's template also uses clip_vision_h and SAM 3.1"
+[models."scail-2".guide]
+summary = "Animates a reference character with a driving video; character replacement; multi-character scenes."
+prompt = "Short description of the scene; the motion comes from the driving video."
+source = "https://huggingface.co/zai-org/SCAIL-2"
+checked = 2026-09-29
+
+[models."sora-2"]
+provider = "openai_compatible"
+kind = "video"
+model = "sora-2"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+[models."sora-2".capabilities]
+sizes = ["720x1280", "1280x720"]
+durations_s = [4, 8, 12]
+max_references = 1
+price = { per_output_second = 0.10 }
+license = "OpenAI service terms (hosted)"
+commercial_use = true
+[models."sora-2".install]
+source = "https://platform.openai.com/docs/guides/video-generation"
+note = "hosted: nothing to install; set OPENAI_API_KEY"
+[models."sora-2".guide]
+summary = "Hosted video with sound, 4, 8 or 12 s; a start image as the first frame."
+prompt = "Describe the shot like a storyboard: subject, action, camera, light, sound; one shot per call."
+source = "https://platform.openai.com/docs/guides/video-generation"
+checked = 2026-09-29
+
+[models."sora-2-pro"]
+provider = "openai_compatible"
+kind = "video"
+model = "sora-2-pro"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+[models."sora-2-pro".capabilities]
+sizes = ["720x1280", "1280x720", "1024x1792", "1792x1024"]
+durations_s = [4, 8, 12]
+max_references = 1
+price = { per_output_second = 0.30 }
+license = "OpenAI service terms (hosted)"
+commercial_use = true
+[models."sora-2-pro".install]
+source = "https://platform.openai.com/docs/guides/video-generation"
+note = "hosted: nothing to install; set OPENAI_API_KEY"
+[models."sora-2-pro".guide]
+summary = "Hosted video with sound, higher quality and larger sizes than sora-2; slower and dearer."
+prompt = "Describe the shot like a storyboard: subject, action, camera, light, sound; one shot per call."
+source = "https://platform.openai.com/docs/guides/video-generation"
+checked = 2026-09-29

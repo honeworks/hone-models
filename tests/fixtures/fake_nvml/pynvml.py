@@ -1,4 +1,4 @@
-"""A fake `pynvml` reporting one GPU with 8 GB total and nothing used (AC-12)."""
+"""A fake `pynvml`: one GPU ("Fake GPU"), 8 GB total, nothing used, 0 % utilization (AC-12)."""
 
 from types import SimpleNamespace
 
@@ -27,3 +27,15 @@ def nvmlDeviceGetMemoryInfo(handle: int) -> SimpleNamespace:
 
 def nvmlDeviceGetComputeRunningProcesses(handle: int) -> list[SimpleNamespace]:
     return []
+
+
+def nvmlDeviceGetCount() -> int:
+    return 1
+
+
+def nvmlDeviceGetName(handle: int) -> str:
+    return "Fake GPU"
+
+
+def nvmlDeviceGetUtilizationRates(handle: int) -> SimpleNamespace:
+    return SimpleNamespace(gpu=0, memory=0)

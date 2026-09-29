@@ -1,0 +1,447 @@
+# Packaged catalog: music and songs (change 0015 §3b). `lyrics_format` names how the common lyrics format
+# (section tags on their own line, one sung line per line) is converted for the model (formats.py).
+# ComfyUI entries have `workflow` and `inputs` once the workflow is proven (`hone-models models check`,
+# D-070); `vram_gb` is the peak that check measured.
+
+[models."ace-step-1.5-turbo"]
+provider = "comfyui"
+kind = "music"
+workflow = "workflows/ace-step-1.5-turbo.json"
+outputs = ["111"]
+defaults = { duration_s = 120, steps = 8 }
+lyrics_format = "sections"
+[models."ace-step-1.5-turbo".inputs]
+prompt = "94.tags"
+lyrics = "94.lyrics"
+seed = "109.value"
+steps = "3.steps"
+duration_s = ["94.duration", "98.seconds"]
+bpm = "94.bpm"
+key = "94.keyscale"
+time_signature = "94.timesignature"
+language = "94.language"
+[models."ace-step-1.5-turbo".capabilities]
+vram_gb = 6.4
+max_duration_s = 600
+license = "MIT"
+commercial_use = true
+[models."ace-step-1.5-turbo".install]
+source = "https://github.com/ace-step/ACE-Step-1.5"
+files = [
+  { repo = "Comfy-Org/ace_step_1.5_ComfyUI_files", file = "split_files/diffusion_models/acestep_v1.5_turbo.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/ace_step_1.5_ComfyUI_files", file = "split_files/text_encoders/qwen_0.6b_ace15.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/ace_step_1.5_ComfyUI_files", file = "split_files/text_encoders/qwen_4b_ace15.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/ace_step_1.5_ComfyUI_files", file = "split_files/vae/ace_1.5_vae.safetensors", to = "vae" },
+]
+size_gb = 14.7
+tier = 1
+note = "fast full songs with vocals; the text encoders are those of ComfyUI's ACE-Step 1.5 template"
+[models."ace-step-1.5-turbo".guide]
+summary = "Full songs with vocals up to 10 minutes; the fastest ACE-Step; follows genre and instrument tags."
+prompt = "Comma-separated tags: genre, mood, instruments, vocal type, tempo (e.g. 'dark trap, 95 bpm, female vocals, 808')."
+inputs = { lyrics = "the common format: [verse], [chorus], [bridge] ... tags, one sung line per line", key = "e.g. 'C minor', 'F# major'", time_signature = "'2', '3', '4' or '6'", bpm = "beats per minute, 10-300", language = "ISO code of the sung language" }
+source = "https://github.com/ace-step/ACE-Step-1.5"
+checked = 2026-09-29
+[[models."ace-step-1.5-turbo".guide.features]]
+name = "lyrics"
+how = "Sings the lyrics input; section tags shape the song."
+input = "lyrics"
+examples = ["[verse]\nNeon on the water\n[chorus]\nWe run until the morning"]
+source = "https://github.com/ace-step/ACE-Step-1.5"
+
+[models."ace-step-1.5-xl-turbo"]
+provider = "comfyui"
+kind = "music"
+workflow = "workflows/ace-step-1.5-xl-turbo.json"
+outputs = ["111"]
+defaults = { duration_s = 120, steps = 8 }
+lyrics_format = "sections"
+[models."ace-step-1.5-xl-turbo".inputs]
+prompt = "94.tags"
+lyrics = "94.lyrics"
+seed = "109.value"
+steps = "3.steps"
+duration_s = ["94.duration", "98.seconds"]
+bpm = "94.bpm"
+key = "94.keyscale"
+time_signature = "94.timesignature"
+language = "94.language"
+[models."ace-step-1.5-xl-turbo".capabilities]
+vram_gb = 6.4
+max_duration_s = 600
+license = "MIT"
+commercial_use = true
+[models."ace-step-1.5-xl-turbo".install]
+source = "https://github.com/ace-step/ACE-Step-1.5"
+files = [
+  { repo = "Comfy-Org/ace_step_1.5_ComfyUI_files", file = "split_files/diffusion_models/acestep_v1.5_xl_turbo_bf16.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/ace_step_1.5_ComfyUI_files", file = "split_files/text_encoders/qwen_0.6b_ace15.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/ace_step_1.5_ComfyUI_files", file = "split_files/text_encoders/qwen_4b_ace15.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/ace_step_1.5_ComfyUI_files", file = "split_files/vae/ace_1.5_vae.safetensors", to = "vae" },
+]
+size_gb = 19.9
+tier = 1
+note = "the larger ACE-Step, distilled for few steps"
+[models."ace-step-1.5-xl-turbo".guide]
+summary = "Full songs with vocals up to 10 minutes; fast; follows genre and instrument tags well."
+prompt = "Comma-separated tags: genre, mood, instruments, vocal type, tempo (e.g. 'dark trap, 95 bpm, female vocals, 808')."
+inputs = { lyrics = "the common format: [verse], [chorus], [bridge] ... tags, one sung line per line", key = "e.g. 'C minor', 'F# major'", time_signature = "'2', '3', '4' or '6'", bpm = "beats per minute, 10-300", language = "ISO code of the sung language" }
+source = "https://github.com/ace-step/ACE-Step-1.5"
+checked = 2026-09-29
+[[models."ace-step-1.5-xl-turbo".guide.features]]
+name = "lyrics"
+how = "Sings the lyrics input; section tags shape the song."
+input = "lyrics"
+examples = ["[verse]\nNeon on the water\n[chorus]\nWe run until the morning"]
+source = "https://github.com/ace-step/ACE-Step-1.5"
+
+[models."ace-step-1.5-xl-sft"]
+provider = "comfyui"
+kind = "music"
+workflow = "workflows/ace-step-1.5-xl-sft.json"
+outputs = ["111"]
+defaults = { duration_s = 120, steps = 50 }
+lyrics_format = "sections"
+[models."ace-step-1.5-xl-sft".inputs]
+prompt = "94.tags"
+lyrics = "94.lyrics"
+seed = "109.value"
+steps = "3.steps"
+duration_s = ["94.duration", "98.seconds"]
+bpm = "94.bpm"
+key = "94.keyscale"
+time_signature = "94.timesignature"
+language = "94.language"
+[models."ace-step-1.5-xl-sft".capabilities]
+vram_gb = 6.4
+max_duration_s = 600
+license = "MIT"
+commercial_use = true
+[models."ace-step-1.5-xl-sft".install]
+source = "https://github.com/ace-step/ACE-Step-1.5"
+files = [
+  { repo = "Comfy-Org/ace_step_1.5_ComfyUI_files", file = "split_files/diffusion_models/acestep_v1.5_xl_sft_bf16.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/ace_step_1.5_ComfyUI_files", file = "split_files/text_encoders/qwen_0.6b_ace15.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/ace_step_1.5_ComfyUI_files", file = "split_files/text_encoders/qwen_4b_ace15.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/ace_step_1.5_ComfyUI_files", file = "split_files/vae/ace_1.5_vae.safetensors", to = "vae" },
+]
+size_gb = 19.9
+tier = 2
+note = "the larger ACE-Step without distillation: more steps, possibly better quality"
+[models."ace-step-1.5-xl-sft".guide]
+summary = "ACE-Step XL, supervised fine-tune: slower (more steps) than the turbo versions."
+prompt = "Comma-separated tags: genre, mood, instruments, vocal type, tempo."
+inputs = { lyrics = "the common format: [verse], [chorus], [bridge] ... tags, one sung line per line", key = "e.g. 'C minor', 'F# major'", time_signature = "'2', '3', '4' or '6'", bpm = "beats per minute, 10-300", language = "ISO code of the sung language" }
+source = "https://github.com/ace-step/ACE-Step-1.5"
+checked = 2026-09-29
+[[models."ace-step-1.5-xl-sft".guide.features]]
+name = "lyrics"
+how = "Sings the lyrics input; section tags shape the song."
+input = "lyrics"
+examples = ["[verse]\nNeon on the water\n[chorus]\nWe run until the morning"]
+source = "https://github.com/ace-step/ACE-Step-1.5"
+
+[models."minimax-music3"]
+provider = "comfyui"
+kind = "music"
+workflow = "workflows/minimax-music3.json"
+outputs = ["35"]
+defaults = { duration_s = 60, steps = 30 }
+lyrics_format = "sections"
+[models."minimax-music3".inputs]
+prompt = "13.caption"
+lyrics = "13.lyrics"
+seed = "38.seed"
+steps = "9.steps"
+duration_s = "13.max_duration"
+[models."minimax-music3".capabilities]
+vram_gb = 6.3
+license = "MiniMax-Music3 community license (credit 'MiniMax-Music3'; written authorization above 20 M USD yearly revenue)"
+commercial_use = true
+[models."minimax-music3".install]
+source = "https://huggingface.co/MiniMaxAI/MiniMax-Music3"
+files = [
+  { repo = "Comfy-Org/MiniMax-Music-3", file = "diffusion_models/minimax_music3_dit_int8_convrot.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/MiniMax-Music-3", file = "text_encoders/minimax_music3_text_encoder_pruned_int8_convrot.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/MiniMax-Music-3", file = "vae/minimax_music3_dav.safetensors", to = "vae" },
+]
+size_gb = 11.9
+tier = 1
+note = "commercial use needs the 'MiniMax-Music3' credit on the product's interface"
+[models."minimax-music3".guide]
+summary = "Songs with vocals from a style description and lyrics."
+inputs = { duration_s = "the longest the song may be, up to 360 s (the model's max_duration)" }
+prompt = "A short style description: genre, mood, instruments, vocals."
+source = "https://huggingface.co/MiniMaxAI/MiniMax-Music3"
+checked = 2026-09-29
+[[models."minimax-music3".guide.features]]
+name = "lyrics"
+how = "Sings the lyrics input with section tags."
+input = "lyrics"
+examples = ["[verse]\nNeon on the water\n[chorus]\nWe run until the morning"]
+source = "https://huggingface.co/MiniMaxAI/MiniMax-Music3"
+
+[models."yue2-3b"]
+provider = "comfyui"
+kind = "music"
+workflow = "workflows/yue2-3b.json"
+outputs = ["10"]
+defaults = { duration_s = 120, steps = 32 }
+lyrics_format = "sections"
+[models."yue2-3b".inputs]
+prompt = ["24.style", "25.style"]
+lyrics = ["24.lyrics", "25.lyrics"]
+seed = "34.seed"
+steps = "8.steps"
+duration_s = "25.max_duration"
+[models."yue2-3b".capabilities]
+vram_gb = 4.0
+license = "CC-BY-NC-4.0"
+commercial_use = false
+[models."yue2-3b".install]
+source = "https://huggingface.co/m-a-p/YuE2-3B"
+files = [{ repo = "Comfy-Org/YuE2", file = "checkpoints/yue2_3b_int8_convrot.safetensors", to = "checkpoints" }]
+size_gb = 4.0
+tier = 3
+note = "frontier open song quality, non-commercial; covers also need audio_encoders/sheetsage2_bf16.safetensors from the same repo"
+[models."yue2-3b".guide]
+summary = "Complete songs with vocals from lyrics and a style prompt; quality close to hosted services; non-commercial."
+inputs = { duration_s = "the longest the song may be (the model's max_duration); it writes an ABC sketch first, then the audio" }
+prompt = "A style prompt (genre, instruments, vocal, mood) plus the full lyrics with section tags."
+source = "https://huggingface.co/m-a-p/YuE2-3B"
+checked = 2026-09-29
+[[models."yue2-3b".guide.features]]
+name = "lyrics"
+how = "Sings the full lyrics; section tags set the structure."
+input = "lyrics"
+examples = ["[verse]\nNeon on the water\n[chorus]\nWe run until the morning"]
+source = "https://huggingface.co/m-a-p/YuE2-3B"
+
+[models."heartmula-3b"]
+provider = "comfyui"
+kind = "music"
+workflow = "workflows/heartmula-3b.json"
+outputs = ["5"]
+defaults = { duration_s = 60 }
+lyrics_format = "sections"
+[models."heartmula-3b".inputs]
+prompt = "9.tags"
+lyrics = "9.lyrics"
+seed = "7.seed"
+duration_s = "7.max_duration_sec"
+[models."heartmula-3b".capabilities]
+vram_gb = 6.0  # not measured: the node's ultra mode; its loader fails here (D-073)
+license = "Apache-2.0"
+commercial_use = true
+[models."heartmula-3b".install]
+source = "https://huggingface.co/HeartMuLa/HeartMuLa-oss-3B"
+files = [
+  { repo = "HeartMuLa/HeartMuLa-oss-3B", to = "heartmula/HeartMuLa-oss-3B" },
+  { repo = "HeartMuLa/HeartCodec-oss-20260123", to = "heartmula/HeartCodec-oss" },
+  { repo = "HeartMuLa/HeartMuLaGen", to = "heartmula" },
+]
+size_gb = 22.4
+tier = 2
+note = "custom node ComfyUI_FL-HeartMuLa, which reads one 3B folder (heartmula/HeartMuLa-oss-3B): whichever of the base and RL weights is there is the model that runs"
+[models."heartmula-3b".guide]
+summary = "Songs with vocals from lyrics and style tags (HeartMuLa 3B, custom node). Its ComfyUI node does not load with transformers 5 (D-073)."
+prompt = "Comma-separated style tags: genre, vocal, mood, tempo, instruments (e.g. 'indie rock, male vocal, melancholic, slow, acoustic guitar')."
+inputs = { lyrics = "section tags; the node's own markers are [Intro], [Verse], [Prechorus], [Chorus], [Bridge], [Outro], [Instrumental]" }
+source = "https://github.com/HeartMuLa/heartlib"
+checked = 2026-09-29
+[[models."heartmula-3b".guide.features]]
+name = "lyrics"
+how = "Sings the lyrics input with section markers."
+input = "lyrics"
+examples = ["[Verse]\nWalking down the empty street\n[Chorus]\nWe belong together"]
+source = "https://github.com/HeartMuLa/heartlib"
+
+[models."heartmula-rl-3b"]
+provider = "comfyui"
+kind = "music"
+workflow = "workflows/heartmula-rl-3b.json"
+outputs = ["5"]
+defaults = { duration_s = 60 }
+lyrics_format = "sections"
+[models."heartmula-rl-3b".inputs]
+prompt = "9.tags"
+lyrics = "9.lyrics"
+seed = "7.seed"
+duration_s = "7.max_duration_sec"
+[models."heartmula-rl-3b".capabilities]
+vram_gb = 6.0  # not measured: the node's ultra mode; its loader fails here (D-073)
+license = "Apache-2.0"
+commercial_use = true
+[models."heartmula-rl-3b".install]
+source = "https://huggingface.co/HeartMuLa/HeartMuLa-RL-oss-3B-20260123"
+files = [
+  { repo = "HeartMuLa/HeartMuLa-RL-oss-3B-20260123", to = "heartmula/HeartMuLa-oss-3B" },
+  { repo = "HeartMuLa/HeartCodec-oss-20260123", to = "heartmula/HeartCodec-oss" },
+  { repo = "HeartMuLa/HeartMuLaGen", to = "heartmula" },
+]
+size_gb = 22.4
+tier = 1
+note = "the RL-tuned HeartMuLa; the custom node reads it from heartmula/HeartMuLa-oss-3B (a link to it on this machine)"
+[models."heartmula-rl-3b".guide]
+summary = "HeartMuLa 3B after reinforcement learning: songs with vocals from lyrics and style tags. Its ComfyUI node does not load with transformers 5 (D-073)."
+prompt = "Comma-separated style tags: genre, vocal, mood, tempo, instruments."
+inputs = { lyrics = "section tags; the node's own markers are [Intro], [Verse], [Prechorus], [Chorus], [Bridge], [Outro], [Instrumental]" }
+source = "https://github.com/HeartMuLa/heartlib"
+checked = 2026-09-29
+[[models."heartmula-rl-3b".guide.features]]
+name = "lyrics"
+how = "Sings the lyrics input with section markers."
+input = "lyrics"
+examples = ["[Verse]\nWalking down the empty street\n[Chorus]\nWe belong together"]
+source = "https://github.com/HeartMuLa/heartlib"
+
+[models."stable-audio-open-1.0"]
+provider = "comfyui"
+kind = "music"
+workflow = "workflows/stable-audio-open-1.0.json"
+outputs = ["20"]
+defaults = { duration_s = 30, steps = 50 }
+[models."stable-audio-open-1.0".inputs]
+prompt = "6.text"
+negative = "7.text"
+seed = "3.seed"
+steps = "3.steps"
+duration_s = "11.seconds"
+[models."stable-audio-open-1.0".capabilities]
+vram_gb = 5.7
+max_duration_s = 47
+license = "Stability AI Community License (commercial use under 1 M USD yearly revenue)"
+commercial_use = true
+[models."stable-audio-open-1.0".install]
+source = "https://huggingface.co/stabilityai/stable-audio-open-1.0"
+files = [{ repo = "Comfy-Org/stable-audio-open-1.0_repackaged", file = "stable-audio-open-1.0.safetensors", to = "checkpoints" }]
+size_gb = 4.9
+tier = 3
+note = "instrumental clips and sound effects up to 47 s; also needs text_encoders/t5-base.safetensors (google-t5/t5-base)"
+[models."stable-audio-open-1.0".guide]
+summary = "Short instrumental clips, loops and sound effects (no vocals), up to 47 s."
+prompt = "Descriptive tags: genre, instruments, tempo, mood, recording quality (e.g. '128 BPM tech house drum loop')."
+source = "https://huggingface.co/stabilityai/stable-audio-open-1.0"
+checked = 2026-09-29
+
+[models."stable-audio-3-small-music"]
+provider = "comfyui"
+kind = "music"
+[models."stable-audio-3-small-music".capabilities]
+license = "Stability AI Community License (commercial use under 1 M USD yearly revenue)"
+commercial_use = true
+[models."stable-audio-3-small-music".install]
+source = "https://huggingface.co/stabilityai/stable-audio-3-small-music"
+files = [
+  { repo = "Comfy-Org/stable-audio-3", file = "checkpoints/stable_audio_3_small_music.safetensors", to = "checkpoints" },
+  { repo = "Comfy-Org/stable-audio-3", file = "text_encoders/t5gemma_b_b_ul2.safetensors", to = "text_encoders" },
+]
+size_gb = 3.5
+tier = 2
+note = "small instrumental music model"
+[models."stable-audio-3-small-music".guide]
+summary = "Instrumental music from a text description (Stable Audio 3, small)."
+prompt = "Descriptive tags: genre, instruments, tempo, mood."
+source = "https://huggingface.co/stabilityai/stable-audio-3-small-music"
+checked = 2026-09-29
+
+[models."stable-audio-3-medium"]
+provider = "comfyui"
+kind = "music"
+[models."stable-audio-3-medium".capabilities]
+license = "Stability AI Community License (commercial use under 1 M USD yearly revenue)"
+commercial_use = true
+[models."stable-audio-3-medium".install]
+source = "https://huggingface.co/stabilityai/stable-audio-3-medium"
+files = [
+  { repo = "Comfy-Org/stable-audio-3", file = "checkpoints/stable_audio_3_medium.safetensors", to = "checkpoints" },
+  { repo = "Comfy-Org/stable-audio-3", file = "text_encoders/t5gemma_b_b_ul2.safetensors", to = "text_encoders" },
+]
+size_gb = 10.4
+tier = 2
+note = "larger Stable Audio 3; ComfyUI's template also loads a qwen3.5_2b text encoder"
+[models."stable-audio-3-medium".guide]
+summary = "Music and sound from a text description (Stable Audio 3, medium)."
+prompt = "Descriptive tags: genre, instruments, tempo, mood."
+source = "https://huggingface.co/stabilityai/stable-audio-3-medium"
+checked = 2026-09-29
+
+[models."mulacover"]
+provider = "comfyui"
+kind = "music"
+[models."mulacover".capabilities]
+license = "CC-BY-NC-4.0"
+commercial_use = false
+[models."mulacover".install]
+source = "https://huggingface.co/HeartMuLa/MuLaCover"
+files = [{ repo = "HeartMuLa/MuLaCover", to = "heartmula/MuLaCover" }]
+size_gb = 8.8
+tier = 3
+note = "covers a take in another style; non-commercial; the folder the node expects is unverified"
+[models."mulacover".guide]
+summary = "Re-sings or re-arranges an existing song in another style (cover); non-commercial."
+prompt = "Style tags for the cover; the source audio is the song to cover."
+source = "https://huggingface.co/HeartMuLa/MuLaCover"
+checked = 2026-09-29
+
+[models."songgeneration-v2-medium"]
+provider = "command"
+kind = "music"
+command = ["$HONE_LEVO2_DIR/.venv/bin/python", "{adapter:levo2}", "{request}"]
+cwd = "$HONE_LEVO2_DIR"
+inputs = ["generate_type"]                         # mixed | vocal | bgm | separate
+defaults = { generate_type = "mixed", low_mem = true }
+lyrics_format = "levo"
+[models."songgeneration-v2-medium".capabilities]
+max_duration_s = 270
+vram_gb = 7.5
+license = "SongGeneration license terms (academic, research and education use only)"
+commercial_use = false
+[models."songgeneration-v2-medium".install]
+source = "https://github.com/tencent-ailab/SongGeneration"
+repo = "https://github.com/tencent-ailab/SongGeneration"
+setup = [
+  "python3.10 -m venv .venv",
+  ".venv/bin/pip install -r requirements.txt",
+  ".venv/bin/pip install -r requirements_nodeps.txt --no-deps",
+  "hf download lglg666/SongGeneration-Runtime --local-dir runtime",
+  "mv runtime/ckpt ckpt && mv runtime/third_party third_party",
+  "hf download lglg666/SongGeneration-v2-medium --local-dir songgeneration_v2_medium",
+]
+dir_env = "HONE_LEVO2_DIR"
+check = "test -x .venv/bin/python -a -f songgeneration_v2_medium/model.pt"
+size_gb = 22.4
+tier = 1
+note = "Tencent LeVo 2 medium: strong lyric accuracy; its own Python 3.10 environment, run with --low_mem on 8 GB"
+[models."songgeneration-v2-medium".guide]
+summary = "Full songs with vocals up to 4.5 minutes and precise lyrics (LeVo 2); non-commercial."
+prompt = "A description with gender, genre, emotion and instruments (e.g. 'female, dark, hip hop, sad, piano and drums')."
+inputs = { generate_type = "'mixed' (song), 'vocal' (a cappella), 'bgm' (instrumental) or 'separate' (vocal and accompaniment tracks)", lyrics = "the common format; converted to LeVo's '[verse] line. line. ; [chorus] ...' form" }
+source = "https://github.com/tencent-ailab/SongGeneration"
+checked = 2026-09-29
+[[models."songgeneration-v2-medium".guide.features]]
+name = "lyrics"
+how = "Sings the lyrics; [intro], [inst] and [outro] become LeVo's short instrumental sections."
+input = "lyrics"
+examples = ["[intro]\n[verse]\nThese faded memories of us\n[chorus]\nLike a fool begs for supper\n[outro]"]
+source = "https://github.com/tencent-ailab/SongGeneration"
+
+[models."diffrhythm2"]
+provider = "command"
+kind = "music"
+[models."diffrhythm2".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."diffrhythm2".install]
+source = "https://github.com/ASLP-lab/DiffRhythm2"
+repo = "https://github.com/ASLP-lab/DiffRhythm2"
+setup = ["python3.10 -m venv .venv", ".venv/bin/pip install -r requirements.txt", "hf download ASLP-lab/DiffRhythm2"]
+dir_env = "HONE_DIFFRHYTHM2_DIR"
+check = "test -x .venv/bin/python"
+size_gb = 5.1
+tier = 2
+note = "weights downloaded, no environment and no adapter yet; its script needs espeak-ng"
+[models."diffrhythm2".guide]
+summary = "Full songs from lyrics and a style prompt (DiffRhythm 2); no adapter yet, so it cannot be called."
+source = "https://github.com/ASLP-lab/DiffRhythm2"
+checked = 2026-09-29

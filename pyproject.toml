@@ -37,6 +37,9 @@ expressive = [
     # its watermarker (resemble-perth) imports pkg_resources, which setuptools 81 removed
     "setuptools>=70,<81; python_version < '3.13'",
 ]
+# transcription with word timestamps (faster-whisper on CTranslate2, MIT; no torch). On CUDA it also
+# needs the CUDA 12 cuBLAS and cuDNN 9 libraries: the nvidia-cublas-cu12 / nvidia-cudnn-cu12 wheels
+transcribe = ["faster-whisper>=1.1"]
 
 [dependency-groups]
 # Development only (never published; `uv sync` installs it by default).
@@ -69,11 +72,29 @@ hone_models = "hone_models:text"
 [project.entry-points."hone.embedders"]
 hone_models = "hone_models:embedder"
 
+[project.entry-points."hone.image_clients"]
+hone_models = "hone_models:image"
+
+[project.entry-points."hone.music_clients"]
+hone_models = "hone_models:music"
+
+[project.entry-points."hone.video_clients"]
+hone_models = "hone_models:video"
+
+[project.entry-points."hone.transcribers"]
+hone_models = "hone_models:transcriber"
+
+[project.entry-points."hone.model_guides"]
+hone_models = "hone_models:guide"
+
 [project.entry-points."hone.gpu_leases"]
 hone_models = "hone_models.gpu:GPU"
 
 [project.entry-points."hone.replayers"]
 hone_models = "hone_models.replay:Replayer"
+
+[project.entry-points."hone.machine_probes"]
+hone_models = "hone_models.machine:Machine"
 
 [build-system]
 requires = ["hatchling>=1.25"]

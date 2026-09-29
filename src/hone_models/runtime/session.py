@@ -21,7 +21,7 @@ from urllib.parse import urlparse
 import httpx
 
 from ..errors import ConfigError, ProviderError
-from ..providers import ollama
+from ..providers import _comfyui_server, comfyui, ollama
 from ..registry import LOCAL_HOSTS, Registry, load
 
 # Variables of the calling Python environment that break the server's own libraries.
@@ -47,9 +47,19 @@ def clean_env(url: str) -> dict[str, str]:
 
 @contextmanager
 def session(provider: str = "ollama") -> Generator[str]:
-    """Use the running server, else start it; stop it on exit only if we started it. Yields its URL."""
+    """Use the running server, else start it; stop it on exit only if we started it. Yields its URL.
+
+    `"ollama"` starts `ollama serve`; `"comfyui"` starts the command in `HONE_COMFYUI_START` (change
+    0015), for the server at `HONE_COMFYUI_URL` (default `http://127.0.0.1:8188`)."""
+    if provider == "comfyui":
+        url = _comfyui_server.default_url()
+        with _comfyui_server.running(url):
+            yield url
+        return
     if provider != "ollama":
-        raise ConfigError(f"sessions are supported for provider 'ollama' only, not {provider!r}")
+        raise ConfigError(
+            f"sessions are supported for the providers 'ollama' and 'comfyui', not {provider!r}"
+        )
     url = ollama.base_url()
     if healthy(url):
         yield url
@@ -87,8 +97,14 @@ def _wait_healthy(url: str, proc: subprocess.Popen[bytes]) -> None:
 
 
 def unload(model_id: str, *, registry: Registry | None = None) -> None:
-    """Free the model's memory now (Ollama `keep_alive: 0`)."""
+    """Free the model's memory now: Ollama `keep_alive: 0`; for a ComfyUI entry `POST /free`, which frees
+    every model that server holds (ComfyUI cannot free one alone)."""
     cfg = (registry or load()).get(model_id)
+    if cfg.provider == "comfyui":
+        comfyui.unload(cfg)
+        return
     if cfg.provider != "ollama":
-        raise ConfigError(f"model {cfg.id!r} ({cfg.provider}) cannot be unloaded; only Ollama models can")
+        raise ConfigError(
+            f"model {cfg.id!r} ({cfg.provider}) cannot be unloaded; only Ollama and ComfyUI models can"
+        )
     ollama.unload(ollama.base_url(cfg), cfg.name)

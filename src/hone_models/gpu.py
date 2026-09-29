@@ -10,7 +10,8 @@ and guarded by `fcntl.flock`; entries of dead processes are dropped. Free memory
 memory from the ledger, so a lease counts before its model is loaded and other programs count too. Memory
 the leasing process itself uses does not count against it (change 0004).
 When memory is short, Ollama models this process loaded are unloaded once (all running models with
-`unload_others=True`) and the release hooks registered with `on_short` are called, then the lease waits,
+`unload_others=True`; with `if_busy="block"` only while no other process holds a lease or the machine-wide
+lock) and the release hooks registered with `on_short` are called, then the lease waits,
 polling every 0.5 s, until `timeout_s` (`TimeoutError`).
 A wait that cannot end (no other lease held and free memory unchanged for `stall_s`) raises
 `CapabilityError`; a long wait is logged and listed in `status().waiting`. A lease taken inside another
@@ -36,7 +37,17 @@ from typing import Any
 
 from ._gpu_locks import FileLockGpuLease, NullGpuLease
 from ._gpu_memory import MemoryReader, ProcessReader, free_mb, read_memory, read_processes
-from ._gpu_room import comfyui_free, on_short, run_hooks, stalled, torch_empty_cache, unload_idle
+from ._gpu_room import (
+    IfBusy,
+    busy_elsewhere,
+    check_if_busy,
+    comfyui_free,
+    on_short,
+    run_hooks,
+    stalled,
+    torch_empty_cache,
+    unload_idle,
+)
 from ._tracing import extra_attributes
 from .errors import CapabilityError
 from .records import log, now_iso
@@ -113,7 +124,9 @@ class GpuScheduler:
     """Leases GPU memory across processes through the shared ledger (the default is `mk.gpu.GPU`).
 
     `memory` reads (total MB, used MB) and `processes` reads {pid: used MB}; both return `None` when
-    unknown. `stall_s` is how long a wait with no other lease held and no change may last."""
+    unknown. `stall_s` is how long a wait with no other lease held and no change may last. With
+    `unload_others`, `if_busy="block"` leaves other processes' models alone while another process holds a
+    lease or the machine-wide GPU lock; `"unload"` (the default) unloads them anyway (change 0016)."""
 
     def __init__(
         self,
@@ -123,12 +136,14 @@ class GpuScheduler:
         unload_others: bool = False,
         processes: ProcessReader = read_processes,
         stall_s: float = STALL_S,
+        if_busy: IfBusy = "unload",
     ) -> None:
         self._ledger = Path(ledger) if ledger else None
         self.memory = memory
         self.processes = processes
         self.unload_others = unload_others
         self.stall_s = stall_s
+        self.if_busy = check_if_busy(if_busy)
 
     @property
     def ledger_path(self) -> Path:
@@ -269,7 +284,9 @@ class _Wait:
         """Make room once, else raise on timeout or stall, else log and sleep one poll."""
         waited = self.waited()
         if self.unloaded is None and (self.timeout_s is None or waited < self.timeout_s):
-            self.unloaded = unload_idle(self.gpu.unload_others)
+            gpu = self.gpu
+            yield_to_others = gpu.if_busy == "block" and gpu.unload_others and busy_elsewhere(others)
+            self.unloaded = unload_idle(gpu.unload_others and not yield_to_others)
             self.released = run_hooks()
             return
         if self.timeout_s is not None and waited >= self.timeout_s:

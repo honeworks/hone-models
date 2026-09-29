@@ -1,0 +1,8 @@
+{
+  "6": {"class_type": "CLIPTextEncode", "inputs": {"text": ""}},
+  "7": {"class_type": "CLIPTextEncode", "inputs": {"text": ""}},
+  "50": {"class_type": "WanImageToVideo", "inputs": {"width": 832, "height": 480, "length": 81, "positive": ["6", 0], "negative": ["7", 0], "start_image": ["52", 0]}},
+  "52": {"class_type": "LoadImage", "inputs": {"image": "placeholder.png"}},
+  "57": {"class_type": "KSamplerAdvanced", "inputs": {"noise_seed": 0, "latent_image": ["50", 2]}},
+  "60": {"class_type": "SaveVideo", "inputs": {"filename_prefix": "hone/test-video", "video": ["57", 0]}}
+}

@@ -109,8 +109,8 @@ def test_no_server_and_no_executable(fake_ollama, monkeypatch: pytest.MonkeyPatc
         pass
 
 
-def test_only_ollama_sessions() -> None:
-    with pytest.raises(ConfigError, match="'ollama' only"), mk.session("vllm"):
+def test_only_ollama_and_comfyui_sessions() -> None:
+    with pytest.raises(ConfigError, match="'ollama' and 'comfyui', not 'vllm'"), mk.session("vllm"):
         pass
 
 

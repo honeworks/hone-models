@@ -38,7 +38,16 @@ CONTENT_KEYS = (
     "hone.models.decision.answers",
     "hone.models.request.params",
     "hone.models.speech.input",
+    "hone.models.media.prompt",
+    "hone.models.media.revised_prompt",
+    "hone.models.media.log_tail",
+    "hone.models.media.error",
+    "hone.models.transcribe.prompt",
+    "hone.models.transcribe.text",
+    "hone.models.transcribe.words",
 )
+# Attributes whose text values are content (lyrics, texts) while the rest (numbers, file hashes) is not.
+TEXT_CONTENT_KEYS = ("hone.models.media.inputs",)
 BLOB_THRESHOLD = 64 * 1024
 _SECRETS: set[str] = set()
 _SECRET_PATTERN = re.compile(r"(Bearer\s+)[A-Za-z0-9._~+/=-]+|\bsk-[A-Za-z0-9_-]{16,}")
@@ -94,10 +103,23 @@ def _digest(value: Any) -> dict[str, Any]:
     return {"sha256": sha256_text(text), "len": len(text)}
 
 
+def _texts_digested(value: Any) -> Any:
+    """A table's text values (also inside lists) replaced by hashes and lengths."""
+    if not isinstance(value, Mapping):
+        return _digest(value)
+
+    def one(item: Any) -> Any:
+        return _digest(item) if isinstance(item, str) else item
+
+    table: Mapping[str, Any] = value  # pyright: ignore[reportUnknownVariableType]
+    return {k: [one(i) for i in v] if isinstance(v, list) else one(v) for k, v in table.items()}  # pyright: ignore[reportUnknownVariableType]
+
+
 def _without_content(span: Mapping[str, Any]) -> dict[str, Any]:
     """Content attributes, error messages and event reasons replaced by hashes and lengths
     (error text can quote prompts or model output)."""
     attrs = {k: _digest(v) if k in CONTENT_KEYS else v for k, v in span.get("attributes", {}).items()}
+    attrs.update({k: _texts_digested(attrs[k]) for k in TEXT_CONTENT_KEYS if k in attrs})
     status = dict(span.get("status", {}))
     if status.get("message"):
         status["message"] = json.dumps(_digest(status["message"]))

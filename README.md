@@ -22,10 +22,24 @@ records every call so you can see and replay what happened.
   tells you which (`structured_path`) and never hides a truncated reply.
 - **Decision questions:** yes/no, choice and score questions answered by a decision model (Jev) or
   emulated on any LLM, with calibrated probabilities from token logprobs when available.
-- **Embeddings, GPU leases and local model lifecycle** (`mk.gpu.lease`, `mk.session`, `mk.unload`).
+- **Embeddings, GPU leases and local model lifecycle** (`mk.gpu.lease`, `mk.session`, `mk.unload`), and
+  **machine state**: which models every server holds, partly on the CPU or not, and unloading all but the
+  needed ones without breaking another run (`mk.machine.snapshot()`, `prepare()`, `load()`).
 - **Local text to speech** (`mk.speech("kokoro-82m")`, extra `speech`): long narration into one WAV file;
   expressive narration with an emotion and intensity per paragraph (`mk.speech("chatterbox")`, extra
   `expressive`).
+- **Images, music and video** (`mk.image`, `mk.music`, `mk.video`) through ComfyUI workflows or standalone
+  projects run in their own environment (SongGeneration), one registry entry per model: named inputs mapped onto workflow nodes, files uploaded once by hash, a GPU lease per
+  call or session, failed jobs as results with an `error_kind`
+  ([docs/generation.md](https://github.com/honeworks/hone-models/blob/main/docs/generation.md)).
+- **Transcription with word timestamps** (`mk.transcriber`, extra `transcribe`) with faster-whisper, in
+  process, a GPU lease per call or session
+  ([docs/transcription.md](https://github.com/honeworks/hone-models/blob/main/docs/transcription.md)).
+- **A catalog of models with guides:** every model we use or may use, installed or not, with its licence,
+  what installs it (`hone-models models install <id>` prints the commands) and a guide saying what it can
+  take (`mk.guide(id)`, `mk.select({"features": [...]})`); lyrics and prompt phrases written once and
+  converted per model
+  ([docs/models-and-guides.md](https://github.com/honeworks/hone-models/blob/main/docs/models-and-guides.md)).
 - **Every call recorded** as an OpenTelemetry-style span in a local SQLite file, prompt sections included,
   and replayable with changes.
 
@@ -48,6 +62,7 @@ The core needs only pydantic and httpx. Optional extras:
 | `litellm` | hosted models through LiteLLM | the provider's API key in an environment variable |
 | `speech` | local text to speech with Kokoro-82M | Python < 3.13, torch; spaCy's English model ([docs/speech.md](https://github.com/honeworks/hone-models/blob/main/docs/speech.md)) |
 | `expressive` | expressive speech with Chatterbox (emotion and intensity) | Python < 3.13, torch; dependency overrides ([docs/speech.md](https://github.com/honeworks/hone-models/blob/main/docs/speech.md)) |
+| `transcribe` | transcription with word timestamps (faster-whisper) | on a GPU, the CUDA 12 cuBLAS and cuDNN 9 wheels ([docs/transcription.md](https://github.com/honeworks/hone-models/blob/main/docs/transcription.md)) |
 
 `jev` is an empty extra: the Jev decision provider needs nothing beyond the core (it calls the API over httpx).
 
@@ -90,6 +105,7 @@ structurally (it imports none of them):
 | `Embedder` | `mk.embedder(...)` | `hone.embedders` |
 | `GpuLease` | `mk.gpu.GPU` / `mk.gpu.lease` | `hone.gpu_leases` |
 | `Replayer` | `mk.replay.Replayer()` | `hone.replayers` (no argument) |
+| `MachineProbe` (hone-select) | `mk.machine.Machine()` / `mk.machine.MACHINE` | `hone.machine_probes` (no argument) |
 
 For example, `hone-select` judges and `hone-taste` panels take `mk.decision("gemma4-12b")` as their
 decision client, and `hone-flow` steps take `mk.gpu.GPU` as their GPU lease. Spans follow the shared

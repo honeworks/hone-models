@@ -1,0 +1,122 @@
+{
+  "6": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "minimax_music3_dit_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "3": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+      "type": "minimax",
+      "device": "default"
+    }
+  },
+  "7": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax_music3_dav.safetensors"
+    }
+  },
+  "38": {
+    "class_type": "SeedNode",
+    "inputs": {
+      "seed": 0
+    }
+  },
+  "13": {
+    "class_type": "MiniMaxMusic3TextEncode",
+    "inputs": {
+      "caption": "",
+      "lyrics": "[Instrumental]",
+      "seed": [
+        "38",
+        0
+      ],
+      "max_duration": 60,
+      "cfg_scale": 1.7,
+      "top_k": 50,
+      "clip": [
+        "3",
+        0
+      ]
+    }
+  },
+  "15": {
+    "class_type": "EmptyMiniMaxMusic3LatentAudio",
+    "inputs": {
+      "seconds": [
+        "13",
+        1
+      ],
+      "batch_size": 1
+    }
+  },
+  "10": {
+    "class_type": "ConditioningZeroOut",
+    "inputs": {
+      "conditioning": [
+        "13",
+        0
+      ]
+    }
+  },
+  "9": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": [
+        "38",
+        0
+      ],
+      "steps": 30,
+      "cfg": 1.7,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "6",
+        0
+      ],
+      "positive": [
+        "13",
+        0
+      ],
+      "negative": [
+        "10",
+        0
+      ],
+      "latent_image": [
+        "15",
+        0
+      ]
+    }
+  },
+  "42": {
+    "class_type": "VAEDecodeAudioTiled",
+    "inputs": {
+      "tile_size": 1536,
+      "overlap": 64,
+      "samples": [
+        "9",
+        0
+      ],
+      "vae": [
+        "7",
+        0
+      ]
+    }
+  },
+  "35": {
+    "class_type": "SaveAudioAdvanced",
+    "inputs": {
+      "filename_prefix": "hone/minimax-music3",
+      "format": "flac",
+      "audio": [
+        "42",
+        0
+      ]
+    }
+  }
+}

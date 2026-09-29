@@ -16,6 +16,8 @@ saying what was decided.
 | [D-016](#d-016-sibling-packages-as-development-only-path-sources) | Remove the `[tool.uv.sources]` path sources once the sibling packages are published, before hone-models is published. |
 | [D-019](#d-019-the-jev-api-mapping-is-unverified) | Verify the Jev API mapping against the real API (endpoint, auth, field names, token counts). |
 | [D-022](#d-022-the-packaged-gemma4-12b-entry-and-its-ollama-tag) | Before publishing, point the packaged `gemma4-12b` entry at the public Ollama tag `gemma4:12b` (and keep the local tag through a user registry alias). |
+| [D-073](#d-073-heartmulas-node-does-not-load-on-the-reference-machine) | HeartMuLa's ComfyUI node fails with transformers 5 in ComfyUI's environment: pin transformers 4.x for it, wait for a node release, or drop the entries? |
+| [D-074](#d-074-the-machine-snapshot-now-asks-the-local-comfyui-wherever-the-catalog-is-loaded) | The snapshot now reports a local ComfyUI server (not running) on machines without one: keep it, or check only servers whose entries' files are installed? |
 
 ## D-001: `records.py` is a public module
 The span sinks live in one public module, `hone_models.records` (with `read_spans`, `add_secret` and
@@ -205,3 +207,322 @@ yet because the applications built on this machine resolve `gemma4-12b` through 
 **Awaiting owner review:** before publishing, change `model` to `gemma4:12b` in
 `src/hone_models/data/models.toml`, and keep the local tag on the development machine with a user
 registry alias (`[models."gemma4-12b"] model = "gemma4-12b:latest"`).
+
+## D-023: details of `mk.machine` the record left open
+Choices made while building [0016](changes/0016-machine-state.md), each the simplest reading of it:
+- A lock file that does not exist is not held (`held: False`); only a file that exists but cannot be
+  opened is unknown (`held: None`). `held: None` does not block `prepare`, since nobody is known to hold
+  the lock. The probe never creates the file.
+- Per-process GPU memory comes from the existing GPU 0 reader, so `processes` is filled for GPU 0 and
+  `None` (unknown) for other GPUs.
+- An unnamed ComfyUI entry has `name: None` and `model_id: None`. It is added when the newest `/history`
+  job is not in the loaded-models file, or when the server holds torch memory and the file lists nothing.
+  A server with no torch memory lists nothing, whatever the file says.
+- `released` lists server names (`"comfyui"`), as in the record, not URLs.
+- `missing` lists only needed Ollama and ComfyUI ids: hosted and in-process models are never "loaded"
+  on a server, so listing them would always mark them missing.
+- `need_gb` sums the `vram_gb` of the needed entries that use this GPU (`local`, `comfyui`, `command`);
+  hosted entries count 0.
+- `load` sends the entry's `defaults.keep_alive`, else `"5m"` (Ollama's own default, which every chat
+  call resets to anyway), and notes the model as loaded by this process, so a short lease may unload it.
+- `GpuScheduler(if_busy="block")` checks the lock at `HONE_GPU_LOCK` (else `/tmp/honeworks-gpu.lock`),
+  only when it is about to unload other processes' models.
+
+## D-024: ComfyUI workflows are read on every call; uploads are remembered per process
+0015 §2 says a workflow is read once per client. It is read on every call instead (a few kilobytes):
+simpler, and a workflow file changed between two calls is then both used and visible in the records
+through `hone.models.media.workflow_sha256`. A file input is uploaded once per process and server
+(`input/hone/<sha256><suffix>`, remembered in memory); a new process uploads it again, which ComfyUI
+stores over the same name (`overwrite=true`). Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-025: no progress events for ComfyUI jobs
+0015 §2 expected progress from `/api/jobs/{id}` "where the server has it". ComfyUI 0.3x's jobs API
+reports a status (`pending`, `in_progress`, `completed`, ...) but no progress; progress only goes over the
+websocket, which hone-models does not use (no new dependency). So ComfyUI spans carry no `progress`
+events; `hone.models.media.queue_wait_ms` comes from the `execution_start` time in the job's history.
+`/api/jobs/{id}/cancel` is used to cancel. Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-026: file inputs given as strings, the unknown-memory lease, the error text as content
+For `references`, `image` and `source` (inputs that are always files) a string is taken as a path, so
+`image="shots/01.png"` works like `Path(...)`; for other inputs only a `pathlib.Path` is a file. A local
+model without `capabilities.vram_gb` leases 1 GB, as speech does. `hone.models.media.error` is content
+(hashed with capture off), like span status messages, because a provider's error can quote the prompt;
+`hone.models.media.inputs` hashes only its text values, so numbers and file records stay readable. Part
+of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-027: the `install` table's fields for projects
+0015 §3b names what `install` says (an Ollama name, Hugging Face files with their ComfyUI folder, "a
+project to clone and set up", the size, a tier, a note) without field names for projects. The registry
+accepts `repo` (to clone), `setup` (commands), `dir_env` (the folder variable) and `check` (a command that
+succeeds when the project is set up), next to `source`, `ollama`, `files` (`repo`, `file`, `to`),
+`size_gb`, `tier` (1, 2 or 3) and `note`; other keys are an error. The catalog step may add fields.
+Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-050: transcription details the record left open
+The span also records `hone.models.transcribe.prompt` (content, only when given), because Whisper's
+`initial_prompt` changes what is heard, and `session` / `loaded` as speech spans do.
+`hone.models.transcribe.language` is set to the language asked for when the span opens and to the
+language of the transcript when it ends, so a failed call still shows what was asked. `Transcript.text`
+joins the segments' texts with a space; segment and word texts are stripped of faster-whisper's leading
+spaces; times are rounded to milliseconds. `timeout_s` cannot interrupt CTranslate2 mid-segment, so
+decoding stops between segments (faster-whisper decodes while its segment generator is read) and
+`ModelTimeout` is raised; a segment covers at most 30 s of audio. `FakeTranscriber` hears a scripted
+`text` (one segment per line, words 0.4 s apart) rather than reading the audio. The user guide is its own
+page, `docs/transcription.md`. Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-051: how faster-whisper finds the CUDA 12 cuBLAS and cuDNN 9 libraries
+CTranslate2's Linux wheel does not link cuBLAS or cuDNN; it `dlopen`s `libcublas.so.12` and
+`libcudnn.so.9` by name the first time a model runs on CUDA, and fails in the middle of the call when
+they are missing (this machine has only CUDA 13 system-wide). Before the GPU lease, when the entry runs
+on CUDA (`defaults.device`, or `auto` with `ctranslate2.get_cuda_device_count() > 0`), the provider loads
+each library with `ctypes.CDLL(..., RTLD_GLOBAL)`: first by name (the system library path,
+`LD_LIBRARY_PATH`, or a library torch already loaded), then from `nvidia/cublas/lib` and
+`nvidia/cudnn/lib` under each `sys.path` entry, where the `nvidia-cublas-cu12` / `nvidia-cudnn-cu12`
+wheels put them (they carry `RUNPATH=$ORIGIN`, so cuBLASLt and cuDNN's sub-libraries load next to them).
+A library loaded this way satisfies CTranslate2's later `dlopen` by name. When neither place has one,
+`ConfigError` names the missing libraries and the wheels to install, or `defaults.device = "cpu"`. The
+wheels are not in the `transcribe` extra: they are Linux-only, large, and already present wherever a
+CUDA 12 torch is installed (the speech extras); as with Kokoro's spaCy model in
+[0008](changes/0008-speech-extra-and-the-spacy-model.md), the user installs them and the call checks
+first. Found libraries are remembered for the process. Part of [0015](changes/0015-generation-models.md).
+
+## D-030: hosted image and video requests: the inputs each kind takes, no `response_format`, no seed
+0015 §2 lists the request fields of the hosted images and video calls. The `openai_compatible` media row
+takes, besides `prompt` and `seed`, only what those endpoints use: images `size`, `n`, `references`;
+video `size`, `duration_s` (sent as the string `seconds`), `image` (multipart `input_reference`); plus
+the names an entry lists in `inputs`, sent as request fields. The rest of the shared vocabulary
+(`negative`, `steps`, `lyrics`, ...) raises `ConfigError` as for any model that does not take it. The
+record says to send `response_format = "b64_json"`; OpenAI's gpt-image models always answer in base64
+and do not take that parameter, while other models and gateways default to `url`. Both answers are
+handled (decoded, or downloaded without the API key), so nothing is sent by default; an entry that wants
+one lists `response_format` in `inputs` and sets it in `defaults`. The seed is recorded but not sent:
+the endpoints have no seed field. An `openai_compatible` media entry on this host (a local server) takes
+the GPU lease like any local model. Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-031: the per-second cost uses the asked-for duration when the file's cannot be read
+`cost_usd` for a `per_output_second` price multiplies the measured seconds of output. A video's duration
+is read with `ffprobe`, which may not be installed; the hosted API bills the seconds asked for anyway.
+So a file whose duration cannot be read counts the call's `duration_s` (including the entry's default);
+without either the cost stays `None`. Still the naive estimate of 0015 (`cost_estimated = True`). Part
+of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-032: hosted refusals, polling failures and signed URLs
+A moderation refusal at submission comes back from OpenAI as HTTP 400 (`moderation_blocked`); any 4xx
+whose text reads as a refusal (`error_kind` gives `refused`) becomes a result with `error_kind =
+"refused"` and no job id; other 4xx raise `ProviderError` as today. A failed video job's `error.code`
+and `error.message` are joined into `result.error`, and its kind is read from that text, so a
+moderation failure is `refused` too. Polling counts transport errors, 429, 5xx and unreadable JSON as
+transient; the fifth in a row raises `ProviderError` naming the job id (as ComfyUI's polling does);
+another 4xx raises at once. Either way, and on a timeout or interrupt, the job is deleted. Downloaded
+image URLs are signed; they are never put in an error message or the records. Part of
+[0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-040: the LeVo adapter runs the project's generation in its own process, not through `generate.sh`
+The project's `generate.py`, run as a script, reseeds NumPy from the clock and accepts only the v1
+checkpoint folder names (`songgeneration_base`, ..., `songgeneration_large`), so `songgeneration_v2_medium`
+fails its assertion, and seeds set in another process would not reach it. `levo2.py` therefore does what
+`generate.sh` and `generate.py`'s `__main__` do, in its own process: the same environment variables and
+`sys.path`, the working folder, cuDNN off, the four OmegaConf resolvers, then `generate_lowmem(args)` (or
+`generate(args)` when `low_mem` is off and more than 24 GB, 36 GB for a `large` checkpoint, are free, as
+the script decides), after seeding Python, NumPy and torch with the call's seed. The checkpoint folder is
+`defaults.checkpoint` (default `songgeneration_v2_medium`); `defaults.flash_attn` defaults to off (flash
+attention is not installed in the project's environment here, as `--not_use_flash_attn` in the old
+`levo2_generate.sh` shows). A request LeVo cannot take (no lyrics, an unknown `generate_type`) and an
+exception during the generation (out of memory, no CUDA) are written to `result.json` as the error; a
+failure to import the project crashes the adapter, so it surfaces as a `ProviderError` with the traceback.
+The adapter takes `lyrics` as given (already in LeVo's form, §3a) and uses LeVo's `descriptions` for the
+prompt; LeVo's `prompt_audio_path` and `auto_prompt_audio_type` are not wired yet. Not run against the
+real project here (no GPU for this work); the first real run is a `gpu` test run by hand (0015 §9). Part of
+[0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-041: details of the `command` protocol
+0015 §2 fixes the protocol's shape; the details: `request.json` also carries the entry's whole `defaults`
+table, for options that are not inputs (LeVo's `low_mem`), next to `model`, `prompt`, `seed`, `out_dir`
+and `inputs`. The job folder is `<out name>.job-<id>/` next to `out`, with `request.json`,
+`stdout.log`, `stderr.log` and `out/` (the `out_dir`); the program's output goes to those files, never to
+pipes, and the folder is removed after a success and kept after a failure. `cwd` defaults to the
+`install.dir_env` folder. A program that cannot be found (after expansion, relative paths from `cwd`) is
+a `ConfigError` before the lease. An `error` in `result.json` wins over the exit code; without
+`result.json` the files are every file directly in `out_dir`, in name order. `log_tail` keeps what a
+terminal would show (a `\r` rewrites its line, so progress bars take one line). `result.json`'s `meta` is
+read but not recorded: §5 has no attribute for it. The grace between SIGTERM and SIGKILL is
+`providers.command.KILL_GRACE_S` (10 s). Part of [0015](changes/0015-generation-models.md).
+
+## D-060: the packaged catalog, one file per kind; two more `install` forms
+The packaged registry is `hone_models/data/models/<kind>.toml` (0015 §3b); `data/models.toml` is gone.
+The files are merged in name order and an id declared in two files is a `ConfigError`; a packaged entry's
+relative `workflow` still resolves against `hone_models/data/` (so `workflows/<id>.json`). User, project and
+explicit registry files load exactly as before. `install` gains `hf` (a whole Hugging Face repository for
+the HF cache: Whisper, Kokoro, the scorers), and an `install.files` item without `file` means the whole
+repository goes into the ComfyUI folder `to` (HeartMuLa's model folders). Extends D-027. Part of
+[0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-061: scorers and tools are kind `scoring`, provider `none`, until they can be called
+The catalog lists the scoring models and tools (reward models, DINOv2, MuQ, Demucs, SeedVR2, RIFE, ...)
+before hone-models can call them (0015 §3b, open question 1). They share one kind, `scoring`, and the
+provider `none` ("no provider yet"); the change that makes them callable may split the kind
+(`image_embedding`, `audio_score`, `separation`, ...). Every client factory (`mk.text`, `mk.embedder`,
+`mk.speech`, `mk.image` / `music` / `video`, and `mk.decision` through `mk.text`) raises `ConfigError`
+"no client for kind 'scoring' yet" for them (`registry.require_client`). Part of
+[0015](changes/0015-generation-models.md).
+Awaiting owner review (depends on open question 1).
+
+## D-062: how "installed" is decided, and where it is enforced
+`catalog.installed(cfg)` looks at the entry's `install` table in this order: `dir_env` (the variable names a
+folder and `check`, run there without a shell for at most 60 s, succeeds; unset: `unknown`), `files`
+(ComfyUI: the files under `HONE_COMFYUI_DIR` or `~/ComfyUI` `/models/<to>`; when `HONE_COMFYUI_DIR` is set
+but missing: `unknown` without asking a server; when neither folder exists: every file name appears in
+`GET /object_info`; a whole-repository folder cannot be seen there: `unknown`), `ollama` or an Ollama entry
+(`GET /api/tags`, a name without a tag means `:latest`), `hf` (a snapshot with files in `HF_HUB_CACHE`,
+`$HF_HOME/hub` or `~/.cache/huggingface/hub`). A hosted entry is `yes` (nothing to install), anything else
+`unknown`. A server that does not answer is `unknown`. `models list` asks each server once. Only
+generation calls (`MediaClient.generate`) refuse a model that is certainly not installed, before the job
+and the lease; `unknown` goes ahead, and `FakeMedia` skips the check. Chat, embedding and speech calls are
+not checked (Ollama and Hugging Face already say what is missing, and a check per call would cost a
+request); the transcriber can adopt `catalog.require_installed` when it lands. The tests set
+`HONE_COMFYUI_DIR` to a missing folder so that no test asks a real ComfyUI. Part of
+[0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-063: what `models install` prints and runs
+`hf download <repo> <file> --local-dir <dir>` keeps the repository's folders, so for a file in a
+subfolder (`split_files/vae/ae.safetensors`) the printed plan adds `mv` to put it where ComfyUI looks.
+A project is `git clone <repo> $VAR` and each `setup` step as `cd $VAR && <step>` (the variable's value
+when set). The size and the free space of the disk that would hold the download come first, as comments.
+`--run` runs the same lines through a shell, one by one, and stops at the first failure with
+`ProviderError`; it is for the owner (0015 §3b) and is tested with a fake runner only. Part of
+[0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-064: `mk.select` returns every match; features are matched as "all of these"
+0015 §1 says `mk.select(kind=..., require={"features": [...]})` "finds the models". `mk.select(require,
+*, kind="chat", prefer=None, registry=None)` returns the list of matching entries, best first (by
+`prefer`, then id), empty when none matches; `Registry.select` still returns the single best one or
+raises `CapabilityError`, and both use `Registry.matching`. `require={"features": [...]}` is met when
+the entry declares every listed feature (case ignored); one name may be given as a string.
+`capabilities.features` is filled from the guide's feature names unless the entry sets it. The catalog
+declares only capabilities that were checked, so `mk.text(require={"vision": True})` still picks
+`qwen2.5vl-7b`; `mk.text()` without an id or requirement now picks the first chat entry by id, which may be
+a catalog model that is not installed: name the model. Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-065: prompt inputs and the LeVo lyrics form in detail
+A prompt input's phrase is joined to the prompt with ", " (or a space when the prompt already ends with
+punctuation); an empty prompt is just the phrase. `qwen-image-edit-2511` puts `camera_angle` first
+(`place = "prepend"`) because the Multiple-Angles LoRA's format starts with `<sks>`; its twelve choices are
+phrases copied from the LoRA's model card (azimuth, elevation, distance), a subset of its 96 poses; a
+user registry can add more. The `levo` converter follows SongGeneration's README and `conf/vocab.yaml`:
+`[intro]`, `[inst]`, `[outro]` become their `-short` forms (as its own Gradio app does), `[pre-chorus]` a
+`[verse]` (LeVo has no pre-chorus), lines before any tag a `[verse]`; `;` and full-width punctuation are
+replaced; lines are joined with ". " and end with "." unless the section ends in Chinese, Japanese or
+Korean text (then "." without a final period); a sung section without lines, lines under an instrumental
+tag, an unknown tag or a song without a sung section is a `ConfigError` before the job. The span records
+the converted lyrics (what the model got). Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-066: the machine checks only ComfyUI servers that have a runnable entry
+The packaged catalog has ComfyUI entries on every machine, most without a workflow yet (0015 §3b). The
+machine snapshot (0016) would then ask `127.0.0.1:8188` everywhere and report a refused connection, which
+0015 §7 wanted to avoid. It now checks the servers of `comfyui` entries that have a `workflow` (plus
+`HONE_COMFYUI_URL`). Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-067: `models guide`, the guide's shape and the catalog facts
+`hone-models models guide [ID] [--json] [--stale DAYS]`: with an id, the guide; with `--stale`, the entries
+whose guide was never checked or not within DAYS (only ID when given). `ModelGuide.inputs` maps each
+accepted input to `GuideInput(name, origin, note, choices)` (`origin`: `common`, `own` or `prompt`; the
+entry's note wins over the shared one); `as_dict()` is the JSON form; `installed` and the install commands
+are computed when the guide is built. `models list --json` rows gain `installed`. Catalog facts were
+checked on Hugging Face on 2026-09-29 (model cards, licences, file names and sizes), against ComfyUI's
+own templates in `~/ComfyUI/blueprints` (which files each model loads) and against this machine's
+folders: `gemma4-12b`'s licence is corrected to Apache-2.0 (Gemma 4's card); SongGeneration's LICENSE
+allows academic, research and education use only, so `commercial_use = false` (the research catalog had
+"not stated"); ACE-Step 1.5 loads `qwen_0.6b_ace15` and `qwen_4b_ace15`; HeartMuLa's node reads one 3B
+folder, so the base and RL entries share it. Not verified: the Ollama `hf.co` tag of `muse-glimmer-30b`
+(its repository has several Q4_K_M files), the size and licence of SongEval, beat_this, the aesthetic
+predictor and RIFE, where MuLaCover's node expects its folder, and every `vram_gb` (to be measured).
+Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-070: the packaged ComfyUI workflows, and how they differ from ComfyUI's templates
+Every ComfyUI entry whose files were installed on the reference machine (RTX 4060 Laptop 8 GB, 30 GB RAM,
+ComfyUI 0.37 started with `--reserve-vram 1.5`) has a workflow in `hone_models/data/workflows/<id>.json`
+(0015 §3b). They were written by hand in API format from ComfyUI's own templates
+(`comfyui_workflow_templates_json` 0.1.95), the old app's exports (z-image-turbo, ACE-Step: the node ids of
+0015 §3 are kept) and the HeartMuLa node's example, keeping the templates' node ids and settings, with:
+subgraphs flattened; frontend-only nodes (`PrimitiveNode`, `ComfySwitchNode`) replaced by the value or the
+branch they select; one save node per workflow writing under `hone/<id>` (`SaveImage`, `SaveAudioAdvanced`
+as FLAC, `SaveVideo` as MP4) in place of previews and MP3; the model files that are installed here
+(MiniMax-Music3's int8 DiT where the template names the fp16 one). Per model: Wan 2.2 I2V-14B runs with
+the lightx2v LoRAs on (4 steps, 2 on each expert; the template's switch is off, 20 steps);
+MiniMax-Music3 decodes with the tiled VAE decoder (the template's switch for low memory); YuE2 keeps the
+ABC stage; LTX-Video's `LTXVImgToVideo.strength` is 1.0 (the node's default: the start frame is kept; the
+template has 0.15) and both its conditioning frame rate and its video run at 24 fps (the template mixes 25
+and 24), so `duration_s` maps to `24 * s + 1` frames, a valid `8n + 1`; Stable Audio's default length is
+47 s (the template's 47.6 is above the entry's `max_duration_s`). `defaults` hold the templates' sizes,
+steps and lengths. `vram_gb` is the peak of the whole card measured during `models check` (D-072); the
+large models all sit near 6.3-6.4 GB because ComfyUI fills what `--reserve-vram 1.5` leaves and offloads
+the rest, so a larger job takes about the same. The two light models were also measured at full
+length: Stable Audio needs 5.6 GB for 47 s (3.3 GB for the tiny 10 s), so its `vram_gb` is 5.7; YuE2's
+57 s song peaked lower than its tiny job (2.7 GB against 3.9 GB). Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-071: a file input mapped to a list of slots is optional; the random seed is below 2^31
+0015 §2 removes an unused `references` slot with its links. The same now holds for any file input
+(`image`, `source`) mapped to a list: left out, its slot nodes are removed, so Wan 2.2 TI2V-5B
+(`image = ["56.image"]`) makes a video from the prompt alone. Mapped to one path the input stays required:
+the workflow's value is a placeholder (`hone/start-frame.png`) that ComfyUI refuses, so Wan 14B and LTX,
+which need a start frame, fail at `/prompt` with a `ConfigError` naming the node. A seed hone-models picks
+(`seed=None`, no `defaults.seed`) is now below 2^31 instead of 2^32: the HeartMuLa sampler takes at most
+2^31 - 1, and a random seed must never be a value the model refuses. Part of
+[0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-072: `models check` for image, music and video entries
+0015 §3b proves a workflow with `hone-models models check <id>` "a tiny job". For a media entry the command
+runs one job in `client.session()` (so it starts ComfyUI from `HONE_COMFYUI_START` when nothing answers,
+and stops it after) with the smallest inputs every packaged model accepts: 256x256 for images, 10 s of
+audio (HeartMuLa's sampler takes at least 10 s), 1 s at 256x256 for video, from a generated gradient PNG
+when the entry takes `image`; a line of lyrics when it takes `lyrics`; seed 1. Only the inputs the entry
+takes are passed. The file goes to `--out` (default `$HONE_HOME/models/checks/<id>/tiny.<suffix>`: the
+provider's suffix, because ids such as `ace-step-1.5-turbo` look like they have one). It prints the time,
+the measured file and `peak_vram_gb`: GPU 0's used memory sampled every 0.25 s (NVML, else `nvidia-smi`)
+minus the memory in use at the start; the whole card, because ComfyUI is another process. Unlike the chat
+check it saves nothing to the user registry: the value is for the entry's `vram_gb`, which a person sets.
+A job that fails prints its error and exits 1. The default test suite also moves the default ComfyUI URL
+to a closed port (`tests/conftest.py`), so no offline test can reach a real server on the machine. Part
+of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-073: HeartMuLa's node does not load on the reference machine
+The `heartmula-3b` and `heartmula-rl-3b` workflows are written and accepted by ComfyUI's validation, but
+the tiny job fails inside the custom node's loader (`FL_HeartMuLa_ModelLoader`): ComfyUI's environment has
+transformers 5.17, which refuses HeartCodec's checkpoint (`_codebook.initted` buffers of shape `[1]` where
+the model declares `[]`, raised because `ignore_mismatched_sizes` is off). That is a problem between the
+node (`transformers>=4.45`) and ComfyUI's environment, outside hone-models; it was not changed here (the
+environment is the owner's). The call is a failed result (`error_kind = "failed"`), the slow real test
+marks both entries as expected failures, and their `vram_gb` (6.0) is the node's own figure for its
+"ultra" memory mode, not a measurement. The node also reads one folder for both entries
+(`models/heartmula/HeartMuLa-oss-3B`, a link to the RL weights here), so `heartmula-3b` runs the RL
+weights on this machine. Fix: a transformers 4.x for the node, or a node release that loads HeartCodec
+with transformers 5. Part of [0015](changes/0015-generation-models.md).
+Awaiting owner review (how to fix ComfyUI's environment for HeartMuLa).
+
+## D-074: the machine snapshot now asks the local ComfyUI wherever the catalog is loaded
+D-066 checked only servers of `comfyui` entries with a workflow, so machines without ComfyUI reported
+none while the catalog had no workflows. Now that the packaged catalog has workflows, `snapshot()` asks
+`HONE_COMFYUI_URL` (default `http://127.0.0.1:8188`) on every machine; without ComfyUI it reports that
+server as `running: False` with the connection error, which is true and costs one refused connection.
+A registry that should not look (a machine without ComfyUI) can point `HONE_COMFYUI_URL` elsewhere or
+override the entries. Part of [0015](changes/0015-generation-models.md).
+Awaiting owner review (keep the row, or skip servers whose entries' files are not installed).

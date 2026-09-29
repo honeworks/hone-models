@@ -32,7 +32,7 @@ def test_the_packaged_songgeneration_entry_is_disabled_until_its_runtime_matches
         mk.music("songgeneration-v2-medium")
 
 
-def test_a_disabled_transcription_entry_refuses(tmp_path) -> None:
+def test_a_disabled_transcription_entry_refuses() -> None:
     reg = Registry({
         "w": ModelConfig(id="w", provider="faster_whisper", kind="transcription", disabled="weights missing"),
     })  # fmt: skip

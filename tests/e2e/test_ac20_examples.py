@@ -43,6 +43,7 @@ def test_ac20_example_runs(script: Path, tmp_path: Path) -> None:
         "HONE_HOME": str(tmp_path / ".hone"),
         "PYTHONPATH": str(FAKE_NVML),
         "OLLAMA_HOST": "http://127.0.0.1:9",
+        "HONE_COMFYUI_URL": "http://127.0.0.1:9",  # nor a real ComfyUI (installed checks ask /object_info)
     }
     done = subprocess.run(
         [sys.executable, str(script)],

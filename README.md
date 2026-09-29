@@ -32,6 +32,11 @@ records every call so you can see and replay what happened.
   entry per model: named inputs mapped onto workflow nodes, files uploaded once by hash, a GPU lease per
   call or session, failed jobs as results with an `error_kind`
   ([docs/generation.md](https://github.com/honeworks/hone-models/blob/main/docs/generation.md)).
+- **A catalog of models with guides:** every model we use or may use, installed or not, with its licence,
+  what installs it (`hone-models models install <id>` prints the commands) and a guide saying what it can
+  take (`mk.guide(id)`, `mk.select({"features": [...]})`); lyrics and prompt phrases written once and
+  converted per model
+  ([docs/models-and-guides.md](https://github.com/honeworks/hone-models/blob/main/docs/models-and-guides.md)).
 - **Every call recorded** as an OpenTelemetry-style span in a local SQLite file, prompt sections included,
   and replayable with changes.
 

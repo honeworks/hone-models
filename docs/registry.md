@@ -2,15 +2,16 @@
 
 TOML files are merged in this order (later ones override key by key):
 
-1. packaged defaults (`hone_models/data/models.toml`: `gemma4-12b`, `qwen2.5vl-7b`, `deepseek-r1-8b`,
-   `nomic-embed-text`, `jev`, `gpt-4.1-mini`)
+1. the packaged catalog (`hone_models/data/models/<kind>.toml`, one file per kind: every model we use or
+   may use, installed or not, with its licence, install table and guide; see
+   [models-and-guides.md](models-and-guides.md))
 2. `~/.config/hone/models.toml` (user)
 3. `./hone-models.toml` (project)
 4. paths passed to `mk.registry.load(paths=[...])` or `--registry` on the CLI
 
 ```toml
 [models."gemma4-12b"]
-provider = "ollama"              # ollama | openai_compatible | litellm | jev | kokoro | chatterbox | comfyui
+provider = "ollama"              # ollama | openai_compatible | litellm | jev | kokoro | chatterbox | comfyui | command | faster_whisper | none
 model    = "gemma4-12b:latest"   # the provider's name (defaults to the id)
 defaults = { temperature = 0.8 } # params used unless the call passes its own
 [models."gemma4-12b".capabilities]
@@ -75,8 +76,19 @@ print(reg.select({"vision": True, "min_context": 8000}, prefer="local").id)  # q
 vision = mk.text(require={"vision": True}, prefer="local")
 ```
 
-`require` keys are capability names (exact match) plus `min_context`; `prefer` is `local`, `hosted`,
-`cheapest` or `fastest`. No match raises `CapabilityError` listing the closest candidates.
+`require` keys are capability names (exact match) plus `min_context` and `features` (every listed feature
+of the model's guide declared, case ignored); `prefer` is `local`, `hosted`, `cheapest` or `fastest`. No
+match raises `CapabilityError` listing the closest candidates. `mk.select(require, kind=...)` returns every
+match instead of the best one:
+
+```python
+import hone_models as mk
+
+print([m.id for m in mk.select({"features": ["camera angle"]}, kind="image")])  # ['qwen-image-edit-2511']
+```
+
+The catalog declares only capabilities that were checked, and it lists models this machine may not have:
+name the model when you call one (`mk.text("gemma4-12b")`) rather than relying on the first match.
 
 `hone-models models check <id>` makes a smoke call and saves the measured `speed_tok_s` to the user
 registry; request timeouts grow with it: `2 * max_tokens / speed_tok_s`, at least 120 s, at most
@@ -85,12 +97,13 @@ so a long answer (`max_tokens=7000`) gets up to 600 s on a fresh machine; hosted
 measurement get 120 s.
 
 **Generation models.** `kind` is `chat` (default), `embedding`, `decision`, `speech`, `image`, `music`,
-`video` or `transcription`. A `comfyui` entry adds `workflow`, an `inputs` table of workflow paths and
+`video`, `transcription` or `scoring` (catalog entries hone-models cannot call yet). A `comfyui` entry adds `workflow`, an `inputs` table of workflow paths and
 `outputs`; generation capabilities are `max_references`, `sizes`, `max_duration_s`, `durations_s`,
 `word_timestamps`, `commercial_use` (information only: it never blocks a call, and it is copied onto every
 result) and `features`; `price` also takes `per_image` and `per_output_second`. `max_timeout_s` defaults
-by kind: image 600 s, music 1800 s, video 3600 s, transcription 600 s. The keys `lyrics_format`,
-`prompt_inputs`, `guide`, `install`, `command`, `cwd` and `env` are checked when the registry loads. See
-[generation.md](generation.md#comfyui-entries).
+by kind: image 600 s, music 1800 s, video 3600 s, transcription 600 s. See
+[generation.md](generation.md#comfyui-entries). `lyrics_format`, `prompt_inputs`, `guide` and `install`
+are described in [models-and-guides.md](models-and-guides.md); `command`, `cwd` and `env` are for the
+`command` provider.
 
 **Runnable examples:** [registry.py](../examples/registry.py), [openai_compatible.py](../examples/openai_compatible.py), [litellm_provider.py](../examples/litellm_provider.py).

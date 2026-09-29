@@ -11,7 +11,27 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
 [0002 replay entry point and spans from other recorders](design/changes/0002-replay-entry-point-and-foreign-spans.md),
 [0003 examples set and a scriptable FakeOllama](design/changes/0003-examples-and-scriptable-fake-ollama.md).
 
+### Changed
+- `gemma4-12b`'s packaged licence is Apache-2.0 (Gemma 4's model card), not "Gemma Terms of Use". The
+  machine snapshot checks only ComfyUI servers of entries that have a workflow
+  ([decisions.md](design/decisions.md) D-066, D-067).
+
 ### Added
+- The catalog and model guides: the packaged registry is split by kind
+  (`hone_models/data/models/<kind>.toml`) and lists every model in use or worth trying, installed or not,
+  each with `install` (Ollama name, Hugging Face files with their ComfyUI folder, a Hugging Face repository,
+  or a project to clone and set up; size, tier, note), licence, `commercial_use` and a `guide`.
+  `mk.guide(id)` returns a `ModelGuide` (summary, prompt advice, every accepted input with its note,
+  features with examples and a source, limits, licence, install state; `as_text()`, `as_dict()`; entry
+  point `hone.model_guides`); `capabilities.features` comes from the guide and
+  `require={"features": [...]}` / `mk.select(...)` match models declaring every listed feature. Common
+  input formats: `lyrics` in one format converted by the entry's `lyrics_format` (`sections`, `levo`,
+  `plain`) and `prompt_inputs` written into the prompt (an unknown choice lists the choices).
+  `mk.catalog.installed(cfg)` (`yes` / `no` / `unknown`); a generation call to a model that is not
+  installed fails before any job; kind `scoring` entries (provider `none`) cannot be called yet. CLI:
+  `models guide <id> [--json] [--stale DAYS]`, `models install <id>` (prints the commands, size and free
+  disk; `--run`), and `models list` with an `installed` column and `--kind`, `--feature`, `--installed`,
+  `--missing`, `--tier` ([0015](design/changes/0015-generation-models.md) §3a, §3b).
 - `mk.machine`: `snapshot()` reports every GPU (name, memory, utilization, processes), the Ollama and
   ComfyUI servers and the models they hold (partly on the CPU or not), the machine-wide GPU lock and the
   leases, with `None` for anything unknown; `prepare(needed, if_busy=...)` unloads every model not needed

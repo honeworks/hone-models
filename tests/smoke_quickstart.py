@@ -18,4 +18,7 @@ with FakeOllama():
     exec(compile(code.group(1), "README quickstart", "exec"), scope)  # noqa: S102
 assert scope["r"].error is None, scope["r"].error
 assert scope["r"].parsed is not None
+from importlib import resources  # noqa: E402
+
+assert (resources.files("hone_models") / "data" / "adapters" / "levo2.py").is_file(), "adapters not shipped"
 print("quickstart ok")

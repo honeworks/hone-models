@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 from datetime import date
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -136,22 +136,25 @@ class Guide(BaseModel):
 
 
 class InstallFile(BaseModel):
-    """A Hugging Face file and the ComfyUI model folder it goes to."""
+    """A Hugging Face file and the ComfyUI model folder it goes to; without `file`, the whole repository
+    goes into that folder (`to` is then the model's own folder, e.g. `heartmula/HeartCodec-oss`)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
     repo: str
-    file: str
+    file: str | None = None
     to: str
 
 
 class Install(BaseModel):
-    """Where a model comes from and what to fetch (§3b): an Ollama name, Hugging Face files, or a project
-    to clone and set up (`repo`, `setup`, its folder variable `dir_env` and a `check` command)."""
+    """Where a model comes from and what to fetch (§3b): an Ollama name, Hugging Face files for ComfyUI,
+    a whole Hugging Face repository for the HF cache (`hf`), or a project to clone and set up (`repo`,
+    `setup`, its folder variable `dir_env` and a `check` command)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
     source: str | None = None
     ollama: str | None = None
     files: list[InstallFile] = []
+    hf: str | None = None
     repo: str | None = None
     setup: list[str] = []
     dir_env: str | None = None
@@ -159,6 +162,15 @@ class Install(BaseModel):
     size_gb: float | None = None
     tier: Literal[1, 2, 3] | None = None
     note: str | None = None
+
+
+def feature_names(guide: Any) -> list[str]:
+    """The feature names of a raw or parsed `guide` table (empty without one)."""
+    if isinstance(guide, Guide):
+        return [f.name for f in guide.features]
+    raw = cast(dict[str, Any], guide) if isinstance(guide, dict) else {}
+    features = cast(list[Any], raw.get("features") or [])
+    return [str(cast(dict[str, Any], f)["name"]) if isinstance(f, dict) else str(f.name) for f in features]
 
 
 def shape_errors(provider: str, raw: dict[str, Any]) -> list[str]:

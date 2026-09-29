@@ -16,7 +16,7 @@ from .errors import ConfigError, ProviderError
 from .ports import RecordSink
 from .providers import EMBED, lookup, model_attributes
 from .records import default_sink
-from .registry import ModelConfig, Registry, load
+from .registry import ModelConfig, Registry, load, require_client
 
 
 class Embedder:
@@ -75,6 +75,7 @@ def embedder(model_id: str, *, registry: Registry | None = None, sink: RecordSin
     """An `Embedder` for a registered embedding model or an ad-hoc id (`ollama:nomic-embed-text`)."""
     reg = registry or load()
     cfg = reg.get(model_id)
+    require_client(cfg)
     if cfg.kind != "embedding" and cfg.id in reg.models:
         raise ConfigError(f"model {cfg.id!r} is a {cfg.kind} model, not an embedding model")
     register_key(cfg)

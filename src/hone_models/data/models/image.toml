@@ -1,0 +1,266 @@
+# Packaged catalog: image generation and editing (change 0015 §3b). ComfyUI entries get their
+# `workflow` (an API-format export, relative to hone_models/data/) and `inputs` table when the workflow is
+# written and proven with `hone-models models check <id>`; until then calling them says the workflow is
+# missing. `install.files` go to <HONE_COMFYUI_DIR or ~/ComfyUI>/models/<to>.
+
+[models."z-image-turbo"]
+provider = "comfyui"
+kind = "image"
+[models."z-image-turbo".capabilities]
+max_references = 0
+license = "Apache-2.0"
+commercial_use = true
+[models."z-image-turbo".install]
+source = "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"
+files = [
+  { repo = "Comfy-Org/z_image_turbo", file = "split_files/diffusion_models/z_image_turbo_bf16.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/z_image_turbo", file = "split_files/text_encoders/qwen_3_4b.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/z_image_turbo", file = "split_files/vae/ae.safetensors", to = "vae" },
+]
+size_gb = 20.7
+tier = 1
+note = "the old app's model: a fast baseline"
+[models."z-image-turbo".guide]
+summary = "Fast photorealistic text-to-image in 8 steps; renders English and Chinese text."
+prompt = "Detailed natural-language description: subject, clothing, setting, light, camera; no negative prompt (guidance 0)."
+source = "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"
+checked = 2026-09-29
+[[models."z-image-turbo".guide.features]]
+name = "text in images"
+how = "Write the text in quotes in the prompt and say where it goes."
+examples = ["a shop sign that reads \"OPEN LATE\" above the door"]
+source = "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"
+
+[models."flux.2-klein-4b"]
+provider = "comfyui"
+kind = "image"
+[models."flux.2-klein-4b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."flux.2-klein-4b".install]
+source = "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
+files = [
+  { repo = "Comfy-Org/vae-text-encorder-for-flux-klein-4b", file = "split_files/diffusion_models/flux-2-klein-4b.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/vae-text-encorder-for-flux-klein-4b", file = "split_files/text_encoders/qwen_3_4b.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/vae-text-encorder-for-flux-klein-4b", file = "split_files/vae/flux2-vae.safetensors", to = "vae" },
+]
+size_gb = 16.1
+tier = 1
+note = "generation and reference editing in one small model; fits the GPU (shares qwen_3_4b with z-image-turbo)"
+[models."flux.2-klein-4b".guide]
+summary = "Small FLUX.2: text-to-image and multi-reference editing in one model, 4 steps."
+prompt = "Natural-language description; for edits say what to change and what to keep from each reference."
+source = "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
+checked = 2026-09-29
+[[models."flux.2-klein-4b".guide.features]]
+name = "reference editing"
+how = "Give one or more reference images and describe the change; the model keeps what the prompt does not change."
+input = "references"
+examples = ["the woman from image 1 wearing the jacket from image 2, same pose"]
+source = "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
+
+[models."qwen-image-edit-2511"]
+provider = "comfyui"
+kind = "image"
+[models."qwen-image-edit-2511".capabilities]
+max_references = 3
+license = "Apache-2.0"
+commercial_use = true
+# The Multiple-Angles LoRA's phrases (from its model card): "<sks> <azimuth> <elevation> <distance>".
+[models."qwen-image-edit-2511".prompt_inputs.camera_angle]
+place = "prepend"
+choices = { front = "<sks> front view eye-level shot medium shot", left_45 = "<sks> front-left quarter view eye-level shot medium shot", right_45 = "<sks> front-right quarter view eye-level shot medium shot", left_side = "<sks> left side view eye-level shot medium shot", right_side = "<sks> right side view eye-level shot medium shot", back = "<sks> back view eye-level shot medium shot", back_left_45 = "<sks> back-left quarter view eye-level shot medium shot", back_right_45 = "<sks> back-right quarter view eye-level shot medium shot", low_angle = "<sks> front view low-angle shot medium shot", high_angle = "<sks> front view high-angle shot medium shot", close_up = "<sks> front view eye-level shot close-up", wide = "<sks> front view eye-level shot wide shot" }
+[models."qwen-image-edit-2511".install]
+source = "https://huggingface.co/Qwen/Qwen-Image-Edit-2511"
+files = [
+  { repo = "unsloth/Qwen-Image-Edit-2511-GGUF", file = "qwen-image-edit-2511-Q4_K_M.gguf", to = "unet" },
+  { repo = "Comfy-Org/Qwen-Image_ComfyUI", file = "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/Qwen-Image_ComfyUI", file = "split_files/vae/qwen_image_vae.safetensors", to = "vae" },
+  { repo = "fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA", file = "qwen-image-edit-2511-multiple-angles-lora.safetensors", to = "loras" },
+]
+size_gb = 23.2
+tier = 1
+note = "strongest open editing model: keeps a character across shots; GGUF Q4 through the ComfyUI-GGUF node, plus the Multiple-Angles LoRA for character sheets"
+[models."qwen-image-edit-2511".guide]
+summary = "Edits or re-renders up to three reference images; keeps a character's identity; new camera angles with the Multiple-Angles LoRA."
+prompt = "Plain sentences saying what to change; call the references 'image 1', 'image 2', 'image 3'."
+inputs = { camera_angle = "a camera position of the Multiple-Angles LoRA; written at the start of the prompt" }
+source = "https://huggingface.co/Qwen/Qwen-Image-Edit-2511"
+checked = 2026-09-29
+[[models."qwen-image-edit-2511".guide.features]]
+name = "camera angle"
+how = "The Multiple-Angles LoRA moves the camera when the prompt holds one of its phrases (8 azimuths x 4 elevations x 3 distances); the camera_angle input writes one."
+input = "camera_angle"
+examples = ["<sks> front-left quarter view eye-level shot medium shot", "<sks> back view low-angle shot wide shot", "<sks> right side view high-angle shot close-up"]
+source = "https://huggingface.co/fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA"
+[[models."qwen-image-edit-2511".guide.features]]
+name = "multi-image composition"
+how = "Place people or objects from several references into one scene, naming each reference."
+input = "references"
+examples = ["The magician bear is on the left, the alchemist bear is on the right, facing each other in the central park square."]
+source = "https://huggingface.co/Qwen/Qwen-Image-Edit-2511"
+
+[models."krea-2-turbo"]
+provider = "comfyui"
+kind = "image"
+[models."krea-2-turbo".capabilities]
+license = "Krea-2 community license (terms to read)"
+[models."krea-2-turbo".install]
+source = "https://huggingface.co/krea/Krea-2-Turbo"
+files = [
+  { repo = "Comfy-Org/Krea-2", file = "diffusion_models/krea2_turbo_fp8_scaled.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/Krea-2", file = "text_encoders/qwen3vl_4b_fp8_scaled.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/Krea-2", file = "vae/qwen_image_vae.safetensors", to = "vae" },
+]
+size_gb = 18.6
+tier = 2
+note = "strong aesthetics; read the community licence before publishing with it"
+[models."krea-2-turbo".guide]
+summary = "Aesthetic-first text-to-image (Krea 2, turbo); style LoRAs available."
+prompt = "Natural-language description with mood and style words."
+source = "https://huggingface.co/krea/Krea-2-Turbo"
+checked = 2026-09-29
+
+[models."ming-image-0.1-design"]
+provider = "comfyui"
+kind = "image"
+[models."ming-image-0.1-design".capabilities]
+license = "MIT"
+commercial_use = true
+[models."ming-image-0.1-design".install]
+source = "https://huggingface.co/inclusionAI/Ming-Image-0.1-Design"
+files = [
+  { repo = "Comfy-Org/Ming-Image", file = "diffusion_models/ming_image_0.1_design_int8_convrot.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/Ming-Image", file = "text_encoders/ming_image_0.1_ling_mini_2.0_w4a8.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/Ming-Image", file = "vae/ming_image_vae_bf16.safetensors", to = "vae" },
+]
+size_gb = 19.2
+tier = 2
+note = "brand-new, design-oriented (thumbnails?)"
+[models."ming-image-0.1-design".guide]
+summary = "Design-oriented text-to-image (posters, layouts), 2048 px recommended, 12 steps."
+prompt = "A detailed design brief; the model card recommends rewriting short prompts with an LLM first (prompt enhancement)."
+source = "https://huggingface.co/inclusionAI/Ming-Image-0.1-Design"
+checked = 2026-09-29
+
+[models."character-sheet"]
+provider = "comfyui"
+kind = "image"
+[models."character-sheet".capabilities]
+max_references = 1
+license = "Civitai model license (see the listing)"
+[models."character-sheet".install]
+source = "https://huggingface.co/Alissonerdx/CharacterSheet"
+files = [
+  { repo = "Alissonerdx/CharacterSheet", file = "QuadView_krea2_v1.safetensors", to = "loras" },
+  { repo = "Comfy-Org/Krea-2", file = "diffusion_models/krea2_turbo_fp8_scaled.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/Krea-2", file = "text_encoders/qwen3vl_4b_fp8_scaled.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/Krea-2", file = "vae/qwen_image_vae.safetensors", to = "vae" },
+]
+size_gb = 19.5
+tier = 2
+note = "multi-view character sheet LoRA on Krea 2 (TripleView / QuadView); a FLUX.2-klein-9B version exists (non-commercial base)"
+[models."character-sheet".guide]
+summary = "Turns one character image into a sheet: face close-up plus front, side and back full-body views."
+prompt = "Use the trigger caption as the prompt, with one clear, well-framed reference image."
+source = "https://huggingface.co/Alissonerdx/CharacterSheet"
+checked = 2026-09-29
+[[models."character-sheet".guide.features]]
+name = "character sheet"
+how = "The LoRA answers to its trigger caption; the reference image is the character."
+input = "references"
+examples = ["Convert the character in the image to a Character Sheet showing a face close-up, front full body, side full body and back full body views"]
+source = "https://huggingface.co/Alissonerdx/CharacterSheet"
+
+[models."flux.2-klein-9b"]
+provider = "comfyui"
+kind = "image"
+[models."flux.2-klein-9b".capabilities]
+license = "FLUX non-commercial license"
+commercial_use = false
+[models."flux.2-klein-9b".install]
+source = "https://huggingface.co/black-forest-labs/FLUX.2-klein-9B"
+files = [
+  { repo = "black-forest-labs/FLUX.2-klein-9B", file = "flux-2-klein-9b.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/vae-text-encorder-for-flux-klein-9b", file = "split_files/text_encoders/qwen_3_8b_fp8mixed.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/vae-text-encorder-for-flux-klein-9b", file = "split_files/vae/flux2-vae.safetensors", to = "vae" },
+]
+size_gb = 27.2
+tier = 3
+note = "quality ceiling only (non-commercial); the weights are gated: accept the licence on Hugging Face first"
+[models."flux.2-klein-9b".guide]
+summary = "Larger FLUX.2 klein: better quality than 4B, non-commercial."
+prompt = "As FLUX.2-klein-4B."
+source = "https://huggingface.co/black-forest-labs/FLUX.2-klein-9B"
+checked = 2026-09-29
+
+[models."flux.2-dev"]
+provider = "comfyui"
+kind = "image"
+[models."flux.2-dev".capabilities]
+license = "FLUX non-commercial license"
+commercial_use = false
+[models."flux.2-dev".install]
+source = "https://huggingface.co/black-forest-labs/FLUX.2-dev"
+files = [
+  { repo = "Comfy-Org/flux2-dev", file = "split_files/diffusion_models/flux2_dev_fp8mixed.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/flux2-dev", file = "split_files/text_encoders/mistral_3_small_flux2_fp8.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/flux2-dev", file = "split_files/vae/flux2-vae.safetensors", to = "vae" },
+]
+size_gb = 53.8
+tier = 3
+note = "quality ceiling only (non-commercial); 32B, far beyond 8 GB (heavy offloading)"
+[models."flux.2-dev".guide]
+summary = "Full FLUX.2 [dev] (32B): the open quality ceiling; non-commercial and very slow here."
+prompt = "Detailed natural-language description; multi-reference editing like klein."
+source = "https://huggingface.co/black-forest-labs/FLUX.2-dev"
+checked = 2026-09-29
+
+[models."qwen-image-2.1"]
+provider = "comfyui"
+kind = "image"
+[models."qwen-image-2.1".capabilities]
+license = "Qwen research license"
+commercial_use = false
+[models."qwen-image-2.1".install]
+source = "https://huggingface.co/Qwen/Qwen-Image-2.1"
+files = [
+  { repo = "Comfy-Org/Qwen-Image-2.1", file = "diffusion_models/qwen_image_2.1_int8_convrot.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/Qwen-Image-2.1", file = "text_encoders/qwen3vl_8b_w4a8.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/Qwen-Image-2.1", file = "vae/qwen_image_2.1_vae_bf16.safetensors", to = "vae" },
+]
+size_gb = 14.3
+tier = 3
+note = "the trending model; test only to learn the ceiling (research licence)"
+[models."qwen-image-2.1".guide]
+summary = "Qwen-Image 2.1 text-to-image: strong text rendering and prompt following; research licence."
+prompt = "Detailed natural-language description; quote any text to render."
+source = "https://huggingface.co/Qwen/Qwen-Image-2.1"
+checked = 2026-09-29
+
+[models."gpt-image-1.5"]
+provider = "openai_compatible"
+kind = "image"
+model = "gpt-image-1.5"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+inputs = ["quality", "background"]
+[models."gpt-image-1.5".capabilities]
+sizes = ["1024x1024", "1536x1024", "1024x1536"]
+license = "OpenAI service terms (hosted)"
+commercial_use = true
+[models."gpt-image-1.5".install]
+source = "https://platform.openai.com/docs/guides/image-generation"
+note = "hosted: nothing to install; set OPENAI_API_KEY"
+[models."gpt-image-1.5".guide]
+summary = "Follows long, precise instructions; renders text in images; edits with reference images."
+prompt = "Full sentences; say what to keep from each reference."
+inputs = { quality = "'low', 'medium', 'high' or 'auto'", background = "'transparent', 'opaque' or 'auto'" }
+source = "https://platform.openai.com/docs/guides/image-generation"
+checked = 2026-09-29
+[[models."gpt-image-1.5".guide.features]]
+name = "restyle a reference"
+how = "Give the picture as a reference and name the target form in the prompt; there are no commands in the API, only instructions."
+input = "references"
+examples = ["Turn image 1 into a detailed technical blueprint: white lines on blue, labelled dimensions."]
+source = "https://platform.openai.com/docs/guides/image-generation"

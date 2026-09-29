@@ -33,6 +33,10 @@ mk.embedder(model_id, *, registry=None, sink=None) -> Embedder
 mk.speech(model_id, *, registry=None, sink=None) -> SpeechClient   # extras `speech` (kokoro-82m), `expressive` (chatterbox)
 mk.image(model_id, *, registry=None, sink=None) -> MediaClient     # also mk.music(...), mk.video(...) (change 0015)
 mk.transcriber(model_id, *, registry=None, sink=None) -> Transcriber   # extra `transcribe` (faster_whisper)
+mk.guide(model_id, *, registry=None) -> ModelGuide                   # what a model takes (§3, change 0015 §3a)
+mk.select(require=None, *, kind="chat", prefer=None, registry=None) -> list[ModelConfig]   # every match, best first
+mk.catalog.installed(cfg) -> "yes" | "no" | "unknown", mk.catalog.install_commands(cfg) -> list[str]
+mk.formats.convert_lyrics(text, lyrics_format), mk.formats.apply(cfg, prompt, inputs)   # common input formats
 mk.Prompt(template_id, version, sections: dict[str, str | Section], variables=None, system_sections=("system",))
 mk.Section(text, version=None)          # a section with its own version
 mk.YesNo(instructions), mk.Choice(options, instructions), mk.ScoreQ(instructions, scale=(1, 5), anchors=None)
@@ -183,8 +187,9 @@ exception); sessions do not nest. Aligning known lyrics to the heard words stays
 
 ## 3. Registry
 
-TOML files merged in order: packaged defaults (`hone_models/data/models.toml`), the user file
-`~/.config/hone/models.toml`, the project file `./hone-models.toml`, then explicit paths.
+TOML files merged in order: the packaged catalog (`hone_models/data/models/<kind>.toml`, one file per
+kind), the user file `~/.config/hone/models.toml`, the project file `./hone-models.toml`, then explicit
+paths.
 
 ```toml
 [models."gemma4-12b"]
@@ -199,7 +204,16 @@ logprobs = false
 max_input_tokens = 32768
 max_output_tokens = 8192
 vram_gb = 7.4
-license = "Gemma Terms of Use"
+license = "Apache-2.0"
+commercial_use = true
+[models."gemma4-12b".install]
+ollama = "gemma4:12b"
+size_gb = 7.4
+tier = 1
+[models."gemma4-12b".guide]
+summary = "General 12B model that fits the 8 GB GPU; the baseline writer the fine-tunes are compared with."
+source = "https://huggingface.co/google/gemma-4-12B-it"
+checked = 2026-09-29
 
 [models.jev]
 provider = "jev"
@@ -217,9 +231,17 @@ base_url = "https://api.openai.com/v1"
 api_key_env = "OPENAI_API_KEY"
 ```
 
-The packaged defaults are `gemma4-12b`, `qwen2.5vl-7b`, `deepseek-r1-8b`, `nomic-embed-text`, `jev`,
-`gpt-4.1-mini`, `kokoro-82m` and `chatterbox`. `kind` is `chat` (default), `embedding`, `decision`,
-`speech`, `image`, `music`, `video` or `transcription` ([0015](changes/0015-generation-models.md)); a vision model may declare an image's prompt cost (`image_tokens` flat, or `image_patch_px`);
+The packaged registry is the **catalog** ([0015 §3b](changes/0015-generation-models.md)): every model we
+use or may use, installed on this machine or not, each with an `install` table, a licence, a
+`commercial_use` flag and a guide: the chat writers and general models on Ollama (the original
+`gemma4-12b`, `qwen2.5vl-7b`, `deepseek-r1-8b`, plus the `hf.co/...:Q4_K_M` fine-tunes and the rest of the
+research catalog), `nomic-embed-text`, `jev`, `gpt-4.1-mini`, `kokoro-82m`, `chatterbox`, the
+faster-whisper models, the ComfyUI image, music and video models, SongGeneration and DiffRhythm2
+(`command`), the hosted `gpt-image-1.5`, `sora-2`, `sora-2-pro`, and the scorers (`hone-models models list`
+shows them all). No machine paths: folders come from variables (`HONE_COMFYUI_DIR`, `HONE_LEVO2_DIR`, ...).
+`kind` is `chat` (default), `embedding`, `decision`, `speech`, `image`, `music`, `video`, `transcription`
+or `scoring` (catalog entries hone-models cannot call yet, provider `none`: every client raises
+`ConfigError` "no client for kind 'scoring' yet"); a vision model may declare an image's prompt cost (`image_tokens` flat, or `image_patch_px`);
 a speech model lists its voices in `capabilities.voices` (the first is the default) and whether
 it applies emotion and intensity in `capabilities.expressive`.
 
@@ -233,22 +255,50 @@ it applies emotion and intensity in `capabilities.expressive`.
   variable (unset or not a folder: `ConfigError`), which is also the default `cwd`. Capabilities `max_references`, `sizes`,
   `max_duration_s`, `durations_s`, `word_timestamps`, `commercial_use` (information only, copied onto
   results and spans) and `features`; `price.per_image` / `per_output_second`; `max_timeout_s` defaults
-  by kind (image 600 s, music 1800 s, video 3600 s, transcription 600 s). The keys
-  `lyrics_format`, `prompt_inputs`, `guide` and `install` are shape-checked on load; the features that
-  use them follow in later steps of 0015. Registry files are trusted configuration: a `command` entry
+  by kind (image 600 s, music 1800 s, video 3600 s, transcription 600 s). A ComfyUI catalog entry without
+  a `workflow` yet raises `ConfigError` "no workflow yet for '<id>'" when called; `command`, `cwd` and
+  `env` are for the `command` provider. Registry files are trusted configuration: a `command` entry
   runs the program it names.
+- **Common formats and prompt inputs** (0015 §3a). `lyrics` has one common format (section tags such as
+  `[verse]`, `[chorus]` on their own line, then one sung line per line); `lyrics_format` names how an entry
+  gets it: `sections` (as is), `levo` (SongGeneration's `[verse] line. line. ; [chorus] ...`) or `plain`
+  (tags removed), converted by the media client before the provider sees it (`hone_models.formats`).
+  `prompt_inputs.<name>` (`place` `append` / `prepend`, `choices` value -> phrase) are named inputs the
+  entry accepts that end up as words in the prompt; an unknown value raises `ConfigError` listing the
+  choices.
+- **Guides.** `guide` (`summary`, `prompt`, `inputs` notes, `features` with `name`, `how`, `input`,
+  `examples`, `source`, and `source` / `checked`) documents what the model can take; it never changes a
+  call. `mk.guide(id)` returns a `ModelGuide`: the guide, every accepted input (common, the model's own,
+  prompt inputs with their choices) with its note, the limits (`sizes`, `durations_s`, `max_duration_s`,
+  `max_references`), licence, `commercial_use`, the install state and commands; `as_text()` and
+  `as_dict()` (JSON). An entry without a guide gets one built from its inputs and capabilities
+  (`summary = None`). `capabilities.features` is filled from the guide's feature names.
+- **Installed or not** (§3b). `install` gives `source`, an Ollama name (`ollama`), Hugging Face files with
+  their ComfyUI folder (`files`), a whole repository for the HF cache (`hf`), or a project (`repo`, `setup`,
+  `dir_env`, `check`), plus `size_gb`, `tier` (1 test first, 2 worth a try, 3 the ceiling) and a `note`.
+  `mk.catalog.installed(cfg)` answers `yes`, `no` or `unknown` from Ollama's `/api/tags`, the files under
+  `HONE_COMFYUI_DIR` (else `~/ComfyUI`) or ComfyUI's `/object_info`, the HF cache, or the project folder
+  and its check; a server that does not answer or an unset variable is `unknown`, never `no`. A generation
+  call to a model that is certainly not installed raises `ConfigError` naming `hone-models models install
+  <id>` before any job.
 - **Unknown is not false.** Every capability defaults to unknown (`None`). Pre-call checks refuse only
   what the registry *declares* impossible; selection matches only declared values.
 - **Ad-hoc ids.** `provider:model` ids (`ollama:llama3.2:1b`, `openai:gpt-4.1`, `litellm:<model>`) work
   without a registry entry. Ollama ids are probed through `/api/show`; LiteLLM ids take hints from
   LiteLLM's model map; the rest stay unknown.
-- **Selection.** `require={...}` takes `min_context` (context size at least n) and any capability name
-  (exact match); unknown keys raise `ConfigError`. `prefer=` is `"local"`, `"hosted"`, `"cheapest"`
+- **Selection.** `require={...}` takes `min_context` (context size at least n), `features` (every listed
+  feature declared, case ignored) and any other capability name (exact match); unknown keys raise
+  `ConfigError`. `mk.select(require, kind=...)` returns every match, best first. `prefer=` is `"local"`, `"hosted"`, `"cheapest"`
   (local models cost 0, unknown hosted prices last) or `"fastest"` (by measured `speed_tok_s`, unknown
   last); without it candidates are ordered by id. No match raises `CapabilityError` listing the closest
   candidates.
-- **CLI** (`cli` extra): `hone-models models list | show <id> | check <id>`. `check` sends a short smoke
-  call, measures tokens per second and writes `speed_tok_s` to the user registry.
+- **CLI** (`cli` extra): `hone-models models list | show <id> | guide <id> | install <id> | check <id>`.
+  `list` has an `installed` column and the filters `--kind`, `--feature` (repeatable), `--installed`,
+  `--missing`, `--tier N`; `guide` prints the guide (`--json`; `--stale DAYS` lists guides not checked
+  lately); `install` prints the commands that would fetch the model (`ollama pull`, `hf download ...
+  --local-dir <ComfyUI>/models/<folder>`, clone and setup) with the size and the free disk and downloads
+  nothing (`--run` runs them, for the owner). `check` sends a short smoke call, measures tokens per second
+  and writes `speed_tok_s` to the user registry.
 
 ## 4. Providers
 
@@ -563,6 +613,7 @@ directly. `mk.PORTS_VERSION` is `"1"`.
 | `mk.image(...)`, `mk.music(...)`, `mk.video(...)` | `kind`, `model_id`, `inputs`, `generate(prompt, *, out, seed=None, timeout_s=None, trace=None, **inputs) -> MediaResult` (§2.2), `session()` |
 | `mk.transcriber(...)` | `model_id`, `transcribe(audio, *, language=None, prompt=None, words=True, timeout_s=None, trace=None) -> Transcript` (§2.2), `session()` |
 | `mk.embedder(...)` | `model_id`, `dimensions`, `embed(texts, *, trace=None) -> list[list[float]]`: L2-normalized, input order, `[]` for no input |
+| `mk.guide(model_id)` | `ModelGuide`: `id`, `kind`, `summary`, `prompt`, `inputs` (name -> `origin`, `note`, `choices`), `features` (`name`, `how`, `input`, `examples`, `source`), `source`, `checked`, `license`, `commercial_use`, `sizes`, `durations_s`, `max_duration_s`, `max_references`, `lyrics_format`, `installed`, `install`; `as_text()`, `as_dict()` |
 | `mk.gpu`, `mk.gpu.GPU`, `NullGpuLease`, `FileLockGpuLease` | `lease(name, vram_gb, *, timeout_s=None, trace=None)` context manager, reentrant, `TimeoutError` on timeout (§7) |
 | `mk.replay.Replayer()` | `replay_call(span, overrides, *, trace=None) -> span` (§8.6) |
 | a record sink | `emit(span)`, `flush()`, `close()` (§8.2); `hone_models.testing.check_record_sink` checks one |
@@ -577,6 +628,7 @@ Entry points, so tools can load these by name without importing hone-models:
 | `hone.embedders` | `hone_models` | `hone_models:embedder` (takes a model id) |
 | `hone.image_clients`, `hone.music_clients`, `hone.video_clients` | `hone_models` | `hone_models:image`, `hone_models:music`, `hone_models:video` (take a model id) |
 | `hone.transcribers` | `hone_models` | `hone_models:transcriber` (takes a model id) |
+| `hone.model_guides` | `hone_models` | `hone_models:guide` (takes a model id) |
 | `hone.gpu_leases` | `hone_models` | `hone_models.gpu:GPU` |
 | `hone.replayers` | `hone_models` | `hone_models.replay:Replayer` (no arguments) |
 | `hone.machine_probes` | `hone_models` | `hone_models.machine:Machine` (no arguments: the default probe) |
@@ -618,7 +670,9 @@ models in `tests/gpu/`.
 | AC-26 | Hosted images (generation, edit with references, b64 and url) and video (polled, then downloaded; `failed`; timeout) through respx | files written, no bytes in the SQLite file, cost from `per_image` / `per_output_second`, `failed` as `result.error`, `DELETE` sent on timeout, the planted `OPENAI_API_KEY` never stored; a size or duration the model does not declare raises before any request |
 | AC-27 | `command` provider with the fake project: success, `result.json` error, non-zero exit, hang | files collected; `result.error`; `ProviderError` with the stderr tail; the process group killed on timeout |
 | AC-28 | `mk.session("comfyui")` with no server and a fake start command; again with a running server; a plain call with no server | started once, reused by two clients, stopped at the end; a running server is never stopped; the plain call raises `ProviderError` saying to start ComfyUI or use a session, and starts nothing |
-| AC-29 | Transcription with the fake module, capture on and off | words with times on the result; one span; text and words hashed with capture off |
+  and hosted OpenAI-compatible images and video and `command` projects (SongGeneration) so far
+  (transcription runs in-process through faster-whisper); hosted transcription is a later step of
+  [0015](changes/0015-generation-models.md). ComfyUI jobs report no progress (its HTTP API has none).
 | AC-23 | A lease inside another in the same thread; a lease no one can grant (fake memory) | the nested lease reserves only what the outer one does not cover and never waits for it; the impossible one raises `CapabilityError` after `stall_s`, naming the holders |
 | AC-32 **[real]** | `mk.machine.snapshot()` with a fake NVML (8 GB, one foreign process), FakeOllama with a model partly on the CPU, ComfyUI (fake) after a job, after `/free`, after a job hone-models did not run, and refused; no NVML and no `nvidia-smi`; Ollama answering 500; the lock held by another process, by our own `gpu-lock.sh`, and free | GB values and `vram_gb < size_gb` as scripted; ComfyUI named by registry id, dropped after `/free`, unnamed for a foreign job; a registry without `comfyui` entries checks none; `gpus` is `None`; Ollama `running: None` with an error and no entries; `held` / `mine` / `holder` right; the real card is reported |
 | AC-33 **[real]** | `prepare(["a"])` with Ollama holding `a` and `b` and ComfyUI a model not needed; with ComfyUI holding only needed models; with another process's lease (`if_busy` `"block"` and `"unload"`); with the lock held elsewhere; with the unload of `b` failing | `b` unloaded, ComfyUI freed, span recorded; ComfyUI kept; blocked: nothing sent, `blocked_by` names the holder; `"unload"`: `b` unloaded, `blocked_by` still reported; failure: in `errors`, span status `error`, `b` still loaded; on the real machine `prepare([])` leaves nothing loaded |
@@ -683,6 +737,11 @@ copies an entry.
   (transcription runs in-process through faster-whisper): hosted transcription, model guides, common input
   formats and the catalog are later steps of [0015](changes/0015-generation-models.md). ComfyUI jobs
   report no progress (its HTTP API has none).
+  only so far: hosted images and video, `command` projects and transcription are later steps of
+  [0015](changes/0015-generation-models.md). ComfyUI jobs report no progress (its HTTP API has none).
+- The catalog's ComfyUI entries have no workflows yet (each is exported and proven with `models check`
+  when the model is installed), so calling them says so; `vram_gb` is unmeasured for most entries, and a
+  few catalog facts are unverified (D-067). Guides are checked by hand (`models guide --stale`).
 - The `speech` extra (Kokoro) needs Python < 3.13 and loads the model on every call (about a second)
   outside a session.
 - The `expressive` extra (Chatterbox) needs Python < 3.13, uv overrides of its exact torch / numpy pins

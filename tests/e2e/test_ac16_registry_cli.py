@@ -4,6 +4,7 @@ import json
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -11,7 +12,8 @@ from typer.testing import CliRunner
 
 import hone_models as mk
 from hone_models.cli import app
-from hone_models.registry import Capabilities
+from hone_models.registry import GENERATION_KEYS, Capabilities
+from hone_models.testing import FakeOllama
 
 pytestmark = pytest.mark.e2e
 runner = CliRunner()
@@ -19,6 +21,13 @@ MODEL_KEYS = {
     "id", "provider", "model", "name", "kind", "base_url", "api_key_env",
     "defaults", "capabilities", "max_timeout_s", "local",
 }  # fmt: skip
+
+
+@pytest.fixture(autouse=True)
+def ollama() -> Iterator[FakeOllama]:
+    """`models list` asks Ollama which models are installed: a fake answers (also for the subprocess)."""
+    with FakeOllama() as server:
+        yield server
 
 
 def test_ac16_registry_merge_and_adhoc(isolated: Path) -> None:
@@ -39,7 +48,18 @@ def test_ac16_models_list_json(isolated: Path) -> None:
     result = runner.invoke(app, ["models", "list", "--json", "--registry", str(extra)])
     assert result.exit_code == 0, result.output
     rows = json.loads(result.output)
-    assert all(set(r) == MODEL_KEYS for r in rows)
+    # the generation keys (change 0015) only where an entry sets them; `installed` on every row
+    assert all(
+        MODEL_KEYS | {"installed"} <= set(r) <= MODEL_KEYS | {"installed", *GENERATION_KEYS} for r in rows
+    )
+    assert (
+        set(
+            json.loads(
+                runner.invoke(app, ["models", "show", "extra", "--json", "--registry", str(extra)]).output
+            )
+        )
+        == MODEL_KEYS
+    )
     by_id = {r["id"]: r for r in rows}
     assert by_id["extra"]["local"] is True
     assert by_id["gemma4-12b"]["capabilities"]["max_input_tokens"] == 32768

@@ -27,7 +27,11 @@ clip = mk.video("wan2.2-i2v-14b")
 clip.generate("slow push-in, candle flicker", image=Path("shots/01.png"), duration_s=5, out="clips/01.mp4")
 ```
 
-The packaged registry does not list generation models yet; until it does, add your own entries (below).
+The packaged catalog lists these models with their install tables and guides, but their ComfyUI
+workflows are not written yet: calling one says "no workflow yet for '<id>'" until its workflow is
+exported and proven (`hone-models models check <id>`). Until then, add your own entries (below). Lyrics are
+written once in a common format and converted per model, and inputs such as `camera_angle` become the
+model's own phrases: see [models-and-guides.md](models-and-guides.md).
 
 ## Calling
 

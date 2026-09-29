@@ -1,0 +1,150 @@
+# Catalog entries for the guide, format and install tests (tests/e2e/test_ac31_guides_catalog.py). The
+# workflows are the ComfyUI test workflows; the variables are set by the tests: HONE_COMFYUI_DIR (a fake
+# ComfyUI folder), HF_HUB_CACHE (a fake Hugging Face cache), HONE_CAT_PROJECT (a fake project folder).
+
+[models."cat-image-edit"]
+provider = "comfyui"
+kind = "image"
+workflow = "../comfyui/image.json"
+[models."cat-image-edit".inputs]
+prompt = "6.text"
+seed = "3.seed"
+steps = "3.steps"
+width = "13.width"
+height = "13.height"
+references = ["78.image", "106.image"]
+[models."cat-image-edit".capabilities]
+max_references = 2
+license = "Apache-2.0"
+commercial_use = true
+[models."cat-image-edit".prompt_inputs.camera_angle]
+place = "append"
+choices = { left_45 = "<sks> front-left quarter view eye-level shot medium shot", top_down = "<sks> front view high-angle shot medium shot" }
+[models."cat-image-edit".install]
+source = "https://example.org/cat-image-edit"
+files = [{ repo = "org/cat-image-edit", file = "split_files/diffusion_models/cat_edit.safetensors", to = "diffusion_models" }]
+size_gb = 7.8
+tier = 1
+note = "edits with references"
+[models."cat-image-edit".guide]
+summary = "Edits up to two reference images."
+prompt = "Plain sentences saying what to change."
+inputs = { steps = "4 to 8", camera_angle = "where the camera stands" }
+source = "https://example.org/cat-image-edit"
+checked = 2026-09-29
+[[models."cat-image-edit".guide.features]]
+name = "camera angle"
+how = "A LoRA phrase in the prompt moves the camera; the camera_angle input writes it."
+input = "camera_angle"
+examples = ["<sks> front-left quarter view eye-level shot medium shot"]
+source = "https://example.org/lora-card"
+
+[models."cat-song-sections"]
+provider = "comfyui"
+kind = "music"
+workflow = "../comfyui/music.json"
+lyrics_format = "sections"
+[models."cat-song-sections".inputs]
+prompt = "94.tags"
+lyrics = "94.lyrics"
+seed = "109.value"
+[models."cat-song-sections".install]
+files = [{ repo = "org/song", file = "song.safetensors", to = "diffusion_models" }]
+size_gb = 5.0
+
+[models."cat-song-levo"]
+provider = "comfyui"
+kind = "music"
+workflow = "../comfyui/music.json"
+lyrics_format = "levo"
+[models."cat-song-levo".inputs]
+prompt = "94.tags"
+lyrics = "94.lyrics"
+seed = "109.value"
+[models."cat-song-levo".install]
+files = [{ repo = "org/song", file = "song.safetensors", to = "diffusion_models" }]
+size_gb = 5.0
+
+[models."cat-missing-image"]
+provider = "comfyui"
+kind = "image"
+workflow = "../comfyui/image.json"
+[models."cat-missing-image".inputs]
+prompt = "6.text"
+seed = "3.seed"
+[models."cat-missing-image".install]
+files = [
+  { repo = "org/missing", file = "split_files/diffusion_models/missing.safetensors", to = "diffusion_models" },
+  { repo = "org/missing", file = "vae.safetensors", to = "vae" },
+]
+size_gb = 12.5
+tier = 2
+
+[models."cat-bare"]
+provider = "comfyui"
+kind = "image"
+workflow = "../comfyui/image.json"
+[models."cat-bare".inputs]
+prompt = "6.text"
+seed = "3.seed"
+steps = "3.steps"
+width = "13.width"
+height = "13.height"
+[models."cat-bare".capabilities]
+sizes = ["512x512", "1024x1024"]
+
+[models."cat-chat-here"]
+provider = "ollama"
+model = "hf.co/org/Here-GGUF:Q4_K_M"
+[models."cat-chat-here".install]
+ollama = "hf.co/org/Here-GGUF:Q4_K_M"
+size_gb = 4.0
+tier = 1
+
+[models."cat-chat-absent"]
+provider = "ollama"
+model = "hf.co/org/Absent-GGUF:Q4_K_M"
+[models."cat-chat-absent".install]
+ollama = "hf.co/org/Absent-GGUF:Q4_K_M"
+size_gb = 5.0
+tier = 3
+
+[models."cat-chat-remote"]
+provider = "ollama"
+model = "remote:7b"
+base_url = "http://127.0.0.1:9"
+[models."cat-chat-remote".install]
+ollama = "remote:7b"
+
+[models."cat-whisper"]
+provider = "faster_whisper"
+kind = "transcription"
+model = "org/whisper-x"
+[models."cat-whisper".install]
+hf = "org/whisper-x"
+
+[models."cat-hf-absent"]
+provider = "faster_whisper"
+kind = "transcription"
+model = "org/not-here"
+[models."cat-hf-absent".install]
+hf = "org/not-here"
+
+[models."cat-project"]
+provider = "command"
+kind = "music"
+command = ["$HONE_CAT_PROJECT/.venv/bin/python", "run.py", "{request}"]
+[models."cat-project".install]
+repo = "https://example.org/cat-project.git"
+setup = ["python3 -m venv .venv", ".venv/bin/pip install -r requirements.txt"]
+dir_env = "HONE_CAT_PROJECT"
+check = "test -f ready.txt"
+size_gb = 3.0
+
+[models."cat-scorer"]
+provider = "none"
+kind = "scoring"
+[models."cat-scorer".install]
+hf = "org/scorer"
+[models."cat-scorer".guide]
+summary = "Scores things."

@@ -58,6 +58,9 @@ class FakeMedia(MediaClient):
         """Make the next call a job that ran without output: `result.error` is `message`."""
         self._failures.append(message)
 
+    def _require_installed(self) -> None:
+        """A fake needs nothing installed."""
+
     def _provider(self) -> MediaProvider:
         real = MEDIA.get(self.config.provider)
         accepted = real.accepted if real is not None and self.config.inputs is not None else listed_inputs

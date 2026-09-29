@@ -354,4 +354,100 @@ a `ConfigError` before the lease. An `error` in `result.json` wins over the exit
 terminal would show (a `\r` rewrites its line, so progress bars take one line). `result.json`'s `meta` is
 read but not recorded: §5 has no attribute for it. The grace between SIGTERM and SIGKILL is
 `providers.command.KILL_GRACE_S` (10 s). Part of [0015](changes/0015-generation-models.md).
+
+## D-060: the packaged catalog, one file per kind; two more `install` forms
+The packaged registry is `hone_models/data/models/<kind>.toml` (0015 §3b); `data/models.toml` is gone.
+The files are merged in name order and an id declared in two files is a `ConfigError`; a packaged entry's
+relative `workflow` still resolves against `hone_models/data/` (so `workflows/<id>.json`). User, project and
+explicit registry files load exactly as before. `install` gains `hf` (a whole Hugging Face repository for
+the HF cache: Whisper, Kokoro, the scorers), and an `install.files` item without `file` means the whole
+repository goes into the ComfyUI folder `to` (HeartMuLa's model folders). Extends D-027. Part of
+[0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-061: scorers and tools are kind `scoring`, provider `none`, until they can be called
+The catalog lists the scoring models and tools (reward models, DINOv2, MuQ, Demucs, SeedVR2, RIFE, ...)
+before hone-models can call them (0015 §3b, open question 1). They share one kind, `scoring`, and the
+provider `none` ("no provider yet"); the change that makes them callable may split the kind
+(`image_embedding`, `audio_score`, `separation`, ...). Every client factory (`mk.text`, `mk.embedder`,
+`mk.speech`, `mk.image` / `music` / `video`, and `mk.decision` through `mk.text`) raises `ConfigError`
+"no client for kind 'scoring' yet" for them (`registry.require_client`). Part of
+[0015](changes/0015-generation-models.md).
+Awaiting owner review (depends on open question 1).
+
+## D-062: how "installed" is decided, and where it is enforced
+`catalog.installed(cfg)` looks at the entry's `install` table in this order: `dir_env` (the variable names a
+folder and `check`, run there without a shell for at most 60 s, succeeds; unset: `unknown`), `files`
+(ComfyUI: the files under `HONE_COMFYUI_DIR` or `~/ComfyUI` `/models/<to>`; when `HONE_COMFYUI_DIR` is set
+but missing: `unknown` without asking a server; when neither folder exists: every file name appears in
+`GET /object_info`; a whole-repository folder cannot be seen there: `unknown`), `ollama` or an Ollama entry
+(`GET /api/tags`, a name without a tag means `:latest`), `hf` (a snapshot with files in `HF_HUB_CACHE`,
+`$HF_HOME/hub` or `~/.cache/huggingface/hub`). A hosted entry is `yes` (nothing to install), anything else
+`unknown`. A server that does not answer is `unknown`. `models list` asks each server once. Only
+generation calls (`MediaClient.generate`) refuse a model that is certainly not installed, before the job
+and the lease; `unknown` goes ahead, and `FakeMedia` skips the check. Chat, embedding and speech calls are
+not checked (Ollama and Hugging Face already say what is missing, and a check per call would cost a
+request); the transcriber can adopt `catalog.require_installed` when it lands. The tests set
+`HONE_COMFYUI_DIR` to a missing folder so that no test asks a real ComfyUI. Part of
+[0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-063: what `models install` prints and runs
+`hf download <repo> <file> --local-dir <dir>` keeps the repository's folders, so for a file in a
+subfolder (`split_files/vae/ae.safetensors`) the printed plan adds `mv` to put it where ComfyUI looks.
+A project is `git clone <repo> $VAR` and each `setup` step as `cd $VAR && <step>` (the variable's value
+when set). The size and the free space of the disk that would hold the download come first, as comments.
+`--run` runs the same lines through a shell, one by one, and stops at the first failure with
+`ProviderError`; it is for the owner (0015 §3b) and is tested with a fake runner only. Part of
+[0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-064: `mk.select` returns every match; features are matched as "all of these"
+0015 §1 says `mk.select(kind=..., require={"features": [...]})` "finds the models". `mk.select(require,
+*, kind="chat", prefer=None, registry=None)` returns the list of matching entries, best first (by
+`prefer`, then id), empty when none matches; `Registry.select` still returns the single best one or
+raises `CapabilityError`, and both use `Registry.matching`. `require={"features": [...]}` is met when
+the entry declares every listed feature (case ignored); one name may be given as a string.
+`capabilities.features` is filled from the guide's feature names unless the entry sets it. The catalog
+declares only capabilities that were checked, so `mk.text(require={"vision": True})` still picks
+`qwen2.5vl-7b`; `mk.text()` without an id or requirement now picks the first chat entry by id, which may be
+a catalog model that is not installed: name the model. Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-065: prompt inputs and the LeVo lyrics form in detail
+A prompt input's phrase is joined to the prompt with ", " (or a space when the prompt already ends with
+punctuation); an empty prompt is just the phrase. `qwen-image-edit-2511` puts `camera_angle` first
+(`place = "prepend"`) because the Multiple-Angles LoRA's format starts with `<sks>`; its twelve choices are
+phrases copied from the LoRA's model card (azimuth, elevation, distance), a subset of its 96 poses; a
+user registry can add more. The `levo` converter follows SongGeneration's README and `conf/vocab.yaml`:
+`[intro]`, `[inst]`, `[outro]` become their `-short` forms (as its own Gradio app does), `[pre-chorus]` a
+`[verse]` (LeVo has no pre-chorus), lines before any tag a `[verse]`; `;` and full-width punctuation are
+replaced; lines are joined with ". " and end with "." unless the section ends in Chinese, Japanese or
+Korean text (then "." without a final period); a sung section without lines, lines under an instrumental
+tag, an unknown tag or a song without a sung section is a `ConfigError` before the job. The span records
+the converted lyrics (what the model got). Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-066: the machine checks only ComfyUI servers that have a runnable entry
+The packaged catalog has ComfyUI entries on every machine, most without a workflow yet (0015 §3b). The
+machine snapshot (0016) would then ask `127.0.0.1:8188` everywhere and report a refused connection, which
+0015 §7 wanted to avoid. It now checks the servers of `comfyui` entries that have a `workflow` (plus
+`HONE_COMFYUI_URL`). Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-067: `models guide`, the guide's shape and the catalog facts
+`hone-models models guide [ID] [--json] [--stale DAYS]`: with an id, the guide; with `--stale`, the entries
+whose guide was never checked or not within DAYS (only ID when given). `ModelGuide.inputs` maps each
+accepted input to `GuideInput(name, origin, note, choices)` (`origin`: `common`, `own` or `prompt`; the
+entry's note wins over the shared one); `as_dict()` is the JSON form; `installed` and the install commands
+are computed when the guide is built. `models list --json` rows gain `installed`. Catalog facts were
+checked on Hugging Face on 2026-09-29 (model cards, licences, file names and sizes), against ComfyUI's
+own templates in `~/ComfyUI/blueprints` (which files each model loads) and against this machine's
+folders: `gemma4-12b`'s licence is corrected to Apache-2.0 (Gemma 4's card); SongGeneration's LICENSE
+allows academic, research and education use only, so `commercial_use = false` (the research catalog had
+"not stated"); ACE-Step 1.5 loads `qwen_0.6b_ace15` and `qwen_4b_ace15`; HeartMuLa's node reads one 3B
+folder, so the base and RL entries share it. Not verified: the Ollama `hf.co` tag of `muse-glimmer-30b`
+(its repository has several Q4_K_M files), the size and licence of SongEval, beat_this, the aesthetic
+predictor and RIFE, where MuLaCover's node expects its folder, and every `vram_gb` (to be measured).
+Part of [0015](changes/0015-generation-models.md).
 No review needed.

@@ -58,7 +58,7 @@ def test_project_folder_variable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     with pytest.raises(ConfigError, match=r"needs HONE_X_DIR.*models install t"):
         song.generate("x", out=tmp_path / "a.wav")
     monkeypatch.setenv("HONE_X_DIR", str(tmp_path / "missing"))
-    with pytest.raises(ConfigError, match=r"HONE_X_DIR=.*missing is not a folder"):
+    with pytest.raises(ConfigError, match=r"not installed on this machine.*models install t"):
         song.generate("x", out=tmp_path / "a.wav")
 
 

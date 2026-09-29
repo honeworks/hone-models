@@ -62,6 +62,7 @@ PROVIDER_NAMES = {
     "comfyui": "comfyui",
     "command": "command",
     "faster_whisper": "faster_whisper",
+    "none": "none",
 }
 
 F = TypeVar("F")

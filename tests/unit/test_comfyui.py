@@ -32,7 +32,7 @@ def entry(tmp_path: Path, extra: str, workflow: object | None = None) -> mk.regi
 
 
 def test_workflow_problems_are_config_errors(tmp_path: Path) -> None:
-    with pytest.raises(ConfigError, match="has no workflow yet"):
+    with pytest.raises(ConfigError, match="no workflow yet for"):
         _comfyui_workflow.load(entry(tmp_path, "").get("m"))
     with pytest.raises(ConfigError, match="cannot read"):
         _comfyui_workflow.load(entry(tmp_path, 'workflow = "missing.json"').get("m"))

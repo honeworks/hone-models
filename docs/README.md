@@ -11,6 +11,7 @@
 | [speech.md](speech.md) | `mk.speech`, voices, long narration, `FakeSpeech` |
 | [generation.md](generation.md) | `mk.image`, `mk.music`, `mk.video`, ComfyUI entries and sessions, `FakeMedia` |
 | [transcription.md](transcription.md) | `mk.transcriber`, words with times, faster-whisper and its CUDA libraries, `FakeTranscriber` |
+| [models-and-guides.md](models-and-guides.md) | the catalog, model guides, `mk.guide`, `mk.select` by feature, lyrics formats, prompt inputs, installed or not, `models install` |
 | [gpu-and-sessions.md](gpu-and-sessions.md) | `mk.gpu.lease`, `mk.gpu.status`, `mk.machine`, `mk.session`, `mk.unload` |
 | [records-and-replay.md](records-and-replay.md) | span attributes, sinks, content capture, secrets, replay |
 | [cli.md](cli.md) | `hone-models models ...` and `hone-models calls ...` |

@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-from . import gpu
+from . import catalog, formats, gpu
 from ._media_files import MediaFile as MediaFile  # noqa: PLC0414 - part of this module's API
 from ._media_files import file_record, measure
 from ._tracing import start_span
@@ -38,7 +38,7 @@ from .ports import RecordSink
 from .providers import MEDIA, lookup, model_attributes
 from .providers.common import FILE_INPUTS, MediaJob, MediaProvider
 from .records import default_sink
-from .registry import ModelConfig, Registry, load
+from .registry import ModelConfig, Registry, load, require_client
 
 _SIZE = re.compile(r"^(\d+)x(\d+)$")
 
@@ -92,7 +92,7 @@ class MediaClient:
     @property
     def inputs(self) -> list[str]:
         """The named inputs `generate` takes besides `prompt` and `seed`."""
-        return sorted(self._provider().accepted(self.config))
+        return sorted(self._provider().accepted(self.config) | formats.prompt_input_names(self.config))
 
     def generate(
         self,
@@ -111,13 +111,15 @@ class MediaClient:
         `max_timeout_s`; on timeout the job is cancelled and `ModelTimeout` raised."""
         cfg, provider = self.config, self._provider()
         named = self._checked(provider, inputs)
+        prompt, job_inputs = formats.apply(cfg, prompt, named)  # prompt inputs written in, lyrics converted
+        self._require_installed()
         seed = seed if seed is not None else int(cfg.defaults.get("seed", secrets.randbelow(2**32)))
         caps = cfg.capabilities
-        attrs = _attributes(cfg, prompt, named, seed, in_session=self._state is not None)
+        attrs = _attributes(cfg, prompt, {**named, **job_inputs}, seed, in_session=self._state is not None)
         started = time.monotonic()
         with start_span(f"hone.models.{cfg.kind}", self.sink, attrs, trace=trace) as span:
             job = MediaJob(
-                cfg, prompt, named, seed, Path(out), timeout_s or cfg.max_timeout_s, span["attributes"],
+                cfg, prompt, job_inputs, seed, Path(out), timeout_s or cfg.max_timeout_s, span["attributes"],
                 lease=lambda: self._call_lease(trace), session=self._state,
             )  # fmt: skip
             outcome = provider.run(job)
@@ -155,6 +157,10 @@ class MediaClient:
             finally:
                 self._state = None
 
+    def _require_installed(self) -> None:
+        """A `ConfigError` before any job when the model is certainly not installed here (§3b)."""
+        catalog.require_installed(self.config)
+
     def _provider(self) -> MediaProvider:
         return lookup(MEDIA, self.config, f"{self.config.kind} generation")
 
@@ -168,7 +174,7 @@ class MediaClient:
         return self._lease(trace)
 
     def _checked(self, provider: MediaProvider, given: dict[str, Any]) -> dict[str, Any]:
-        accepted = provider.accepted(self.config)
+        accepted = provider.accepted(self.config) | formats.prompt_input_names(self.config)
         unknown = sorted(set(given) - accepted)
         if unknown:
             raise ConfigError(
@@ -278,6 +284,7 @@ def _record(
 
 def _client(kind: str, model_id: str, registry: Registry | None, sink: RecordSink | None) -> MediaClient:
     cfg = (registry or load()).get(model_id)
+    require_client(cfg)
     if cfg.kind != kind:
         raise ConfigError(f"model {cfg.id!r} is a {cfg.kind} model; mk.{kind}() takes {kind} models")
     return MediaClient(cfg, sink or default_sink())

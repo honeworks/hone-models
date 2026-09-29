@@ -13,10 +13,15 @@ r = img.generate("a lighthouse at dusk, oil painting", size="1024x1024", seed=7,
 r.path, r.files, r.seed, r.error, r.error_kind, r.span_id, r.cost_usd
 
 song = mk.music("ace-step-1.5-xl-turbo")
-with song.session():                        # lease, server and model held for the block
+with song.session():  # lease, server and model held for the block
     for i, seed in enumerate([1, 2, 3]):
-        song.generate("dark trap, 95 bpm, female vocals", lyrics=text, duration_s=150, seed=seed,
-                      out=f"takes/take_{i}.flac")
+        song.generate(
+            "dark trap, 95 bpm, female vocals",
+            lyrics=text,
+            duration_s=150,
+            seed=seed,
+            out=f"takes/take_{i}.flac",
+        )
 
 clip = mk.video("wan2.2-i2v-14b")
 clip.generate("slow push-in, candle flicker", image=Path("shots/01.png"), duration_s=5, out="clips/01.mp4")
@@ -105,7 +110,7 @@ It runs in its own process group with a clean environment (no `VIRTUAL_ENV`, `LD
 never stopped, and a remote one is never started.
 
 ```python no-run
-with mk.session("comfyui"):                 # one server for several clients
+with mk.session("comfyui"):  # one server for several clients
     mk.image("z-image-turbo").generate("a harbour", out="a.png")
     mk.music("ace-step-1.5-turbo").generate("lo-fi, rain", duration_s=30, out="b.flac")
 ```
@@ -164,12 +169,19 @@ import hone_models as mk
 from hone_models.testing import FakeComfyUI
 
 Path("flows").mkdir(exist_ok=True)
-Path("flows/tiny.json").write_text(json.dumps({
-    "3": {"class_type": "KSampler", "inputs": {"seed": 0, "positive": ["6", 0], "latent_image": ["13", 0]}},
-    "6": {"class_type": "CLIPTextEncode", "inputs": {"text": ""}},
-    "13": {"class_type": "EmptyLatentImage", "inputs": {"width": 512, "height": 512}},
-    "9": {"class_type": "SaveImage", "inputs": {"filename_prefix": "hone/tiny", "images": ["3", 0]}},
-}))
+Path("flows/tiny.json").write_text(
+    json.dumps(
+        {
+            "3": {
+                "class_type": "KSampler",
+                "inputs": {"seed": 0, "positive": ["6", 0], "latent_image": ["13", 0]},
+            },
+            "6": {"class_type": "CLIPTextEncode", "inputs": {"text": ""}},
+            "13": {"class_type": "EmptyLatentImage", "inputs": {"width": 512, "height": 512}},
+            "9": {"class_type": "SaveImage", "inputs": {"filename_prefix": "hone/tiny", "images": ["3", 0]}},
+        }
+    )
+)
 Path("flows/models.toml").write_text("""
 [models.tiny]
 provider = "comfyui"
@@ -180,7 +192,9 @@ capabilities = { vram_gb = 0.5 }
 """)
 registry = mk.registry.load(["flows/models.toml"])
 with FakeComfyUI() as server:
-    r = mk.image("tiny", registry=registry).generate("a harbour", size="96x64", seed=3, out="shots/harbour.png")
+    r = mk.image("tiny", registry=registry).generate(
+        "a harbour", size="96x64", seed=3, out="shots/harbour.png"
+    )
 print(r.path, r.files[0].width, r.files[0].height, r.seed)
 assert server.submitted[0]["6"]["inputs"]["text"] == "a harbour"
 assert (r.files[0].width, r.files[0].height) == (96, 64)

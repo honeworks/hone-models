@@ -21,16 +21,26 @@ TRANSIENT = (httpx.ConnectError, httpx.ConnectTimeout, httpx.RemoteProtocolError
 
 
 def request_json(
-    method: str, url: str, *, payload: Any = None, headers: dict[str, str] | None = None, timeout: float
+    method: str,
+    url: str,
+    *,
+    payload: Any = None,
+    headers: dict[str, str] | None = None,
+    timeout: float,
+    form: dict[str, str] | None = None,
+    files: list[tuple[str, tuple[str, bytes, str]]] | None = None,
 ) -> Any:
-    """Send a JSON request and return the decoded JSON body, retrying transient failures."""
+    """Send a request and return the decoded JSON body, retrying transient failures. The body is
+    `payload` as JSON, or `form` fields and `files` (name, (filename, bytes, mime)) as multipart."""
     reason = ""
     for attempt in range(1, ATTEMPTS + 1):
         if attempt > 1:
             add_event("retry", {"attempt": attempt, "reason": reason})
             time.sleep(BACKOFF_S * 2 ** (attempt - 2) * random.uniform(0.5, 1.0))  # noqa: S311 - jitter
         try:
-            resp = httpx.request(method, url, json=payload, headers=headers, timeout=timeout)
+            resp = httpx.request(
+                method, url, json=payload, data=form, files=files, headers=headers, timeout=timeout
+            )
         except TRANSIENT as exc:
             reason = f"{type(exc).__name__}: {exc}"
             continue

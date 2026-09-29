@@ -125,7 +125,7 @@ class MediaClient:
             error, kind = outcome.error, outcome.error_kind
             if error is None and not files:
                 error, kind = "the job finished without output files", "no_output"
-            cost = _cost(cfg, files)
+            cost = _cost(cfg, files, named.get("duration_s"))
             _record(span, files, outcome.job_id, cost, (error, kind or "failed"))
         return MediaResult(
             files, cfg.id, seed, span["span_id"], round(time.monotonic() - started, 3),
@@ -241,14 +241,16 @@ def _recorded(named: dict[str, Any]) -> dict[str, Any]:
     return {k: [one(i) for i in _items(v)] if isinstance(v, list) else one(v) for k, v in named.items()}
 
 
-def _cost(cfg: ModelConfig, files: list[MediaFile]) -> float | None:
-    """A naive estimate: one flat price per image or per second of output; `None` without a price."""
+def _cost(cfg: ModelConfig, files: list[MediaFile], requested_s: float | None) -> float | None:
+    """A naive estimate: one flat price per image or per second of output (measured, else the
+    `duration_s` asked for); `None` without a price."""
     price = cfg.capabilities.price
     if price is None or not files:
         return None
     if price.per_image:
         return round(price.per_image * sum(1 for f in files if (f.mime or "").startswith("image/")), 6)
-    seconds = [f.duration_s for f in files if f.duration_s is not None]
+    measured = [f.duration_s if f.duration_s is not None else requested_s for f in files]
+    seconds = [s for s in measured if s is not None]
     if price.per_output_second and seconds:
         return round(price.per_output_second * sum(seconds), 6)
     return None

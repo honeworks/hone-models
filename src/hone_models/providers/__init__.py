@@ -7,7 +7,7 @@ from typing import Any, TypeVar
 
 from ..errors import ConfigError
 from ..registry import Capabilities, ModelConfig
-from . import chatterbox, comfyui, kokoro, litellm, ollama, openai_compat
+from . import chatterbox, comfyui, kokoro, litellm, ollama, openai_compat, openai_media
 from .common import ChatReply, ChatRequest, MediaProvider, SpeechEngine
 
 CHAT: dict[str, Callable[[ModelConfig, ChatRequest], ChatReply]] = {
@@ -29,7 +29,10 @@ SPEECH: dict[str, Callable[[ModelConfig], SpeechEngine]] = {
 # Speech: checks that fail before the GPU lease when a voice cannot run here (change 0008).
 SPEECH_READY: dict[str, Callable[[str], None]] = {"kokoro": kokoro.check_ready}
 # Images, music and video (change 0015): which inputs an entry takes, one job, a session (common.py).
-MEDIA: dict[str, MediaProvider] = {"comfyui": comfyui.PROVIDER}
+MEDIA: dict[str, MediaProvider] = {
+    "comfyui": comfyui.PROVIDER,
+    "openai_compatible": openai_media.PROVIDER,
+}
 # Capability probes for ad-hoc ids.
 PROBE: dict[str, Callable[[ModelConfig], Capabilities]] = {"ollama": ollama.probe, "litellm": litellm.probe}
 # `gen_ai.provider.name` (OTel GenAI) for each provider.

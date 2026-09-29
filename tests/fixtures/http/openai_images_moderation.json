@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "moderation_blocked",
+    "message": "Your request was rejected by the safety system. If you believe this is an error, contact us.",
+    "param": null,
+    "type": "image_generation_user_error"
+  }
+}

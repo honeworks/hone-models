@@ -1,0 +1,25 @@
+# Hosted generation entries for the tests (OpenAI's endpoints, answered by respx).
+
+[models."test-gpt-image"]
+provider = "openai_compatible"
+kind = "image"
+model = "gpt-image-1.5"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+inputs = ["quality", "background"]
+[models."test-gpt-image".capabilities]
+sizes = ["1024x1024", "1536x1024", "1024x1536"]
+max_references = 4
+price = { per_image = 0.04 }
+
+[models."test-sora"]
+provider = "openai_compatible"
+kind = "video"
+model = "sora-2"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+defaults = { duration_s = 4, size = "720x1280" }
+[models."test-sora".capabilities]
+sizes = ["720x1280", "1280x720"]
+durations_s = [4, 8, 12]
+price = { per_output_second = 0.10 }

@@ -1,0 +1,11 @@
+{
+  "created": 1759132800,
+  "data": [
+    {
+      "url": "https://files.example.com/img-1.png?sig=abc123"
+    },
+    {
+      "url": "https://files.example.com/img-2.png?sig=def456"
+    }
+  ]
+}

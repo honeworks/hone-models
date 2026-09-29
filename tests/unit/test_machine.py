@@ -160,6 +160,11 @@ def test_comfyui_urls_from_registry_and_environment(monkeypatch: pytest.MonkeyPa
     assert _machine_read.comfyui_urls(Registry({"flux": no_url})) == ["http://gpu-box:8188"]
 
 
+def test_the_packaged_catalog_checks_the_local_comfyui() -> None:
+    # D-074: the packaged ComfyUI entries have workflows, so the default server is checked everywhere
+    assert _machine_read.comfyui_urls(mk.registry.load()) == [_machine_read.COMFYUI_URL]
+
+
 def test_comfyui_entry_is_named_by_its_workflow_file() -> None:
     cfg = ModelConfig.model_construct(id="z", provider="comfyui", kind="image")
     object.__setattr__(cfg, "workflow", "workflows/z-image-turbo.json")  # the 0015 entry key

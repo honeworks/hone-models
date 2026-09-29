@@ -1,12 +1,27 @@
 # Packaged catalog: music and songs (change 0015 §3b). `lyrics_format` names how the common lyrics format
 # (section tags on their own line, one sung line per line) is converted for the model (formats.py).
-# ComfyUI entries get `workflow` and `inputs` when the workflow is proven (`hone-models models check`).
+# ComfyUI entries have `workflow` and `inputs` once the workflow is proven (`hone-models models check`,
+# D-070); `vram_gb` is the peak that check measured.
 
 [models."ace-step-1.5-turbo"]
 provider = "comfyui"
 kind = "music"
+workflow = "workflows/ace-step-1.5-turbo.json"
+outputs = ["111"]
+defaults = { duration_s = 120, steps = 8 }
 lyrics_format = "sections"
+[models."ace-step-1.5-turbo".inputs]
+prompt = "94.tags"
+lyrics = "94.lyrics"
+seed = "109.value"
+steps = "3.steps"
+duration_s = ["94.duration", "98.seconds"]
+bpm = "94.bpm"
+key = "94.keyscale"
+time_signature = "94.timesignature"
+language = "94.language"
 [models."ace-step-1.5-turbo".capabilities]
+vram_gb = 6.4
 max_duration_s = 600
 license = "MIT"
 commercial_use = true
@@ -24,7 +39,7 @@ note = "fast full songs with vocals; the text encoders are those of ComfyUI's AC
 [models."ace-step-1.5-turbo".guide]
 summary = "Full songs with vocals up to 10 minutes; the fastest ACE-Step; follows genre and instrument tags."
 prompt = "Comma-separated tags: genre, mood, instruments, vocal type, tempo (e.g. 'dark trap, 95 bpm, female vocals, 808')."
-inputs = { lyrics = "the common format: [verse], [chorus], [bridge] ... tags, one sung line per line", key = "e.g. 'C minor', 'F# major'", time_signature = "'4' or '3'", language = "ISO code of the sung language" }
+inputs = { lyrics = "the common format: [verse], [chorus], [bridge] ... tags, one sung line per line", key = "e.g. 'C minor', 'F# major'", time_signature = "'2', '3', '4' or '6'", bpm = "beats per minute, 10-300", language = "ISO code of the sung language" }
 source = "https://github.com/ace-step/ACE-Step-1.5"
 checked = 2026-09-29
 [[models."ace-step-1.5-turbo".guide.features]]
@@ -37,8 +52,22 @@ source = "https://github.com/ace-step/ACE-Step-1.5"
 [models."ace-step-1.5-xl-turbo"]
 provider = "comfyui"
 kind = "music"
+workflow = "workflows/ace-step-1.5-xl-turbo.json"
+outputs = ["111"]
+defaults = { duration_s = 120, steps = 8 }
 lyrics_format = "sections"
+[models."ace-step-1.5-xl-turbo".inputs]
+prompt = "94.tags"
+lyrics = "94.lyrics"
+seed = "109.value"
+steps = "3.steps"
+duration_s = ["94.duration", "98.seconds"]
+bpm = "94.bpm"
+key = "94.keyscale"
+time_signature = "94.timesignature"
+language = "94.language"
 [models."ace-step-1.5-xl-turbo".capabilities]
+vram_gb = 6.4
 max_duration_s = 600
 license = "MIT"
 commercial_use = true
@@ -56,7 +85,7 @@ note = "the larger ACE-Step, distilled for few steps"
 [models."ace-step-1.5-xl-turbo".guide]
 summary = "Full songs with vocals up to 10 minutes; fast; follows genre and instrument tags well."
 prompt = "Comma-separated tags: genre, mood, instruments, vocal type, tempo (e.g. 'dark trap, 95 bpm, female vocals, 808')."
-inputs = { lyrics = "the common format: [verse], [chorus], [bridge] ... tags, one sung line per line", key = "e.g. 'C minor', 'F# major'", time_signature = "'4' or '3'", language = "ISO code of the sung language" }
+inputs = { lyrics = "the common format: [verse], [chorus], [bridge] ... tags, one sung line per line", key = "e.g. 'C minor', 'F# major'", time_signature = "'2', '3', '4' or '6'", bpm = "beats per minute, 10-300", language = "ISO code of the sung language" }
 source = "https://github.com/ace-step/ACE-Step-1.5"
 checked = 2026-09-29
 [[models."ace-step-1.5-xl-turbo".guide.features]]
@@ -69,8 +98,22 @@ source = "https://github.com/ace-step/ACE-Step-1.5"
 [models."ace-step-1.5-xl-sft"]
 provider = "comfyui"
 kind = "music"
+workflow = "workflows/ace-step-1.5-xl-sft.json"
+outputs = ["111"]
+defaults = { duration_s = 120, steps = 50 }
 lyrics_format = "sections"
+[models."ace-step-1.5-xl-sft".inputs]
+prompt = "94.tags"
+lyrics = "94.lyrics"
+seed = "109.value"
+steps = "3.steps"
+duration_s = ["94.duration", "98.seconds"]
+bpm = "94.bpm"
+key = "94.keyscale"
+time_signature = "94.timesignature"
+language = "94.language"
 [models."ace-step-1.5-xl-sft".capabilities]
+vram_gb = 6.4
 max_duration_s = 600
 license = "MIT"
 commercial_use = true
@@ -88,7 +131,7 @@ note = "the larger ACE-Step without distillation: more steps, possibly better qu
 [models."ace-step-1.5-xl-sft".guide]
 summary = "ACE-Step XL, supervised fine-tune: slower (more steps) than the turbo versions."
 prompt = "Comma-separated tags: genre, mood, instruments, vocal type, tempo."
-inputs = { lyrics = "the common format: [verse], [chorus], [bridge] ... tags, one sung line per line", key = "e.g. 'C minor', 'F# major'", time_signature = "'4' or '3'", language = "ISO code of the sung language" }
+inputs = { lyrics = "the common format: [verse], [chorus], [bridge] ... tags, one sung line per line", key = "e.g. 'C minor', 'F# major'", time_signature = "'2', '3', '4' or '6'", bpm = "beats per minute, 10-300", language = "ISO code of the sung language" }
 source = "https://github.com/ace-step/ACE-Step-1.5"
 checked = 2026-09-29
 [[models."ace-step-1.5-xl-sft".guide.features]]
@@ -101,8 +144,18 @@ source = "https://github.com/ace-step/ACE-Step-1.5"
 [models."minimax-music3"]
 provider = "comfyui"
 kind = "music"
+workflow = "workflows/minimax-music3.json"
+outputs = ["35"]
+defaults = { duration_s = 60, steps = 30 }
 lyrics_format = "sections"
+[models."minimax-music3".inputs]
+prompt = "13.caption"
+lyrics = "13.lyrics"
+seed = "38.seed"
+steps = "9.steps"
+duration_s = "13.max_duration"
 [models."minimax-music3".capabilities]
+vram_gb = 6.3
 license = "MiniMax-Music3 community license (credit 'MiniMax-Music3'; written authorization above 20 M USD yearly revenue)"
 commercial_use = true
 [models."minimax-music3".install]
@@ -117,6 +170,7 @@ tier = 1
 note = "commercial use needs the 'MiniMax-Music3' credit on the product's interface"
 [models."minimax-music3".guide]
 summary = "Songs with vocals from a style description and lyrics."
+inputs = { duration_s = "the longest the song may be, up to 360 s (the model's max_duration)" }
 prompt = "A short style description: genre, mood, instruments, vocals."
 source = "https://huggingface.co/MiniMaxAI/MiniMax-Music3"
 checked = 2026-09-29
@@ -130,8 +184,18 @@ source = "https://huggingface.co/MiniMaxAI/MiniMax-Music3"
 [models."yue2-3b"]
 provider = "comfyui"
 kind = "music"
+workflow = "workflows/yue2-3b.json"
+outputs = ["10"]
+defaults = { duration_s = 120, steps = 32 }
 lyrics_format = "sections"
+[models."yue2-3b".inputs]
+prompt = ["24.style", "25.style"]
+lyrics = ["24.lyrics", "25.lyrics"]
+seed = "34.seed"
+steps = "8.steps"
+duration_s = "25.max_duration"
 [models."yue2-3b".capabilities]
+vram_gb = 4.0
 license = "CC-BY-NC-4.0"
 commercial_use = false
 [models."yue2-3b".install]
@@ -142,6 +206,7 @@ tier = 3
 note = "frontier open song quality, non-commercial; covers also need audio_encoders/sheetsage2_bf16.safetensors from the same repo"
 [models."yue2-3b".guide]
 summary = "Complete songs with vocals from lyrics and a style prompt; quality close to hosted services; non-commercial."
+inputs = { duration_s = "the longest the song may be (the model's max_duration); it writes an ABC sketch first, then the audio" }
 prompt = "A style prompt (genre, instruments, vocal, mood) plus the full lyrics with section tags."
 source = "https://huggingface.co/m-a-p/YuE2-3B"
 checked = 2026-09-29
@@ -155,8 +220,17 @@ source = "https://huggingface.co/m-a-p/YuE2-3B"
 [models."heartmula-3b"]
 provider = "comfyui"
 kind = "music"
+workflow = "workflows/heartmula-3b.json"
+outputs = ["5"]
+defaults = { duration_s = 60 }
 lyrics_format = "sections"
+[models."heartmula-3b".inputs]
+prompt = "9.tags"
+lyrics = "9.lyrics"
+seed = "7.seed"
+duration_s = "7.max_duration_sec"
 [models."heartmula-3b".capabilities]
+vram_gb = 6.0  # not measured: the node's ultra mode; its loader fails here (D-073)
 license = "Apache-2.0"
 commercial_use = true
 [models."heartmula-3b".install]
@@ -170,7 +244,7 @@ size_gb = 22.4
 tier = 2
 note = "custom node ComfyUI_FL-HeartMuLa, which reads one 3B folder (heartmula/HeartMuLa-oss-3B): whichever of the base and RL weights is there is the model that runs"
 [models."heartmula-3b".guide]
-summary = "Songs with vocals from lyrics and style tags (HeartMuLa 3B, custom node)."
+summary = "Songs with vocals from lyrics and style tags (HeartMuLa 3B, custom node). Its ComfyUI node does not load with transformers 5 (D-073)."
 prompt = "Comma-separated style tags: genre, vocal, mood, tempo, instruments (e.g. 'indie rock, male vocal, melancholic, slow, acoustic guitar')."
 inputs = { lyrics = "section tags; the node's own markers are [Intro], [Verse], [Prechorus], [Chorus], [Bridge], [Outro], [Instrumental]" }
 source = "https://github.com/HeartMuLa/heartlib"
@@ -185,8 +259,17 @@ source = "https://github.com/HeartMuLa/heartlib"
 [models."heartmula-rl-3b"]
 provider = "comfyui"
 kind = "music"
+workflow = "workflows/heartmula-rl-3b.json"
+outputs = ["5"]
+defaults = { duration_s = 60 }
 lyrics_format = "sections"
+[models."heartmula-rl-3b".inputs]
+prompt = "9.tags"
+lyrics = "9.lyrics"
+seed = "7.seed"
+duration_s = "7.max_duration_sec"
 [models."heartmula-rl-3b".capabilities]
+vram_gb = 6.0  # not measured: the node's ultra mode; its loader fails here (D-073)
 license = "Apache-2.0"
 commercial_use = true
 [models."heartmula-rl-3b".install]
@@ -200,7 +283,7 @@ size_gb = 22.4
 tier = 1
 note = "the RL-tuned HeartMuLa; the custom node reads it from heartmula/HeartMuLa-oss-3B (a link to it on this machine)"
 [models."heartmula-rl-3b".guide]
-summary = "HeartMuLa 3B after reinforcement learning: songs with vocals from lyrics and style tags."
+summary = "HeartMuLa 3B after reinforcement learning: songs with vocals from lyrics and style tags. Its ComfyUI node does not load with transformers 5 (D-073)."
 prompt = "Comma-separated style tags: genre, vocal, mood, tempo, instruments."
 inputs = { lyrics = "section tags; the node's own markers are [Intro], [Verse], [Prechorus], [Chorus], [Bridge], [Outro], [Instrumental]" }
 source = "https://github.com/HeartMuLa/heartlib"
@@ -215,7 +298,17 @@ source = "https://github.com/HeartMuLa/heartlib"
 [models."stable-audio-open-1.0"]
 provider = "comfyui"
 kind = "music"
+workflow = "workflows/stable-audio-open-1.0.json"
+outputs = ["20"]
+defaults = { duration_s = 30, steps = 50 }
+[models."stable-audio-open-1.0".inputs]
+prompt = "6.text"
+negative = "7.text"
+seed = "3.seed"
+steps = "3.steps"
+duration_s = "11.seconds"
 [models."stable-audio-open-1.0".capabilities]
+vram_gb = 5.7
 max_duration_s = 47
 license = "Stability AI Community License (commercial use under 1 M USD yearly revenue)"
 commercial_use = true

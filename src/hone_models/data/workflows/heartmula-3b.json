@@ -1,0 +1,65 @@
+{
+  "13": {
+    "class_type": "FL_HeartMuLa_ModelLoader",
+    "inputs": {
+      "model_version": "3B",
+      "memory_mode": "auto",
+      "precision": "auto",
+      "use_4bit": false,
+      "force_reload": false
+    }
+  },
+  "9": {
+    "class_type": "FL_HeartMuLa_Conditioning",
+    "inputs": {
+      "lyrics": "",
+      "tags": "",
+      "cfg_scale": 1.5,
+      "model": [
+        "13",
+        0
+      ]
+    }
+  },
+  "7": {
+    "class_type": "FL_HeartMuLa_Sampler",
+    "inputs": {
+      "max_duration_sec": 60,
+      "temperature": 1,
+      "top_k": 50,
+      "seed": 0,
+      "model": [
+        "13",
+        0
+      ],
+      "conditioning": [
+        "9",
+        0
+      ]
+    }
+  },
+  "8": {
+    "class_type": "FL_HeartMuLa_Decode",
+    "inputs": {
+      "model": [
+        "13",
+        0
+      ],
+      "audio_tokens": [
+        "7",
+        0
+      ]
+    }
+  },
+  "5": {
+    "class_type": "SaveAudioAdvanced",
+    "inputs": {
+      "filename_prefix": "hone/heartmula-3b",
+      "format": "flac",
+      "audio": [
+        "8",
+        0
+      ]
+    }
+  }
+}

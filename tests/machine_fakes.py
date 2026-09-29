@@ -33,9 +33,10 @@ SLEEPER = "import sys, time\nfrom pathlib import Path\nwhile not Path(sys.argv[1
 
 
 def registry(*, comfyui: bool = True) -> Registry:
-    """The packaged registry plus Ollama models `a` (4 GB) and `b` (`b:7b`, 5 GB) and, with `comfyui`,
-    the ComfyUI entries `z-image-turbo` (7 GB) and `wan-video` (unknown size) on `COMFY`."""
-    models = dict(mk.registry.load().models)
+    """The packaged registry without its ComfyUI entries, plus Ollama models `a` (4 GB) and `b` (`b:7b`,
+    5 GB) and, with `comfyui`, the ComfyUI entries `z-image-turbo` (7 GB) and `wan-video` (unknown size) on
+    `COMFY`."""
+    models = {k: m for k, m in mk.registry.load().models.items() if m.provider != "comfyui"}
     models["a"] = ModelConfig(id="a", provider="ollama", capabilities=Capabilities(vram_gb=4.0))
     models["b"] = ModelConfig(id="b", provider="ollama", model="b:7b", capabilities=Capabilities(vram_gb=5.0))
     if comfyui:  # `comfyui` entries arrive with change 0015; built without validation until then

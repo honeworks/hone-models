@@ -154,6 +154,8 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
 - Docs (`docs/`) and a real-model test suite (`tests/gpu/`, run through `scripts/gpu-lock.sh`).
 
 ### Fixed (before release)
+- `songgeneration-v2-medium` sets `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1` for its own process, so torch 2.6
+  loads the project's bundled `tools/new_prompt.pt`; its setup starts with `git lfs pull` (D-077).
 - `models check` for a music entry that takes the whole shared vocabulary (a `command` entry) no longer
   sends the video start frame as `image` (D-072).
 - An `out` without a file suffix whose name has a dot (`takes/ace-step-1.5-turbo`, `clips/v1.2`) gets the

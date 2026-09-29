@@ -389,6 +389,9 @@ provider = "command"
 kind = "music"
 command = ["$HONE_LEVO2_DIR/.venv/bin/python", "{adapter:levo2}", "{request}"]
 cwd = "$HONE_LEVO2_DIR"
+# The project's generate.py torch.loads its bundled tools/new_prompt.pt, a pickle torch >= 2.6 refuses
+# under weights_only; owner decision: allow it for this entry's process only (D-077).
+env = { TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD = "1" }
 inputs = ["generate_type"]                         # mixed | vocal | bgm | separate
 defaults = { generate_type = "mixed", low_mem = true }
 lyrics_format = "levo"
@@ -401,6 +404,7 @@ commercial_use = false
 source = "https://github.com/tencent-ailab/SongGeneration"
 repo = "https://github.com/tencent-ailab/SongGeneration"
 setup = [
+  "git lfs pull",
   "python3.10 -m venv .venv",
   ".venv/bin/pip install -r requirements.txt",
   ".venv/bin/pip install -r requirements_nodeps.txt --no-deps",

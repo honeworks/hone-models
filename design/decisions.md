@@ -574,3 +574,16 @@ Python 3.10 environment (0015 §2), and their ComfyUI workflows are gone. Detail
   machine until the base weights are downloaded into `HeartMuLa-oss-3B`.
 Part of [0015](changes/0015-generation-models.md).
 No review needed.
+
+## D-077: SongGeneration loads its bundled prompt pickle
+The project's `generate.py` calls `torch.load("tools/new_prompt.pt")`, a pickle bundled with the project,
+and torch 2.6 in its environment refuses it under the `weights_only` default. The owner chose ("go with
+a") to set `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1` in the `songgeneration-v2-medium` entry's `env`: the
+`command` provider passes it to that job's process only, so no other model or the caller's process loads
+pickles that way, and the project is not changed. The real run on the reference machine (2026-09-29) shows
+the variable reaching `generate.py` (torch warns that it forces `weights_only=False`), but the job still
+fails with `UnpicklingError: invalid load key, 'v'`: that checkout's `tools/new_prompt.pt` is a 133-byte
+Git LFS pointer, not the 15 MB file, and git-lfs is not installed, so `git lfs pull` in the project (now
+the first `install.setup` step) is still needed; `install.check` cannot tell a pointer from the file.
+Part of [0015](changes/0015-generation-models.md).
+Decided (owner).

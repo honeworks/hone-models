@@ -228,6 +228,13 @@ def test_heartmula_runs_in_heartlibs_own_environment(isolated: Path, monkeypatch
     assert catalog.installed(reg.models["heartmula-rl-3b"]) == "yes"
 
 
+def test_songgeneration_loads_its_bundled_prompt_pickle() -> None:
+    models = mk.registry.load().models
+    assert models["songgeneration-v2-medium"].env == {"TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD": "1"}  # D-077
+    others = [m.id for m in models.values() if "TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD" in (m.env or {})]
+    assert others == ["songgeneration-v2-medium"]  # no other entry loads pickles that way
+
+
 def test_scoring_entries_cannot_be_called() -> None:
     with pytest.raises(ConfigError, match="no client for kind 'scoring' yet"):
         mk.speech("htdemucs")

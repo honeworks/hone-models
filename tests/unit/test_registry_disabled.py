@@ -30,3 +30,11 @@ def test_the_packaged_songgeneration_entry_is_disabled_until_its_runtime_matches
     assert "D-080" in cfg.disabled
     with pytest.raises(ConfigError, match="songgeneration-v2-medium' is disabled"):
         mk.music("songgeneration-v2-medium")
+
+
+def test_a_disabled_transcription_entry_refuses(tmp_path) -> None:
+    reg = Registry({
+        "w": ModelConfig(id="w", provider="faster_whisper", kind="transcription", disabled="weights missing"),
+    })  # fmt: skip
+    with pytest.raises(ConfigError, match="'w' is disabled: weights missing"):
+        mk.transcriber("w", registry=reg)

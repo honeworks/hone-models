@@ -53,6 +53,9 @@ def test_ac16_models_list_json(isolated: Path) -> None:
         MODEL_KEYS | {"installed"} <= set(r) <= MODEL_KEYS | {"installed", "disabled", *GENERATION_KEYS}
         for r in rows
     )
+    by_id = {r["id"]: r for r in rows}
+    assert isinstance(by_id["songgeneration-v2-medium"]["disabled"], str)  # a disabled entry says why
+    assert "disabled" not in by_id["ace-step-1.5-turbo"]  # an enabled one has no such key
     assert (
         set(
             json.loads(

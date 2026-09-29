@@ -154,6 +154,13 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
 - Docs (`docs/`) and a real-model test suite (`tests/gpu/`, run through `scripts/gpu-lock.sh`).
 
 ### Fixed (before release)
+- `models check` on a chat entry saved a speed of 0.3-5 tok/s where warm calls make 3.6-45: it divided
+  a 2-3 token reply by the whole call, cold load included. It now makes the smoke call (up to 1024 tokens,
+  which `deepseek-r1-8b` needs), times a ~200-token warm reply for `speed_tok_s`, and prints `load_s`
+  apart (D-079).
+- Every packaged chat entry whose model thinks declares `thinking = true` (Hemmingway-1, Muse-Glimmer,
+  the Qwen 3.x and Nemotron 3.5 entries, Gemma 4 26B / 31B, Ornith 1.5), so `think=false` is sent;
+  `models check` on them returned only thinking text (D-078).
 - `songgeneration-v2-medium` sets `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1` for its own process, so torch 2.6
   loads the project's bundled `tools/new_prompt.pt`; its setup starts with `git lfs pull` (D-077).
 - `models check` for a music entry that takes the whole shared vocabulary (a `command` entry) no longer

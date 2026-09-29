@@ -587,3 +587,32 @@ Git LFS pointer, not the 15 MB file, and git-lfs is not installed, so `git lfs p
 the first `install.setup` step) is still needed; `install.check` cannot tell a pointer from the file.
 Part of [0015](changes/0015-generation-models.md).
 Decided (owner).
+Update 2026-09-29: after `git lfs pull` the prompt file loads, and the real run fails one step later, in
+the project: `size mismatch for condition_provider.conditioners.type_info.output_proj.weight: [151652,
+1536]` in the checkpoint, `[151646, 1536]` in the model. The `type_info` conditioner sizes its embedding
+from the tokenizer in `third_party/Qwen2-7B` (from SongGeneration-Runtime; 151,643 + 3 added tokens) with
+the project's pinned transformers 4.37.2, and the v2-medium checkpoint expects six more tokens.
+Not fixed here (the project and its downloads are the owner's); `vram_gb` stays the estimate.
+
+## D-078: which chat entries declare `thinking`
+`models check` returned "only 'thinking' text" for `hemmingway-1`, `muse-glimmer-30b`,
+`nemotron-3.5-lightning`, `qwen3.6-27b` and `qwen3.6-35b-a3b`: their entries did not declare `thinking`,
+so `think=false` was never sent and the 64-token smoke call ran out while thinking. `thinking = true` now
+marks every packaged chat entry whose installed model Ollama's `/api/show` lists with the `thinking`
+capability (checked 2026-09-29: also `qwen3.8-27b`, `gemma4-26b-a4b`, `gemma4-31b`, `ornith-1.5-9b` and
+`-35b`), and the two tunes not installed here by their base (`qwen3.6-35b-a3b-styletune`,
+`nemotron-3.5-30b-a3b-antislop`). The Gemma 4 StyleTune, MeroMero and Equinox builds report no thinking
+and stay unmarked. `tests/unit/test_catalog.py` pins the list both ways.
+No review needed.
+
+## D-079: `models check` times a warm reply
+The chat check divided the 2-3 tokens of "Say OK." by the whole call, cold load included, and saved
+0.3-5 tok/s for models that make 3.6-45 warm. Now the smoke call (which loads the model and must answer)
+comes first, then a ~200-token reply ("Describe the sea at dawn in about 200 words.", `max_tokens=200`)
+is timed: `speed_tok_s` = its output tokens / its seconds. A timed reply cut at the limit or with only
+thinking text still counts (its tokens were generated). `load_s` = the smoke call's seconds less its own
+tokens at the measured speed, `None` when either is unknown; it is printed, not saved. The smoke call
+has 1024 tokens, because `deepseek-r1:8b` thinks even with `think=false` (§13) and answered "OK" at 1024.
+Timing on the client works for every provider; Ollama's own `load_duration` / `eval_duration` would need
+new fields on `TextResult` for one provider.
+No review needed.

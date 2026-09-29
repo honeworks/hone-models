@@ -128,9 +128,11 @@ def ollama_rows(data: dict[str, Any]) -> list[dict[str, Any]] | None:
 
 
 def comfyui_urls(registry: Registry) -> list[str]:
-    """The distinct `base_url`s of the registry's `comfyui` entries, plus `HONE_COMFYUI_URL` when set."""
+    """The distinct `base_url`s of the registry's runnable `comfyui` entries (those with a workflow: the
+    packaged catalog lists ComfyUI models before their workflows exist), plus `HONE_COMFYUI_URL` when set."""
     env = os.environ.get("HONE_COMFYUI_URL")
-    entries = sorted((c for c in registry.models.values() if provider(c) == "comfyui"), key=lambda c: c.id)
+    runnable = (c for c in registry.models.values() if provider(c) == "comfyui" and c.workflow)
+    entries = sorted(runnable, key=lambda c: c.id)
     urls = [(c.base_url or env or COMFYUI_URL).rstrip("/") for c in entries]
     return list(dict.fromkeys(urls + ([env.rstrip("/")] if env else [])))
 

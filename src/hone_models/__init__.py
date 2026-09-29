@@ -7,13 +7,15 @@ r = llm.complete([{"role": "user", "content": "Write a haiku about rain."}])
 
 __version__ = "0.1.0"
 
-from . import errors, gpu, machine, records, registry, replay
+from . import catalog, errors, formats, gpu, machine, records, registry, replay
 from ._tracing import current_trace
 from .decision import Choice, DecisionClient, ScoreQ, YesNo, decision
 from .embeddings import Embedder, embedder
+from .guide import ModelGuide, guide
 from .media import MediaClient, MediaFile, MediaResult, image, music, video
 from .ports import PORTS_VERSION, RecordSink
 from .prompt import Prompt, Section
+from .registry import select
 from .runtime.session import session, unload
 from .speech import SpeechClient, SpeechResult, SpeechSegment, speech
 from .text import TextClient, TextResult, text
@@ -26,6 +28,7 @@ __all__ = [
     "MediaClient",
     "MediaFile",
     "MediaResult",
+    "ModelGuide",
     "Prompt",
     "RecordSink",
     "ScoreQ",
@@ -37,17 +40,21 @@ __all__ = [
     "TextResult",
     "YesNo",
     "__version__",
+    "catalog",
     "current_trace",
     "decision",
     "embedder",
     "errors",
+    "formats",
     "gpu",
+    "guide",
     "image",
     "machine",
     "music",
     "records",
     "registry",
     "replay",
+    "select",
     "session",
     "speech",
     "text",

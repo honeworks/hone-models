@@ -1,0 +1,334 @@
+# Packaged catalog: scorers and tools (change 0015 §3b). hone-models cannot call these yet (kind
+# `scoring`, provider `none`): calling one raises ConfigError "no client for kind 'scoring' yet". They are
+# here so that installing, licences and guides live in one place; hone-taste still loads them itself.
+
+[models."skywork-reward-v2-0.6b"]
+provider = "none"
+kind = "scoring"
+[models."skywork-reward-v2-0.6b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."skywork-reward-v2-0.6b".install]
+source = "https://huggingface.co/Skywork/Skywork-Reward-V2-Qwen3-0.6B"
+hf = "Skywork/Skywork-Reward-V2-Qwen3-0.6B"
+size_gb = 1.2
+tier = 1
+note = "general reward score"
+[models."skywork-reward-v2-0.6b".guide]
+summary = "General reward model: scores how good a reply is (hone-taste `reward_model`)."
+source = "https://huggingface.co/Skywork/Skywork-Reward-V2-Qwen3-0.6B"
+checked = 2026-09-29
+
+[models."litbench-rm-3b"]
+provider = "none"
+kind = "scoring"
+[models."litbench-rm-3b".capabilities]
+license = "Llama 3.2 Community License"
+commercial_use = true
+[models."litbench-rm-3b".install]
+source = "https://huggingface.co/ConicCat/Litbench-Creative-Writing-RM-3B"
+hf = "ConicCat/Litbench-Creative-Writing-RM-3B"
+size_gb = 6.4
+tier = 1
+note = "check its agreement with the hosted judges before trusting it"
+[models."litbench-rm-3b".guide]
+summary = "Reward model trained on human creative-writing preferences: a cheap pre-filter for stories."
+source = "https://huggingface.co/ConicCat/Litbench-Creative-Writing-RM-3B"
+checked = 2026-09-29
+
+[models."story-reward-8b"]
+provider = "none"
+kind = "scoring"
+[models."story-reward-8b".capabilities]
+license = "not stated"
+[models."story-reward-8b".install]
+source = "https://huggingface.co/mradermacher/story_reward_Qwen3_8B_v1-GGUF"
+ollama = "hf.co/mradermacher/story_reward_Qwen3_8B_v1-GGUF:Q4_K_M"
+size_gb = 5.0
+tier = 2
+note = "Llama and DeepSeek versions exist too"
+[models."story-reward-8b".guide]
+summary = "Story-quality reward model (Qwen3 8B); same check as litbench-rm-3b."
+source = "https://huggingface.co/mradermacher/story_reward_Qwen3_8B_v1-GGUF"
+checked = 2026-09-29
+
+[models."dinov2-small"]
+provider = "none"
+kind = "scoring"
+[models."dinov2-small".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."dinov2-small".install]
+source = "https://huggingface.co/facebook/dinov2-small"
+hf = "facebook/dinov2-small"
+size_gb = 0.1
+tier = 1
+note = "identity / consistency across shots"
+[models."dinov2-small".guide]
+summary = "Image embeddings for identity and consistency checks between shots."
+source = "https://huggingface.co/facebook/dinov2-small"
+checked = 2026-09-29
+
+[models."audiobox-aesthetics"]
+provider = "none"
+kind = "scoring"
+[models."audiobox-aesthetics".capabilities]
+license = "CC-BY-4.0"
+commercial_use = true
+[models."audiobox-aesthetics".install]
+source = "https://huggingface.co/facebook/audiobox-aesthetics"
+hf = "facebook/audiobox-aesthetics"
+size_gb = 0.5
+tier = 1
+note = "music scores"
+[models."audiobox-aesthetics".guide]
+summary = "Audio aesthetics scores: production quality, enjoyment, complexity, usefulness."
+source = "https://huggingface.co/facebook/audiobox-aesthetics"
+checked = 2026-09-29
+
+[models."muq-mulan-large"]
+provider = "none"
+kind = "scoring"
+[models."muq-mulan-large".capabilities]
+license = "CC-BY-NC-4.0"
+commercial_use = false
+[models."muq-mulan-large".install]
+source = "https://huggingface.co/OpenMuQ/MuQ-MuLan-large"
+hf = "OpenMuQ/MuQ-MuLan-large"
+size_gb = 2.8
+tier = 2
+note = "music-text match; non-commercial"
+[models."muq-mulan-large".guide]
+summary = "Music-text embeddings: how well a song matches a description."
+source = "https://huggingface.co/OpenMuQ/MuQ-MuLan-large"
+checked = 2026-09-29
+
+[models."muq-large-msd"]
+provider = "none"
+kind = "scoring"
+[models."muq-large-msd".capabilities]
+license = "CC-BY-NC-4.0"
+commercial_use = false
+[models."muq-large-msd".install]
+source = "https://huggingface.co/OpenMuQ/MuQ-large-msd-iter"
+hf = "OpenMuQ/MuQ-large-msd-iter"
+size_gb = 1.3
+tier = 2
+note = "music features; non-commercial"
+[models."muq-large-msd".guide]
+summary = "Music representation model (MuQ, trained on MSD) for music scores and features."
+source = "https://huggingface.co/OpenMuQ/MuQ-large-msd-iter"
+checked = 2026-09-29
+
+[models."htdemucs"]
+provider = "none"
+kind = "scoring"
+[models."htdemucs".capabilities]
+license = "MIT (demucs)"
+commercial_use = true
+[models."htdemucs".install]
+source = "https://github.com/facebookresearch/demucs"
+hf = "adefossez/HTDemucs"
+size_gb = 0.2
+tier = 1
+note = "stems for vocal checks"
+[models."htdemucs".guide]
+summary = "Separates a song into stems (vocals, drums, bass, other)."
+source = "https://github.com/facebookresearch/demucs"
+checked = 2026-09-29
+
+[models."mel-band-roformer"]
+provider = "none"
+kind = "scoring"
+[models."mel-band-roformer".capabilities]
+license = "MIT"
+commercial_use = true
+[models."mel-band-roformer".install]
+source = "https://huggingface.co/KimberleyJSN/melbandroformer"
+hf = "KimberleyJSN/melbandroformer"
+size_gb = 0.9
+tier = 1
+note = "better vocal separation"
+[models."mel-band-roformer".guide]
+summary = "Vocal separation, cleaner vocals than HTDemucs."
+source = "https://huggingface.co/KimberleyJSN/melbandroformer"
+checked = 2026-09-29
+
+[models."depth-anything-v2-small"]
+provider = "none"
+kind = "scoring"
+[models."depth-anything-v2-small".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."depth-anything-v2-small".install]
+source = "https://huggingface.co/depth-anything/Depth-Anything-V2-Small-hf"
+hf = "depth-anything/Depth-Anything-V2-Small-hf"
+size_gb = 0.1
+tier = 2
+note = "depth estimation"
+[models."depth-anything-v2-small".guide]
+summary = "Depth maps from images (for composition checks and depth control)."
+source = "https://huggingface.co/depth-anything/Depth-Anything-V2-Small-hf"
+checked = 2026-09-29
+
+[models."beat-this"]
+provider = "none"
+kind = "scoring"
+[models."beat-this".capabilities]
+license = "MIT (code; weights: see source, not verified)"
+[models."beat-this".install]
+source = "https://github.com/CPJKU/beat_this"
+size_gb = 0.1
+tier = 2
+note = "installed with `pip install beat-this`; the checkpoint downloads on first use"
+[models."beat-this".guide]
+summary = "Beat and downbeat tracking: tempo and bar grid of a song."
+source = "https://github.com/CPJKU/beat_this"
+checked = 2026-09-29
+
+[models."songeval"]
+provider = "none"
+kind = "scoring"
+[models."songeval".capabilities]
+license = "not verified"
+[models."songeval".install]
+source = "https://github.com/ASLP-lab/SongEval"
+size_gb = 0.5
+tier = 2
+note = "music scores; licence and size not verified"
+[models."songeval".guide]
+summary = "Song aesthetics scores (coherence, memorability, naturalness, clarity, musicality)."
+source = "https://github.com/ASLP-lab/SongEval"
+checked = 2026-09-29
+
+[models."florence-2"]
+provider = "none"
+kind = "scoring"
+[models."florence-2".capabilities]
+license = "MIT"
+commercial_use = true
+[models."florence-2".install]
+source = "https://huggingface.co/microsoft/Florence-2-large"
+hf = "microsoft/Florence-2-large"
+size_gb = 1.5
+tier = 2
+note = "stray text in images"
+[models."florence-2".guide]
+summary = "Captions, OCR and object detection: finds stray text in images."
+source = "https://huggingface.co/microsoft/Florence-2-large"
+checked = 2026-09-29
+
+[models."paddleocr-vl-1.6"]
+provider = "none"
+kind = "scoring"
+[models."paddleocr-vl-1.6".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."paddleocr-vl-1.6".install]
+source = "https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6"
+hf = "PaddlePaddle/PaddleOCR-VL-1.6"
+size_gb = 2.0
+tier = 2
+note = "stray text in images"
+[models."paddleocr-vl-1.6".guide]
+summary = "Document and scene-text OCR (vision-language)."
+source = "https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6"
+checked = 2026-09-29
+
+[models."hpsv3"]
+provider = "none"
+kind = "scoring"
+[models."hpsv3".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."hpsv3".install]
+source = "https://huggingface.co/MizzenAI/HPSv3"
+hf = "MizzenAI/HPSv3"
+size_gb = 16.0
+tier = 2
+note = "image preference; size not verified"
+[models."hpsv3".guide]
+summary = "Human-preference score for generated images (HPSv3)."
+source = "https://huggingface.co/MizzenAI/HPSv3"
+checked = 2026-09-29
+
+[models."pickscore"]
+provider = "none"
+kind = "scoring"
+[models."pickscore".capabilities]
+license = "not stated"
+[models."pickscore".install]
+source = "https://huggingface.co/yuvalkirstain/PickScore_v1"
+hf = "yuvalkirstain/PickScore_v1"
+size_gb = 3.9
+tier = 3
+note = "image preference (hone-taste has it through its own loader)"
+[models."pickscore".guide]
+summary = "Human-preference score for text-to-image pairs (PickScore)."
+source = "https://huggingface.co/yuvalkirstain/PickScore_v1"
+checked = 2026-09-29
+
+[models."aesthetic-v2.5"]
+provider = "none"
+kind = "scoring"
+[models."aesthetic-v2.5".capabilities]
+license = "not verified"
+[models."aesthetic-v2.5".install]
+source = "https://github.com/discus0434/aesthetic-predictor-v2-5"
+size_gb = 1.0
+tier = 3
+note = "image aesthetics; installed as a pip package"
+[models."aesthetic-v2.5".guide]
+summary = "Aesthetic score for images (SigLIP-based predictor v2.5)."
+source = "https://github.com/discus0434/aesthetic-predictor-v2-5"
+checked = 2026-09-29
+
+[models."seedvr2-3b"]
+provider = "none"
+kind = "scoring"
+[models."seedvr2-3b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."seedvr2-3b".install]
+source = "https://huggingface.co/ByteDance-Seed/SeedVR2-3B"
+files = [{ repo = "Comfy-Org/SeedVR2", file = "diffusion_models/seedvr2_3b_fp8_e4m3fn.safetensors", to = "diffusion_models" }, { repo = "Comfy-Org/SeedVR2", file = "vae/seedvr2_ema_vae_fp16.safetensors", to = "vae" }]
+size_gb = 3.9
+tier = 2
+note = "upscale final videos"
+[models."seedvr2-3b".guide]
+summary = "Video and image upscaling / restoration (SeedVR2 3B)."
+source = "https://huggingface.co/ByteDance-Seed/SeedVR2-3B"
+checked = 2026-09-29
+
+[models."seedvr2-7b"]
+provider = "none"
+kind = "scoring"
+[models."seedvr2-7b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."seedvr2-7b".install]
+source = "https://huggingface.co/ByteDance-Seed/SeedVR2-7B"
+files = [{ repo = "Comfy-Org/SeedVR2", file = "diffusion_models/seedvr2_7b_fp8_e4m3fn.safetensors", to = "diffusion_models" }, { repo = "Comfy-Org/SeedVR2", file = "vae/seedvr2_ema_vae_fp16.safetensors", to = "vae" }]
+size_gb = 8.7
+tier = 3
+note = "the larger upscaler"
+[models."seedvr2-7b".guide]
+summary = "Video and image upscaling / restoration (SeedVR2 7B)."
+source = "https://huggingface.co/ByteDance-Seed/SeedVR2-7B"
+checked = 2026-09-29
+
+[models."rife"]
+provider = "none"
+kind = "scoring"
+[models."rife".capabilities]
+license = "MIT"
+commercial_use = true
+[models."rife".install]
+source = "https://github.com/hzwer/Practical-RIFE"
+size_gb = 0.1
+tier = 3
+note = "interpolation; weights from the project page"
+[models."rife".guide]
+summary = "Frame interpolation: smoother or slower video."
+source = "https://github.com/hzwer/Practical-RIFE"
+checked = 2026-09-29

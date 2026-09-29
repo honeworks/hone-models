@@ -1,0 +1,626 @@
+# Packaged catalog: chat models (change 0015 §3b). One file per kind in this folder; an id is in one file.
+# Override or extend in ~/.config/hone/models.toml, ./hone-models.toml or files passed to
+# hone_models.registry.load(paths=[...]). Being installed is checked on the machine
+# (`hone-models models list --installed`), never claimed here. Ollama names are the `hf.co/...:Q4_K_M` tags
+# or the Ollama library tags; tier: 1 test first, 2 worth a try, 3 to learn the ceiling.
+
+# --- the original defaults -----------------------------------------------------------------------
+
+[models."gemma4-12b"]
+provider = "ollama"
+kind = "chat"
+model = "gemma4-12b:latest"
+defaults = { temperature = 0.8 }
+[models."gemma4-12b".capabilities]
+vision = false
+thinking = true            # send think=false unless the caller asks for reasoning
+json_schema = true         # Ollama format=<schema>
+logprobs = false
+max_input_tokens = 32768
+max_output_tokens = 8192
+vram_gb = 7.4
+license = "Apache-2.0"
+commercial_use = true
+[models."gemma4-12b".install]
+source = "https://huggingface.co/google/gemma-4-12B-it"
+ollama = "gemma4:12b"
+size_gb = 7.4
+tier = 1
+note = "the old app's writer: the floor to beat; `gemma4-12b:latest` is a local tag of the same weights"
+[models."gemma4-12b".guide]
+summary = "General 12B model that fits the 8 GB GPU; the baseline writer the fine-tunes are compared with."
+prompt = "Plain instructions; give the output format explicitly. Thinking is off unless asked for."
+source = "https://huggingface.co/google/gemma-4-12B-it"
+checked = 2026-09-29
+
+[models."qwen2.5vl-7b"]
+provider = "ollama"
+kind = "chat"
+model = "qwen2.5vl:7b"
+[models."qwen2.5vl-7b".capabilities]
+vision = true
+image_patch_px = 28        # one prompt token per 28x28 pixels
+json_schema = true
+max_input_tokens = 32768
+vram_gb = 6.0
+license = "Apache-2.0"
+commercial_use = true
+[models."qwen2.5vl-7b".install]
+source = "https://ollama.com/library/qwen2.5vl"
+ollama = "qwen2.5vl:7b"
+size_gb = 6.0
+tier = 1
+note = "vision model that fits the GPU: describes and checks images"
+[models."qwen2.5vl-7b".guide]
+summary = "Vision-language model: describes, compares and checks images; fits the 8 GB GPU."
+prompt = "Attach the images and ask one concrete question per image; ask for JSON when you need fields."
+source = "https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct"
+checked = 2026-09-29
+
+[models."deepseek-r1-8b"]
+provider = "ollama"
+kind = "chat"
+model = "deepseek-r1:8b"
+[models."deepseek-r1-8b".capabilities]
+vision = false
+thinking = true
+json_schema = true
+max_input_tokens = 32768
+vram_gb = 5.2
+license = "MIT"
+commercial_use = true
+[models."deepseek-r1-8b".install]
+source = "https://ollama.com/library/deepseek-r1"
+ollama = "deepseek-r1:8b"
+size_gb = 5.2
+tier = 3
+note = "small reasoning model; screened cheaply, expected weak for prose"
+[models."deepseek-r1-8b".guide]
+summary = "Small reasoning model: thinks before answering; weak for prose."
+prompt = "State the problem and the answer format; the reasoning comes back separately as thinking."
+source = "https://ollama.com/library/deepseek-r1"
+checked = 2026-09-29
+
+[models."gpt-4.1-mini"]
+provider = "openai_compatible"
+kind = "chat"
+model = "gpt-4.1-mini"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+[models."gpt-4.1-mini".capabilities]
+vision = true
+json_schema = true
+logprobs = true
+max_input_tokens = 1047576
+max_output_tokens = 32768
+price = { input_per_mtok = 0.4, output_per_mtok = 1.6 }
+license = "OpenAI service terms (hosted)"
+commercial_use = true
+[models."gpt-4.1-mini".install]
+source = "https://platform.openai.com/docs/models/gpt-4.1-mini"
+note = "hosted: nothing to install; set OPENAI_API_KEY"
+[models."gpt-4.1-mini".guide]
+summary = "Hosted general model with vision, structured output and logprobs; cheap."
+prompt = "Plain instructions; structured output through a JSON schema."
+source = "https://platform.openai.com/docs/models/gpt-4.1-mini"
+checked = 2026-09-29
+
+# --- writers (premise, story, lyrics, rewrite) ------------------------------------------------------
+
+[models."hemmingway-1"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/bartowski/Altworld_Hemmingway-1-GGUF:Q4_K_M"
+[models."hemmingway-1".capabilities]
+license = "CC-BY-NC-4.0"
+commercial_use = false     # owner (2026-09-29): still a real option for published songs
+[models."hemmingway-1".install]
+source = "https://huggingface.co/Altworld/Hemmingway-1"
+ollama = "hf.co/bartowski/Altworld_Hemmingway-1-GGUF:Q4_K_M"
+size_gb = 17.4
+tier = 1
+note = "best open writer on EQ-Bench Creative Writing v3 (Elo 1906) with the lowest slop; Qwen3.8-27B fine-tune"
+[models."hemmingway-1".guide]
+summary = "The strongest open prose writer tested: vivid, low-cliche fiction and lyrics; also a rewrite pass."
+prompt = "Give the premise, voice and constraints in prose; ask for the text only. Good at rewriting another model's draft."
+source = "https://huggingface.co/Altworld/Hemmingway-1"
+checked = 2026-09-29
+
+[models."muse-glimmer-30b"]
+provider = "ollama"
+kind = "chat"
+model = "muse-glimmer:latest"
+[models."muse-glimmer-30b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."muse-glimmer-30b".install]
+source = "https://huggingface.co/meta-models/Muse-Glimmer-30B"
+ollama = "hf.co/meta-models/Muse-Glimmer-30B-GGUF:Q4_K_M"
+size_gb = 18.0
+tier = 1
+note = "second-best open writer (Elo 1798), strong brainstorming; installed here as `muse-glimmer`"
+[models."muse-glimmer-30b".guide]
+summary = "Creative writer, second on the open EQ-Bench board; strong at brainstorming ideas and hooks."
+prompt = "Ask for several distinct options when brainstorming; give tone and length limits."
+source = "https://huggingface.co/meta-models/Muse-Glimmer-30B"
+checked = 2026-09-29
+
+[models."styletune-12b"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/mradermacher/Gemma-4-12B-StyleTune-GGUF:Q4_K_M"
+[models."styletune-12b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."styletune-12b".install]
+source = "https://huggingface.co/Gryphe/Gemma-4-12B-StyleTune"
+ollama = "hf.co/mradermacher/Gemma-4-12B-StyleTune-GGUF:Q4_K_M"
+size_gb = 7.9
+tier = 1
+note = "fits the GPU fully; a direct upgrade of the old app's writer"
+[models."styletune-12b".guide]
+summary = "Gemma 4 12B with an output head trained on narrative only: fewer cliches, fits the GPU."
+prompt = "Same prompts as Gemma 4; ask for prose, not lists."
+source = "https://huggingface.co/Gryphe/Gemma-4-12B-StyleTune"
+checked = 2026-09-29
+
+[models."styletune-26b-a4b"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/mradermacher/Gemma-4-26B-A4B-StyleTune-V2-GGUF:Q4_K_M"
+[models."styletune-26b-a4b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."styletune-26b-a4b".install]
+source = "https://huggingface.co/Gryphe/Gemma-4-26B-A4B-StyleTune-V2"
+ollama = "hf.co/mradermacher/Gemma-4-26B-A4B-StyleTune-V2-GGUF:Q4_K_M"
+size_gb = 17.2
+tier = 1
+note = "StyleTune on the Gemma 4 MoE (4B active): fast with CPU offload"
+[models."styletune-26b-a4b".guide]
+summary = "Narrative-tuned Gemma 4 MoE: StyleTune prose at MoE speed."
+prompt = "Same prompts as Gemma 4; ask for prose, not lists."
+source = "https://huggingface.co/Gryphe/Gemma-4-26B-A4B-StyleTune-V2"
+checked = 2026-09-29
+
+[models."styletune-31b"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/bartowski/Gryphe_Gemma-4-31B-StyleTune-GGUF:Q4_K_M"
+[models."styletune-31b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."styletune-31b".install]
+source = "https://huggingface.co/Gryphe/Gemma-4-31B-StyleTune"
+ollama = "hf.co/bartowski/Gryphe_Gemma-4-31B-StyleTune-GGUF:Q4_K_M"
+size_gb = 20.4
+tier = 1
+note = "output head trained on narrative only: about 60 % fewer cliches than Gemma (model card)"
+[models."styletune-31b".guide]
+summary = "Narrative-tuned Gemma 4 31B: the StyleTune quality ceiling; slow on 8 GB (CPU offload)."
+prompt = "Same prompts as Gemma 4; ask for prose, not lists."
+source = "https://huggingface.co/Gryphe/Gemma-4-31B-StyleTune"
+checked = 2026-09-29
+
+[models."equinox-31b"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/mradermacher/Equinox-31B-GGUF:Q4_K_M"
+[models."equinox-31b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."equinox-31b".install]
+source = "https://huggingface.co/LatitudeGames/Equinox-31B"
+ollama = "hf.co/mradermacher/Equinox-31B-GGUF:Q4_K_M"
+size_gb = 18.7
+tier = 2
+note = "AI Dungeon's story model (Gemma 4 31B): narrative with consequences"
+[models."equinox-31b".guide]
+summary = "Interactive-fiction story model: keeps narrative consequences straight."
+prompt = "Second-person or story prompts; give the scene and what should happen next."
+source = "https://huggingface.co/LatitudeGames/Equinox-31B"
+checked = 2026-09-29
+
+[models."hearthfire-24b"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/bartowski/LatitudeGames_Hearthfire-24B-GGUF:Q4_K_M"
+[models."hearthfire-24b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."hearthfire-24b".install]
+source = "https://huggingface.co/LatitudeGames/Hearthfire-24B"
+ollama = "hf.co/bartowski/LatitudeGames_Hearthfire-24B-GGUF:Q4_K_M"
+size_gb = 14.3
+tier = 2
+note = "story model on another base family (Mistral Small 3.2)"
+[models."hearthfire-24b".guide]
+summary = "Story model on Mistral Small 3.2: a different voice from the Gemma tunes."
+prompt = "Story prompts with the scene and its stakes."
+source = "https://huggingface.co/LatitudeGames/Hearthfire-24B"
+checked = 2026-09-29
+
+[models."meromero-26b-a4b"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/mradermacher/G4-MeroMero-26B-A4B-GGUF:Q4_K_M"
+[models."meromero-26b-a4b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."meromero-26b-a4b".install]
+source = "https://huggingface.co/zerofata/G4-MeroMero-26B-A4B"
+ollama = "hf.co/mradermacher/G4-MeroMero-26B-A4B-GGUF:Q4_K_M"
+size_gb = 16.8
+tier = 2
+note = "popular creative Gemma 4 MoE"
+[models."meromero-26b-a4b".guide]
+summary = "Creative-writing Gemma 4 MoE: fast, playful prose."
+prompt = "Plain creative instructions with tone and length."
+source = "https://huggingface.co/zerofata/G4-MeroMero-26B-A4B"
+checked = 2026-09-29
+
+[models."meromero-v2-31b"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/mradermacher/G4-MeroMero-v2-31B-GGUF:Q4_K_M"
+[models."meromero-v2-31b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."meromero-v2-31b".install]
+source = "https://huggingface.co/zerofata/G4-MeroMero-v2-31B"
+ollama = "hf.co/mradermacher/G4-MeroMero-v2-31B-GGUF:Q4_K_M"
+size_gb = 18.7
+tier = 2
+note = "the dense version of MeroMero"
+[models."meromero-v2-31b".guide]
+summary = "Creative-writing Gemma 4 31B (dense MeroMero v2)."
+prompt = "Plain creative instructions with tone and length."
+source = "https://huggingface.co/zerofata/G4-MeroMero-v2-31B"
+checked = 2026-09-29
+
+[models."cydonia-24b"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/bartowski/TheDrummer_Cydonia-24B-v4.3-GGUF:Q4_K_M"
+[models."cydonia-24b".capabilities]
+license = "not stated (base Mistral Small 3.2: Apache-2.0)"
+[models."cydonia-24b".install]
+source = "https://huggingface.co/TheDrummer/Cydonia-24B-v4.3"
+ollama = "hf.co/bartowski/TheDrummer_Cydonia-24B-v4.3-GGUF:Q4_K_M"
+size_gb = 14.3
+tier = 2
+note = "long-standing community creative favourite; dense Mistral for poetry and rhythm"
+[models."cydonia-24b".guide]
+summary = "Community creative tune of Mistral Small 3.2: rhythm and poetry."
+prompt = "Creative instructions; good for verse with a set metre."
+source = "https://huggingface.co/TheDrummer/Cydonia-24B-v4.3"
+checked = 2026-09-29
+
+[models."orion-26b-a4b"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/bartowski/TheDrummer_Orion-26B-A4B-v1.1-GGUF:Q4_K_M"
+[models."orion-26b-a4b".capabilities]
+license = "not stated"
+[models."orion-26b-a4b".install]
+source = "https://huggingface.co/TheDrummer/Orion-26B-A4B-v1.1"
+ollama = "hf.co/bartowski/TheDrummer_Orion-26B-A4B-v1.1-GGUF:Q4_K_M"
+size_gb = 18.0
+tier = 3
+note = "recent Drummer tune on the Gemma 4 MoE"
+[models."orion-26b-a4b".guide]
+summary = "Creative Gemma 4 MoE tune by TheDrummer; unproven here."
+source = "https://huggingface.co/TheDrummer/Orion-26B-A4B-v1.1"
+checked = 2026-09-29
+
+[models."artemis-31b"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/bartowski/TheDrummer_Artemis-31B-v1.2-GGUF:Q4_K_M"
+[models."artemis-31b".capabilities]
+license = "not stated"
+[models."artemis-31b".install]
+source = "https://huggingface.co/TheDrummer/Artemis-31B-v1.2"
+ollama = "hf.co/bartowski/TheDrummer_Artemis-31B-v1.2-GGUF:Q4_K_M"
+size_gb = 19.5
+tier = 3
+note = "recent Drummer tune on Gemma 4 31B"
+[models."artemis-31b".guide]
+summary = "Creative Gemma 4 31B tune by TheDrummer; unproven here."
+source = "https://huggingface.co/TheDrummer/Artemis-31B-v1.2"
+checked = 2026-09-29
+
+[models."qwen3.6-35b-a3b-styletune"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/mradermacher/Qwen3.6-35B-A3B-StyleTune-GGUF:Q4_K_M"
+[models."qwen3.6-35b-a3b-styletune".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."qwen3.6-35b-a3b-styletune".install]
+source = "https://huggingface.co/Gryphe/Qwen3.6-35B-A3B-StyleTune"
+ollama = "hf.co/mradermacher/Qwen3.6-35B-A3B-StyleTune-GGUF:Q4_K_M"
+size_gb = 21.2
+tier = 3
+note = "StyleTune on a Qwen MoE"
+[models."qwen3.6-35b-a3b-styletune".guide]
+summary = "Narrative-tuned Qwen 3.6 MoE (3B active)."
+prompt = "Ask for prose, not lists."
+source = "https://huggingface.co/Gryphe/Qwen3.6-35B-A3B-StyleTune"
+checked = 2026-09-29
+
+[models."pantheon-reasoning-26b-a4b"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/bartowski/Gryphe_Pantheon-Reasoning-26B-A4B-1.1-V2-GGUF:Q4_K_M"
+[models."pantheon-reasoning-26b-a4b".capabilities]
+thinking = true
+license = "Apache-2.0"
+commercial_use = true
+[models."pantheon-reasoning-26b-a4b".install]
+source = "https://huggingface.co/Gryphe/Pantheon-Reasoning-26B-A4B-1.1-V2"
+ollama = "hf.co/bartowski/Gryphe_Pantheon-Reasoning-26B-A4B-1.1-V2-GGUF:Q4_K_M"
+size_gb = 18.8
+tier = 3
+note = "StyleTune plus reasoning: may plan stories better"
+[models."pantheon-reasoning-26b-a4b".guide]
+summary = "Reasoning creative writer: plans before writing."
+prompt = "Let it think; ask for the plan and the story separately when you need both."
+source = "https://huggingface.co/Gryphe/Pantheon-Reasoning-26B-A4B-1.1-V2"
+checked = 2026-09-29
+
+[models."gemma4-writer-31b-d"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/mradermacher/Gemma4-Writer-31B-D-GGUF:Q4_K_M"
+[models."gemma4-writer-31b-d".capabilities]
+license = "not stated"
+[models."gemma4-writer-31b-d".install]
+source = "https://huggingface.co/ConicCat/Gemma4-Writer-31B-D"
+ollama = "hf.co/mradermacher/Gemma4-Writer-31B-D-GGUF:Q4_K_M"
+size_gb = 18.7
+tier = 3
+note = "brand-new writer tune, unproven"
+[models."gemma4-writer-31b-d".guide]
+summary = "New Gemma 4 31B writer tune; unproven here."
+source = "https://huggingface.co/ConicCat/Gemma4-Writer-31B-D"
+checked = 2026-09-29
+
+[models."nemotron-3.5-30b-a3b-antislop"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/mradermacher/Nemotron-3.5-30B-A3B-Antislop-FTPO-GGUF:Q4_K_M"
+[models."nemotron-3.5-30b-a3b-antislop".capabilities]
+license = "OpenMDW-1.1"
+commercial_use = true
+[models."nemotron-3.5-30b-a3b-antislop".install]
+source = "https://huggingface.co/thoughtworks/Nemotron-3.5-30B-A3B-Antislop-FTPO"
+ollama = "hf.co/mradermacher/Nemotron-3.5-30B-A3B-Antislop-FTPO-GGUF:Q4_K_M"
+size_gb = 25.4
+tier = 3
+note = "anti-slop training (FTPO) on the Nemotron MoE"
+[models."nemotron-3.5-30b-a3b-antislop".guide]
+summary = "Nemotron MoE trained against overused phrases."
+source = "https://huggingface.co/thoughtworks/Nemotron-3.5-30B-A3B-Antislop-FTPO"
+checked = 2026-09-29
+
+[models."gemma-3-27b-antislop"]
+provider = "ollama"
+kind = "chat"
+model = "hf.co/mradermacher/gemma-3-27b-it-antislop-GGUF:Q4_K_M"
+[models."gemma-3-27b-antislop".capabilities]
+license = "not stated (base: Gemma Terms of Use)"
+[models."gemma-3-27b-antislop".install]
+source = "https://huggingface.co/sam-paech/gemma-3-27b-it-antislop"
+ollama = "hf.co/mradermacher/gemma-3-27b-it-antislop-GGUF:Q4_K_M"
+size_gb = 16.6
+tier = 3
+note = "by the anti-slop method's author; older base (Longform 45.2, slop 20.9)"
+[models."gemma-3-27b-antislop".guide]
+summary = "Gemma 3 27B with the anti-slop sampler training; an older base."
+source = "https://huggingface.co/sam-paech/gemma-3-27b-it-antislop"
+checked = 2026-09-29
+
+# --- general, reasoning, vision -----------------------------------------------------------------
+
+[models."qwen3.8-27b"]
+provider = "ollama"
+kind = "chat"
+model = "qwen3.8:27b"
+[models."qwen3.8-27b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."qwen3.8-27b".install]
+source = "https://huggingface.co/Qwen/Qwen3.8-27B"
+ollama = "qwen3.8:27b"
+size_gb = 17.0
+tier = 1
+note = "Hemmingway's base: measures what the fine-tune adds"
+[models."qwen3.8-27b".guide]
+summary = "Strong general 27B model; Hemmingway-1's base."
+prompt = "Plain instructions with the output format."
+source = "https://huggingface.co/Qwen/Qwen3.8-27B"
+checked = 2026-09-29
+
+[models."qwen3.6-27b"]
+provider = "ollama"
+kind = "chat"
+model = "qwen3.6-27b:latest"
+[models."qwen3.6-27b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."qwen3.6-27b".install]
+source = "https://huggingface.co/unsloth/Qwen3.6-27B-GGUF"
+ollama = "hf.co/unsloth/Qwen3.6-27B-GGUF:Q4_K_M"
+size_gb = 17.0
+tier = 3
+note = "installed here as `qwen3.6-27b`; screened cheaply, expected weak for prose"
+[models."qwen3.6-27b".guide]
+summary = "General Qwen 3.6 27B."
+source = "https://huggingface.co/unsloth/Qwen3.6-27B-GGUF"
+checked = 2026-09-29
+
+[models."qwen3.6-35b-a3b"]
+provider = "ollama"
+kind = "chat"
+model = "qwen3.6-35b-a3b:latest"
+[models."qwen3.6-35b-a3b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."qwen3.6-35b-a3b".install]
+source = "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF"
+ollama = "hf.co/unsloth/Qwen3.6-35B-A3B-GGUF:Q4_K_M"
+size_gb = 22.0
+tier = 3
+note = "installed here as `qwen3.6-35b-a3b`; fast MoE"
+[models."qwen3.6-35b-a3b".guide]
+summary = "General Qwen 3.6 MoE (3B active): fast with CPU offload."
+source = "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF"
+checked = 2026-09-29
+
+[models."gemma4-26b-a4b"]
+provider = "ollama"
+kind = "chat"
+model = "gemma4-26b-a4b:latest"
+[models."gemma4-26b-a4b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."gemma4-26b-a4b".install]
+source = "https://huggingface.co/google/gemma-4-26B-A4B-it"
+ollama = "hf.co/unsloth/gemma-4-26B-A4B-it-GGUF:Q4_K_M"
+size_gb = 17.0
+tier = 1
+note = "baseline for the StyleTune MoE; installed here as `gemma4-26b-a4b`"
+[models."gemma4-26b-a4b".guide]
+summary = "General Gemma 4 MoE (4B active); the StyleTune MoE's base."
+source = "https://huggingface.co/google/gemma-4-26B-A4B-it"
+checked = 2026-09-29
+
+[models."gemma4-31b"]
+provider = "ollama"
+kind = "chat"
+model = "gemma4:31b"
+[models."gemma4-31b".capabilities]
+license = "Apache-2.0"
+commercial_use = true
+[models."gemma4-31b".install]
+source = "https://huggingface.co/google/gemma-4-31B-it"
+ollama = "gemma4:31b"
+size_gb = 19.0
+tier = 1
+note = "baseline for the StyleTunes"
+[models."gemma4-31b".guide]
+summary = "General Gemma 4 31B; the 31B StyleTune's base."
+source = "https://huggingface.co/google/gemma-4-31B-it"
+checked = 2026-09-29
+
+[models."nemotron-3.5-lightning"]
+provider = "ollama"
+kind = "chat"
+model = "nemotron-3.5-lightning:latest"
+[models."nemotron-3.5-lightning".capabilities]
+license = "OpenMDW-1.1"
+commercial_use = true
+[models."nemotron-3.5-lightning".install]
+source = "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16"
+ollama = "hf.co/ggml-org/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF:Q4_K_M"
+size_gb = 25.0
+tier = 3
+note = "fast MoE baseline (EQ-Bench 1280); installed here as `nemotron-3.5-lightning`"
+[models."nemotron-3.5-lightning".guide]
+summary = "Fast Nemotron MoE (3B active); a speed baseline."
+source = "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16"
+checked = 2026-09-29
+
+[models."gpt-oss-20b"]
+provider = "ollama"
+kind = "chat"
+model = "gpt-oss:20b"
+[models."gpt-oss-20b".capabilities]
+thinking = true
+license = "Apache-2.0"
+commercial_use = true
+[models."gpt-oss-20b".install]
+source = "https://ollama.com/library/gpt-oss"
+ollama = "gpt-oss:20b"
+size_gb = 13.0
+tier = 3
+note = "reasoning MoE; weak for prose (EQ-Bench 666)"
+[models."gpt-oss-20b".guide]
+summary = "Open reasoning MoE: good at structured tasks, weak for prose."
+source = "https://ollama.com/library/gpt-oss"
+checked = 2026-09-29
+
+[models."deepseek-r1-14b"]
+provider = "ollama"
+kind = "chat"
+model = "deepseek-r1:14b"
+[models."deepseek-r1-14b".capabilities]
+thinking = true
+license = "MIT"
+commercial_use = true
+[models."deepseek-r1-14b".install]
+source = "https://ollama.com/library/deepseek-r1"
+ollama = "deepseek-r1:14b"
+size_gb = 9.0
+tier = 3
+note = "reasoning model; screened cheaply"
+[models."deepseek-r1-14b".guide]
+summary = "Reasoning model (14B distill)."
+source = "https://ollama.com/library/deepseek-r1"
+checked = 2026-09-29
+
+[models."deepseek-r1-32b"]
+provider = "ollama"
+kind = "chat"
+model = "deepseek-r1:32b"
+[models."deepseek-r1-32b".capabilities]
+thinking = true
+license = "MIT"
+commercial_use = true
+[models."deepseek-r1-32b".install]
+source = "https://ollama.com/library/deepseek-r1"
+ollama = "deepseek-r1:32b"
+size_gb = 19.0
+tier = 3
+note = "reasoning model; screened cheaply"
+[models."deepseek-r1-32b".guide]
+summary = "Reasoning model (32B distill)."
+source = "https://ollama.com/library/deepseek-r1"
+checked = 2026-09-29
+
+[models."ornith-1.5-9b"]
+provider = "ollama"
+kind = "chat"
+model = "ornith-1.5:9b"
+[models."ornith-1.5-9b".capabilities]
+license = "MIT"
+commercial_use = true
+[models."ornith-1.5-9b".install]
+source = "https://huggingface.co/ornith-ai/Ornith-1.5-9B-GGUF"
+ollama = "hf.co/ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M"
+size_gb = 6.6
+tier = 3
+note = "installed here as `ornith-1.5:9b`"
+[models."ornith-1.5-9b".guide]
+summary = "Small general model (9B)."
+source = "https://huggingface.co/ornith-ai/Ornith-1.5-9B-GGUF"
+checked = 2026-09-29
+
+[models."ornith-1.5-35b"]
+provider = "ollama"
+kind = "chat"
+model = "ornith-1.5:35b"
+[models."ornith-1.5-35b".capabilities]
+license = "MIT"
+commercial_use = true
+[models."ornith-1.5-35b".install]
+source = "https://huggingface.co/ornith-ai/Ornith-1.5-35B-A3B-GGUF"
+ollama = "hf.co/ornith-ai/Ornith-1.5-35B-A3B-GGUF:Q4_K_M"
+size_gb = 22.0
+tier = 3
+note = "installed here as `ornith-1.5:35b`"
+[models."ornith-1.5-35b".guide]
+summary = "General MoE model (35B, 3B active)."
+source = "https://huggingface.co/ornith-ai/Ornith-1.5-35B-A3B-GGUF"
+checked = 2026-09-29

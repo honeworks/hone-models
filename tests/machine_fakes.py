@@ -42,7 +42,12 @@ def registry(*, comfyui: bool = True) -> Registry:
         for model_id, vram in (("z-image-turbo", 7.0), ("wan-video", None)):
             caps = Capabilities(vram_gb=vram)
             models[model_id] = ModelConfig.model_construct(
-                id=model_id, provider="comfyui", kind="image", base_url=COMFY, capabilities=caps
+                id=model_id,
+                provider="comfyui",
+                kind="image",
+                base_url=COMFY,
+                capabilities=caps,
+                workflow=model_id,  # runnable: the machine reads servers of entries with a workflow
             )
     return Registry(models)
 

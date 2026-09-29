@@ -35,7 +35,7 @@ def load(cfg: ModelConfig) -> tuple[Workflow, str]:
     """The entry's API-format workflow and its SHA-256."""
     if not cfg.workflow:
         raise ConfigError(
-            f"model {cfg.id!r} has no workflow yet: export its ComfyUI workflow with 'Export (API)' and "
+            f"no workflow yet for {cfg.id!r}: export its ComfyUI workflow with 'Export (API)' and "
             f"set `workflow` in its registry entry (then prove it with `hone-models models check {cfg.id}`)"
         )
     path = Path(cfg.workflow)

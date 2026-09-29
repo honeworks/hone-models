@@ -1,7 +1,9 @@
 """`hone-models` command line: inspect the registry and recorded calls.
 
-hone-models models list [--json]
+hone-models models list [--kind K] [--feature F] [--installed | --missing] [--tier N] [--json]
 hone-models models show <id> [--json]
+hone-models models guide [<id>] [--json] [--stale DAYS]   what a model takes; guides not checked lately
+hone-models models install <id> [--run]      print the commands that fetch a model (--run: run them)
 hone-models models check <id> [--json]        smoke call; measured tokens/s saved as speed_tok_s
 hone-models calls list [--since 1d] [--model X] [--json]
 hone-models calls show <span_id>
@@ -24,10 +26,12 @@ try:
 except ImportError as exc:  # pragma: no cover - tested in a subprocess
     raise SystemExit("the hone-models CLI needs the 'cli' extra: pip install 'hone-models[cli]'") from exc
 
+from . import catalog
 from .calls import call_stats, duration_ms, find_calls
 from .errors import HoneModelsError
+from .guide import build, stale
 from .records import default_store, read_spans
-from .registry import GENERATION_KEYS, ModelConfig, load, remember_speed
+from .registry import GENERATION_KEYS, ModelConfig, Registry, load, remember_speed, unmet
 from .text import text
 
 app = typer.Typer(no_args_is_help=True, help="Inspect hone-models registry and call records.")
@@ -79,20 +83,60 @@ def describe(cfg: ModelConfig) -> dict[str, Any]:
 
 
 @models_app.command("list")
-def models_list(registry: RegistryOption = None, as_json: JsonOption = False) -> None:
-    """List registered models."""
+def models_list(  # noqa: PLR0917 - a typer command: one parameter per option
+    registry: RegistryOption = None,
+    as_json: JsonOption = False,
+    kind: Annotated[str | None, typer.Option(help="Only this kind (chat, image, music, ...).")] = None,
+    feature: Annotated[
+        list[str] | None, typer.Option(help="Only models whose guide declares it (repeatable: all of them).")
+    ] = None,
+    installed: Annotated[bool, typer.Option("--installed", help="Only models installed here.")] = False,
+    missing: Annotated[bool, typer.Option("--missing", help="Only models not installed here.")] = False,
+    tier: Annotated[int | None, typer.Option(help="Only catalog tier N (1 test first, 3 ceiling).")] = None,
+) -> None:
+    """List registered models with whether each is installed here (yes, no or unknown)."""
     with user_errors():
-        models = sorted(load(registry).models.values(), key=lambda m: m.id)
+        rows = _listed(load(registry), kind, feature or [], tier)
+    rows = [(m, s) for m, s in rows if not (installed and s != "yes") and not (missing and s != "no")]
     if as_json:
-        print(json.dumps([describe(m) for m in models], indent=2))
+        print(json.dumps([{**describe(m), "installed": s} for m, s in rows], indent=2))
         return
-    table = Table("id", "provider", "kind", "model", "local", "vision", "context")
-    for m in models:
+    ids = Column("id", no_wrap=True)  # never cut: the other commands take it
+    table = Table(
+        ids,
+        "provider",
+        "kind",
+        Column("model", overflow="fold"),
+        Column("installed", min_width=9),
+        "local",
+        "vision",
+        "context",
+    )
+    for m, status in rows:
         caps = m.capabilities
         table.add_row(
-            m.id, m.provider, m.kind, m.name, str(m.local), str(caps.vision), str(caps.max_input_tokens)
+            m.id,
+            m.provider,
+            m.kind,
+            m.name,
+            status,
+            str(m.local),
+            str(caps.vision),
+            str(caps.max_input_tokens),
         )
     console.print(table)
+
+
+def _listed(
+    reg: Registry, kind: str | None, features: list[str], tier: int | None
+) -> list[tuple[ModelConfig, str]]:
+    """The entries that pass the filters, each with its install status (every server asked once)."""
+    wanted = {"features": features} if features else {}
+    models = sorted(reg.models.values(), key=lambda m: m.id)
+    models = [m for m in models if (kind is None or m.kind == kind) and not unmet(m, wanted)]
+    models = [m for m in models if tier is None or (m.install is not None and m.install.tier == tier)]
+    checker = catalog.Checker()
+    return [(m, checker.installed(m)) for m in models]
 
 
 @models_app.command("show")
@@ -101,6 +145,57 @@ def models_show(model_id: str, registry: RegistryOption = None, as_json: JsonOpt
     with user_errors():
         cfg = load(registry).get(model_id)
     show(describe(cfg), as_json)
+
+
+@models_app.command("guide")
+def models_guide(
+    model_id: Annotated[str | None, typer.Argument(help="Registry id; omit with --stale.")] = None,
+    registry: RegistryOption = None,
+    as_json: JsonOption = False,
+    stale_days: Annotated[
+        int | None, typer.Option("--stale", help="List the guides not checked for DAYS days.")
+    ] = None,
+) -> None:
+    """Print what a model can take: its guide, inputs, features, limits, licence and install state."""
+    with user_errors():
+        reg = load(registry)
+        if stale_days is not None:
+            rows = [(i, str(c) if c else None) for i, c in stale(reg, stale_days) if model_id in (None, i)]
+            if as_json:
+                print(json.dumps([{"id": i, "checked": c} for i, c in rows], indent=2))
+            for i, c in [] if as_json else rows:
+                console.print(f"{i}: {c or 'never checked'}")
+            return
+        if model_id is None:
+            raise fail("give a model id, or --stale DAYS")
+        g = build(reg.get(model_id))
+    print(json.dumps(g.as_dict(), indent=2) if as_json else g.as_text())
+
+
+@models_app.command("install")
+def models_install(
+    model_id: str,
+    registry: RegistryOption = None,
+    run: Annotated[bool, typer.Option("--run", help="Run the commands (downloads; for the owner).")] = False,
+) -> None:
+    """Print the commands that would fetch a model, with its size and the free disk; download nothing."""
+    with user_errors():
+        cfg = load(registry).get(model_id)
+        print("\n".join(_install_plan(cfg)))
+        if run:
+            catalog.run_install(cfg)
+
+
+def _install_plan(cfg: ModelConfig) -> list[str]:
+    """What `models install` prints: status, size and free disk as comments, then the commands."""
+    spec, folder = cfg.install, catalog.install_folder(cfg)
+    size = spec.size_gb if spec and spec.size_gb is not None else "unknown"
+    lines = [
+        f"# {cfg.id}: installed {catalog.installed(cfg)}; source {spec.source if spec else None}",
+        f"# size {size} GB; free on {folder}: {catalog.free_gb(folder)} GB",
+        *([f"# {spec.note}"] if spec and spec.note else []),
+    ]
+    return lines + (catalog.install_commands(cfg) or ["# nothing to download: see the source"])
 
 
 @models_app.command("check")

@@ -1,0 +1,18 @@
+# Packaged catalog: decision models (change 0015 §3b).
+
+[models.jev]
+provider = "jev"
+kind = "decision"
+api_key_env = "TYPESAFE_API_KEY"   # API shape unverified (design/decisions.md D-019); base_url defaults to https://api.typesafe.ai/v1
+[models.jev.capabilities]
+questions = ["yes_no", "choice", "score"]
+calibrated = true
+price = { input_per_mtok = 0.042, output_per_mtok = 0.0 }
+license = "Typesafe service terms (hosted)"
+[models.jev.install]
+source = "https://typesafe.ai"
+note = "hosted: nothing to install; set TYPESAFE_API_KEY"
+[models.jev.guide]
+summary = "Hosted decision model: calibrated yes/no, choice and score answers."
+prompt = "One clear question with the context it needs; the answer shape comes from the question type."
+source = "https://typesafe.ai"

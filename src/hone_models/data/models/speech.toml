@@ -1,0 +1,54 @@
+# Packaged catalog: text to speech (change 0015 §3b).
+
+[models."kokoro-82m"]
+provider = "kokoro"              # extra `speech`; weights from Hugging Face on first use
+model = "hexgrad/Kokoro-82M"
+kind = "speech"
+[models."kokoro-82m".capabilities]
+# first letter: a = American, b = British English; second: f = female, m = male. The first is the default.
+voices = ["af_heart", "am_michael", "af_bella", "am_fenrir", "bf_emma", "bm_george"]
+vram_gb = 1.0
+license = "Apache-2.0"
+commercial_use = true
+expressive = false                # accepts emotion / intensity and ignores them
+[models."kokoro-82m".install]
+source = "https://huggingface.co/hexgrad/Kokoro-82M"
+hf = "hexgrad/Kokoro-82M"
+size_gb = 0.4
+tier = 1
+note = "fast, small English voices; also needs the `speech` extra and spaCy's English model"
+[models."kokoro-82m".guide]
+summary = "Fast, clear English speech from a small model; six packaged voices, no emotion control."
+prompt = "Plain sentences; punctuation sets the pauses."
+source = "https://huggingface.co/hexgrad/Kokoro-82M"
+checked = 2026-09-29
+
+[models.chatterbox]
+provider = "chatterbox"          # extra `expressive`; weights (about 3 GB) from Hugging Face on first use
+model = "ResembleAI/chatterbox"
+kind = "speech"
+defaults = { max_chunk_chars = 400, seed = 0 }
+[models.chatterbox.capabilities]
+# reference clips rendered by Kokoro's synthetic voices (scripts/make-expressive-voices.py), plus the
+# voice bundled with the weights. The first is the default.
+voices = ["warm_female", "warm_male", "british_female", "british_male", "chatterbox_default"]
+expressive = true
+vram_gb = 5.0
+license = "MIT"
+commercial_use = true
+[models.chatterbox.install]
+source = "https://huggingface.co/ResembleAI/chatterbox"
+hf = "ResembleAI/chatterbox"
+size_gb = 3.0
+tier = 1
+note = "expressive speech with emotion and intensity; needs the `expressive` extra"
+[models.chatterbox.guide]
+summary = "Expressive English speech: emotion and intensity, voices cloned from short reference clips."
+prompt = "Plain sentences; set emotion and intensity on the call rather than in the text."
+source = "https://huggingface.co/ResembleAI/chatterbox"
+checked = 2026-09-29
+[[models.chatterbox.guide.features]]
+name = "emotion"
+how = "The emotion and intensity arguments of the speech call steer the delivery."
+examples = ["emotion='sad', intensity=0.8"]
+source = "https://huggingface.co/ResembleAI/chatterbox"

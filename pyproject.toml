@@ -78,6 +78,9 @@ hone_models = "hone_models:music"
 [project.entry-points."hone.video_clients"]
 hone_models = "hone_models:video"
 
+[project.entry-points."hone.model_guides"]
+hone_models = "hone_models:guide"
+
 [project.entry-points."hone.gpu_leases"]
 hone_models = "hone_models.gpu:GPU"
 

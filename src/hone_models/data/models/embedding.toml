@@ -1,0 +1,22 @@
+# Packaged catalog: embedding models (change 0015 §3b).
+
+[models."nomic-embed-text"]
+provider = "ollama"
+kind = "embedding"
+model = "nomic-embed-text:latest"
+[models."nomic-embed-text".capabilities]
+dimensions = 768
+vram_gb = 0.3
+license = "Apache-2.0"
+commercial_use = true
+[models."nomic-embed-text".install]
+source = "https://ollama.com/library/nomic-embed-text"
+ollama = "nomic-embed-text:latest"
+size_gb = 0.3
+tier = 1
+note = "small text embedder for similarity and retrieval"
+[models."nomic-embed-text".guide]
+summary = "Small, fast text embedder (768 dimensions)."
+prompt = "Embed plain text; the model card recommends task prefixes such as 'search_query: ' and 'search_document: '."
+source = "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5"
+checked = 2026-09-29

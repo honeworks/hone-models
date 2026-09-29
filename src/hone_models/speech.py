@@ -30,7 +30,7 @@ from .ports import RecordSink
 from .providers import SPEECH, SPEECH_READY, lookup, model_attributes
 from .providers.common import SpeechEngine, Style
 from .records import default_sink
-from .registry import ModelConfig, Registry, load
+from .registry import ModelConfig, Registry, load, require_client
 
 MAX_CHUNK_CHARS = 400
 PAUSE_S = 0.25
@@ -309,6 +309,7 @@ def speech(
 ) -> SpeechClient:
     """A `SpeechClient` for a registered speech model (`kind = "speech"`): `kokoro-82m`, `chatterbox`."""
     cfg = (registry or load()).get(model_id)
+    require_client(cfg)
     if cfg.kind != "speech":
         raise ConfigError(f"model {cfg.id!r} is a {cfg.kind} model, not a speech model")
     return SpeechClient(cfg, sink or default_sink())

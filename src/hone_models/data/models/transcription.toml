@@ -1,0 +1,64 @@
+# Packaged catalog: transcription (change 0015 §3b). Provider `faster_whisper` (extra `transcribe`).
+
+[models."faster-whisper-large-v3-turbo"]
+provider = "faster_whisper"
+kind = "transcription"
+model = "deepdml/faster-whisper-large-v3-turbo-ct2"
+defaults = { compute_type = "float16", beam_size = 5 }
+[models."faster-whisper-large-v3-turbo".capabilities]
+word_timestamps = true
+vram_gb = 2.0
+license = "MIT"
+commercial_use = true
+[models."faster-whisper-large-v3-turbo".install]
+source = "https://huggingface.co/deepdml/faster-whisper-large-v3-turbo-ct2"
+hf = "deepdml/faster-whisper-large-v3-turbo-ct2"
+size_gb = 1.6
+tier = 1
+note = "lyric timing and intelligibility: word timestamps, fast"
+[models."faster-whisper-large-v3-turbo".guide]
+summary = "Fast Whisper large-v3-turbo transcription with word timestamps."
+prompt = "Pass the known lyrics or script as `prompt` to bias the words; set `language` when known."
+source = "https://github.com/SYSTRAN/faster-whisper"
+checked = 2026-09-29
+
+[models."faster-whisper-large-v3"]
+provider = "faster_whisper"
+kind = "transcription"
+model = "Systran/faster-whisper-large-v3"
+defaults = { compute_type = "float16", beam_size = 5 }
+[models."faster-whisper-large-v3".capabilities]
+word_timestamps = true
+license = "MIT"
+commercial_use = true
+[models."faster-whisper-large-v3".install]
+source = "https://huggingface.co/Systran/faster-whisper-large-v3"
+hf = "Systran/faster-whisper-large-v3"
+size_gb = 3.1
+tier = 2
+note = "the full large-v3: slower than turbo, sometimes more accurate on sung words"
+[models."faster-whisper-large-v3".guide]
+summary = "Whisper large-v3 transcription with word timestamps."
+prompt = "Pass the known lyrics or script as `prompt`; set `language` when known."
+source = "https://github.com/SYSTRAN/faster-whisper"
+checked = 2026-09-29
+
+[models."faster-whisper-medium"]
+provider = "faster_whisper"
+kind = "transcription"
+model = "Systran/faster-whisper-medium"
+defaults = { compute_type = "float16", beam_size = 5 }
+[models."faster-whisper-medium".capabilities]
+word_timestamps = true
+license = "MIT"
+commercial_use = true
+[models."faster-whisper-medium".install]
+source = "https://huggingface.co/Systran/faster-whisper-medium"
+hf = "Systran/faster-whisper-medium"
+size_gb = 1.5
+tier = 3
+note = "smaller Whisper: a cheap first pass"
+[models."faster-whisper-medium".guide]
+summary = "Whisper medium transcription with word timestamps; cheaper, less accurate."
+source = "https://github.com/SYSTRAN/faster-whisper"
+checked = 2026-09-29

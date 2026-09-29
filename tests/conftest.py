@@ -39,6 +39,7 @@ def isolated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.delenv("HONE_CAPTURE_CONTENT", raising=False)
     monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    monkeypatch.setenv("HONE_COMFYUI_DIR", str(tmp_path / "no-comfyui"))  # installed checks stay offline
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("hone_models.records._SECRETS", set())
     monkeypatch.setattr("hone_models.providers.ollama.loaded", set())  # a short lease would unload these

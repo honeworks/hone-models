@@ -259,3 +259,36 @@ succeeds when the project is set up), next to `source`, `ollama`, `files` (`repo
 `size_gb`, `tier` (1, 2 or 3) and `note`; other keys are an error. The catalog step may add fields.
 Part of [0015](changes/0015-generation-models.md).
 No review needed.
+
+## D-040: the LeVo adapter runs the project's generation in its own process, not through `generate.sh`
+The project's `generate.py`, run as a script, reseeds NumPy from the clock and accepts only the v1
+checkpoint folder names (`songgeneration_base`, ..., `songgeneration_large`), so `songgeneration_v2_medium`
+fails its assertion, and seeds set in another process would not reach it. `levo2.py` therefore does what
+`generate.sh` and `generate.py`'s `__main__` do, in its own process: the same environment variables and
+`sys.path`, the working folder, cuDNN off, the four OmegaConf resolvers, then `generate_lowmem(args)` (or
+`generate(args)` when `low_mem` is off and more than 24 GB, 36 GB for a `large` checkpoint, are free, as
+the script decides), after seeding Python, NumPy and torch with the call's seed. The checkpoint folder is
+`defaults.checkpoint` (default `songgeneration_v2_medium`); `defaults.flash_attn` defaults to off (flash
+attention is not installed in the project's environment here, as `--not_use_flash_attn` in the old
+`levo2_generate.sh` shows). A request LeVo cannot take (no lyrics, an unknown `generate_type`) and an
+exception during the generation (out of memory, no CUDA) are written to `result.json` as the error; a
+failure to import the project crashes the adapter, so it surfaces as a `ProviderError` with the traceback.
+The adapter takes `lyrics` as given (already in LeVo's form, §3a) and uses LeVo's `descriptions` for the
+prompt; LeVo's `prompt_audio_path` and `auto_prompt_audio_type` are not wired yet. Not run against the
+real project here (no GPU for this work); the first real run is a `gpu` test run by hand (0015 §9). Part of
+[0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-041: details of the `command` protocol
+0015 §2 fixes the protocol's shape; the details: `request.json` also carries the entry's whole `defaults`
+table, for options that are not inputs (LeVo's `low_mem`), next to `model`, `prompt`, `seed`, `out_dir`
+and `inputs`. The job folder is `<out name>.job-<id>/` next to `out`, with `request.json`,
+`stdout.log`, `stderr.log` and `out/` (the `out_dir`); the program's output goes to those files, never to
+pipes, and the folder is removed after a success and kept after a failure. `cwd` defaults to the
+`install.dir_env` folder. A program that cannot be found (after expansion, relative paths from `cwd`) is
+a `ConfigError` before the lease. An `error` in `result.json` wins over the exit code; without
+`result.json` the files are every file directly in `out_dir`, in name order. `log_tail` keeps what a
+terminal would show (a `\r` rewrites its line, so progress bars take one line). `result.json`'s `meta` is
+read but not recorded: §5 has no attribute for it. The grace between SIGTERM and SIGKILL is
+`providers.command.KILL_GRACE_S` (10 s). Part of [0015](changes/0015-generation-models.md).
+No review needed.

@@ -31,6 +31,12 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
   `per_output_second` prices; `FakeComfyUI` and `FakeMedia` for tests; entry points
   `hone.image_clients`, `hone.music_clients`, `hone.video_clients`
   ([0015](design/changes/0015-generation-models.md), step 1).
+- The `command` provider runs a standalone project (its own Python and torch) as a subprocess per job:
+  `request.json` in a job folder next to `out`, files and an optional `result.json` back, the stderr
+  tail on the span (`hone.models.media.log_tail`), the process group killed on timeout or interrupt. The
+  SongGeneration (LeVo 2) adapter `levo2.py` ships in the package; registry entries name the project
+  folder with `install.dir_env` (`HONE_LEVO2_DIR`) ([0015](design/changes/0015-generation-models.md),
+  step 4).
 - `THIRD_PARTY_NOTICES.md` (the Kokoro-rendered voice clips; copyleft dependencies of the optional
   speech extras), shipped in the wheel and sdist.
 - The context budget counts images (capabilities `image_tokens` / `image_patch_px`, else 1024 per

@@ -22,7 +22,7 @@ Main attributes (full list in [design/current.md §8.3](../design/current.md#83-
 `hone.models.structured.{path,attempts,schema}`, `hone.models.context.{limit,estimated_prompt_tokens}`,
 `hone.models.cost_usd`, `hone.models.request.params`, `hone.models.gpu.*`, `hone.models.replay_of`,
 `hone.models.decision.{state,questions,answers}`, and for images, music and video
-`hone.models.media.{prompt,inputs,outputs,job_id,workflow_sha256,session,loaded,freed,server_started,queue_wait_ms,error,error_kind,license,commercial_use,cost_estimated}`
+`hone.models.media.{prompt,inputs,outputs,job_id,workflow_sha256,session,loaded,freed,server_started,queue_wait_ms,log_tail,error,error_kind,license,commercial_use,cost_estimated}`
 ([generation.md](generation.md#records)). Generated files are recorded by path and hash, never their
 bytes. `mk.machine.prepare` and `mk.machine.load` record
 `hone.models.machine.prepare` / `hone.models.machine.load` spans (kind `internal`) with

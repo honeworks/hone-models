@@ -28,8 +28,8 @@ records every call so you can see and replay what happened.
 - **Local text to speech** (`mk.speech("kokoro-82m")`, extra `speech`): long narration into one WAV file;
   expressive narration with an emotion and intensity per paragraph (`mk.speech("chatterbox")`, extra
   `expressive`).
-- **Images, music and video** (`mk.image`, `mk.music`, `mk.video`) through ComfyUI workflows, one registry
-  entry per model: named inputs mapped onto workflow nodes, files uploaded once by hash, a GPU lease per
+- **Images, music and video** (`mk.image`, `mk.music`, `mk.video`) through ComfyUI workflows or standalone
+  projects run in their own environment (SongGeneration), one registry entry per model: named inputs mapped onto workflow nodes, files uploaded once by hash, a GPU lease per
   call or session, failed jobs as results with an `error_kind`
   ([docs/generation.md](https://github.com/honeworks/hone-models/blob/main/docs/generation.md)).
 - **Every call recorded** as an OpenTelemetry-style span in a local SQLite file, prompt sections included,

@@ -19,6 +19,18 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
   hone-select's `MachineProbe` (entry point `hone.machine_probes`); spans `hone.models.machine.prepare` /
   `.load`. `GpuScheduler(if_busy="block")` leaves other processes' models alone while they use the GPU
   ([0016](design/changes/0016-machine-state.md)).
+- Images, music and video: `mk.image`, `mk.music`, `mk.video` return a `MediaClient` whose
+  `generate(prompt, *, out, seed=None, timeout_s=None, trace=None, **inputs)` returns a `MediaResult`
+  (measured `MediaFile`s, seed, `error` / `error_kind`, job id, naive cost, license, `commercial_use`);
+  unknown inputs, missing files and undeclared sizes or durations fail before any request; one
+  `hone.models.image|music|video` span per call; a GPU lease per call or per `session()`. The `comfyui`
+  provider runs one API-format workflow per registry entry (inputs mapped onto node paths, files uploaded
+  once by hash, jobs cancelled on timeout or interrupt, `/free` after a plain call or once per session);
+  `mk.session("comfyui")` starts ComfyUI from `HONE_COMFYUI_START` and `mk.unload` frees it. Registry
+  kinds `image` / `music` / `video` / `transcription`, generation keys and capabilities, `per_image` /
+  `per_output_second` prices; `FakeComfyUI` and `FakeMedia` for tests; entry points
+  `hone.image_clients`, `hone.music_clients`, `hone.video_clients`
+  ([0015](design/changes/0015-generation-models.md), step 1).
 - `THIRD_PARTY_NOTICES.md` (the Kokoro-rendered voice clips; copyleft dependencies of the optional
   speech extras), shipped in the wheel and sdist.
 - The context budget counts images (capabilities `image_tokens` / `image_patch_px`, else 1024 per

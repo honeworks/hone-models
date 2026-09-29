@@ -225,4 +225,37 @@ Choices made while building [0016](changes/0016-machine-state.md), each the simp
   call resets to anyway), and notes the model as loaded by this process, so a short lease may unload it.
 - `GpuScheduler(if_busy="block")` checks the lock at `HONE_GPU_LOCK` (else `/tmp/honeworks-gpu.lock`),
   only when it is about to unload other processes' models.
+
+## D-024: ComfyUI workflows are read on every call; uploads are remembered per process
+0015 §2 says a workflow is read once per client. It is read on every call instead (a few kilobytes):
+simpler, and a workflow file changed between two calls is then both used and visible in the records
+through `hone.models.media.workflow_sha256`. A file input is uploaded once per process and server
+(`input/hone/<sha256><suffix>`, remembered in memory); a new process uploads it again, which ComfyUI
+stores over the same name (`overwrite=true`). Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-025: no progress events for ComfyUI jobs
+0015 §2 expected progress from `/api/jobs/{id}` "where the server has it". ComfyUI 0.3x's jobs API
+reports a status (`pending`, `in_progress`, `completed`, ...) but no progress; progress only goes over the
+websocket, which hone-models does not use (no new dependency). So ComfyUI spans carry no `progress`
+events; `hone.models.media.queue_wait_ms` comes from the `execution_start` time in the job's history.
+`/api/jobs/{id}/cancel` is used to cancel. Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-026: file inputs given as strings, the unknown-memory lease, the error text as content
+For `references`, `image` and `source` (inputs that are always files) a string is taken as a path, so
+`image="shots/01.png"` works like `Path(...)`; for other inputs only a `pathlib.Path` is a file. A local
+model without `capabilities.vram_gb` leases 1 GB, as speech does. `hone.models.media.error` is content
+(hashed with capture off), like span status messages, because a provider's error can quote the prompt;
+`hone.models.media.inputs` hashes only its text values, so numbers and file records stay readable. Part
+of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-027: the `install` table's fields for projects
+0015 §3b names what `install` says (an Ollama name, Hugging Face files with their ComfyUI folder, "a
+project to clone and set up", the size, a tier, a note) without field names for projects. The registry
+accepts `repo` (to clone), `setup` (commands), `dir_env` (the folder variable) and `check` (a command that
+succeeds when the project is set up), next to `source`, `ollama`, `files` (`repo`, `file`, `to`),
+`size_gb`, `tier` (1, 2 or 3) and `note`; other keys are an error. The catalog step may add fields.
+Part of [0015](changes/0015-generation-models.md).
 No review needed.

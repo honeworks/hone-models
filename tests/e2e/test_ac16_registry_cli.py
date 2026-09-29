@@ -44,7 +44,12 @@ def test_ac16_models_list_json(isolated: Path) -> None:
     assert by_id["extra"]["local"] is True
     assert by_id["gemma4-12b"]["capabilities"]["max_input_tokens"] == 32768
     assert all(set(r["capabilities"]) == set(Capabilities.model_fields) for r in rows)
-    assert by_id["gpt-4.1-mini"]["capabilities"]["price"] == {"input_per_mtok": 0.4, "output_per_mtok": 1.6}
+    assert by_id["gpt-4.1-mini"]["capabilities"]["price"] == {
+        "input_per_mtok": 0.4,
+        "output_per_mtok": 1.6,
+        "per_image": 0.0,
+        "per_output_second": 0.0,
+    }
     assert [r["id"] for r in rows] == sorted(by_id)
 
 

@@ -35,7 +35,7 @@ section of [design/current.md](../design/current.md) that the example illustrate
 | [openai_compatible.py](openai_compatible.py) | OpenAI-compatible servers | A registry entry for llama.cpp / vLLM / LM Studio / OpenAI: chat, schemas, logprobs, embeddings. | §4 |
 | [litellm_provider.py](litellm_provider.py) | LiteLLM (extra) | Hosted models through LiteLLM from a registry entry or a `litellm:` id. | §4 |
 
-## Decisions, embeddings and speech
+## Decisions, embeddings, speech and generation
 
 | Example | Concept | What it shows | Design |
 |---|---|---|---|
@@ -43,6 +43,7 @@ section of [design/current.md](../design/current.md) that the example illustrate
 | [jev_decisions.py](jev_decisions.py) | native decision model | The same questions sent to Jev: calibrated answers, cost, a missing answer. | §4, §6 |
 | [embeddings.py](embeddings.py) | `mk.embedder` | Unit-length vectors, cosine ranking, vector-size checks. | §2 |
 | [speech.py](speech.py) | `mk.speech`, `FakeSpeech` | Text to a WAV file: voices, speed, minutes-long narration in chunks, the speech span. | §2, §8 |
+| [generation.py](generation.py) | `mk.image`, `mk.music`, ComfyUI entries | An image from a prompt and a reference, song takes in one session, an input the model does not take, an out-of-memory job as a result, read back from the spans. | §2, §4, §8 |
 | [expressive_speech.py](expressive_speech.py) | `emotion=`, `intensity=`, `session()`, `chatterbox` | A lesson narrated paragraph by paragraph, each with its own emotion and intensity, in one session (one model load), read back from the spans. | §2, §4, §8 |
 
 ## Reliability and records

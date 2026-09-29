@@ -21,13 +21,17 @@ Main attributes (full list in [design/current.md §8.3](../design/current.md#83-
 `hone.models.model_id`, `hone.models.model_digest`, `hone.models.prompt.*`,
 `hone.models.structured.{path,attempts,schema}`, `hone.models.context.{limit,estimated_prompt_tokens}`,
 `hone.models.cost_usd`, `hone.models.request.params`, `hone.models.gpu.*`, `hone.models.replay_of`,
-`hone.models.decision.{state,questions,answers}`. `mk.machine.prepare` and `mk.machine.load` record
+`hone.models.decision.{state,questions,answers}`, and for images, music and video
+`hone.models.media.{prompt,inputs,outputs,job_id,workflow_sha256,session,loaded,freed,server_started,queue_wait_ms,error,error_kind,license,commercial_use,cost_estimated}`
+([generation.md](generation.md#records)). Generated files are recorded by path and hash, never their
+bytes. `mk.machine.prepare` and `mk.machine.load` record
 `hone.models.machine.prepare` / `hone.models.machine.load` spans (kind `internal`) with
-`hone.models.machine.*` attributes. HTTP retries are `retry` events; structured-output
+`hone.models.machine.*` attributes. A cancelled job is a `cancelled` event. HTTP retries are `retry` events; structured-output
 retries are `structured_retry` events. LiteLLM models retry inside LiteLLM, without events.
 
 **Content capture.** `HONE_CAPTURE_CONTENT=0` or `SqliteSpanSink(path, capture_content=False)` stores
-messages, outputs, variables, params and decision content only as `{"sha256", "len"}`.
+messages, outputs, variables, params, decision content, and a generation call's prompt, error and text
+inputs (lyrics, for example; numbers and file records stay readable) only as `{"sha256", "len"}`.
 
 **Secrets.** Headers are never recorded; the value of every `api_key_env` in use, and anything shaped like
 a bearer token or `sk-...` key, is replaced with `***` before writing. Register other values with

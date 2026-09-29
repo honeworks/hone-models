@@ -69,6 +69,15 @@ hone_models = "hone_models:text"
 [project.entry-points."hone.embedders"]
 hone_models = "hone_models:embedder"
 
+[project.entry-points."hone.image_clients"]
+hone_models = "hone_models:image"
+
+[project.entry-points."hone.music_clients"]
+hone_models = "hone_models:music"
+
+[project.entry-points."hone.video_clients"]
+hone_models = "hone_models:video"
+
 [project.entry-points."hone.gpu_leases"]
 hone_models = "hone_models.gpu:GPU"
 

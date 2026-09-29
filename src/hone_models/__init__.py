@@ -11,6 +11,7 @@ from . import errors, gpu, machine, records, registry, replay
 from ._tracing import current_trace
 from .decision import Choice, DecisionClient, ScoreQ, YesNo, decision
 from .embeddings import Embedder, embedder
+from .media import MediaClient, MediaFile, MediaResult, image, music, video
 from .ports import PORTS_VERSION, RecordSink
 from .prompt import Prompt, Section
 from .runtime.session import session, unload
@@ -22,6 +23,9 @@ __all__ = [
     "Choice",
     "DecisionClient",
     "Embedder",
+    "MediaClient",
+    "MediaFile",
+    "MediaResult",
     "Prompt",
     "RecordSink",
     "ScoreQ",
@@ -38,7 +42,9 @@ __all__ = [
     "embedder",
     "errors",
     "gpu",
+    "image",
     "machine",
+    "music",
     "records",
     "registry",
     "replay",
@@ -46,4 +52,5 @@ __all__ = [
     "speech",
     "text",
     "unload",
+    "video",
 ]

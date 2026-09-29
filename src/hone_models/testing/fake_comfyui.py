@@ -188,8 +188,9 @@ class FakeComfyUI:
     def _finish(self, job: _Job) -> dict[str, Any]:
         messages: list[Any] = [["execution_start", {"prompt_id": job.id, "timestamp": job.started_ms}]]
         if job.outcome == "execution_error":
+            node = next(iter(job.workflow))
             error = {
-                "prompt_id": job.id, "node_id": next(iter(job.workflow), "1"), "node_type": "KSampler",
+                "prompt_id": job.id, "node_id": node, "node_type": job.workflow[node]["class_type"],
                 "exception_type": job.details.get("type", "RuntimeError"),
                 "exception_message": job.details.get("message", "the fake job failed"),
             }  # fmt: skip

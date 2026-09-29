@@ -2,7 +2,9 @@
 
 ## Status
 
-`accepted` (2026-09-29, owner: "start implementing"; open questions take the proposed answers)
+`accepted` (2026-09-29, owner: "start implementing"; open questions take the proposed answers).
+Step 1 (media client, records, `comfyui` provider, `FakeComfyUI`, `mk.session("comfyui")`) implemented
+in 0.1.0; small choices in [decisions.md](../decisions.md) D-024 to D-027.
 
 ## Context
 

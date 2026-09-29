@@ -62,4 +62,10 @@ A server the session started runs with a clean environment (no `VIRTUAL_ENV`, `L
 `PYTHONPATH`, `PYTHONHOME`) and is stopped on exit; one that was already running is left alone. A remote
 `OLLAMA_HOST` is never started.
 
+`mk.session("comfyui")` does the same for the ComfyUI server at `HONE_COMFYUI_URL` (default
+`http://127.0.0.1:8188`), started with the command line in `HONE_COMFYUI_START` in its own process group
+and stopped on exit. `mk.unload(model_id)` for a ComfyUI entry sends `POST /free`, which frees every
+model that server holds. Image, music and video calls take their GPU lease by themselves
+([generation.md](generation.md#gpu-and-sessions)).
+
 **Runnable examples:** [gpu_lease.py](../examples/gpu_lease.py), [sessions.py](../examples/sessions.py).

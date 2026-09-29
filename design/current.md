@@ -31,11 +31,12 @@ mk.text(model_id=None, *, require=None, prefer=None, registry=None, sink=None) -
 mk.decision(model_id, *, registry=None, sink=None) -> DecisionClient
 mk.embedder(model_id, *, registry=None, sink=None) -> Embedder
 mk.speech(model_id, *, registry=None, sink=None) -> SpeechClient   # extras `speech` (kokoro-82m), `expressive` (chatterbox)
+mk.image(model_id, *, registry=None, sink=None) -> MediaClient     # also mk.music(...), mk.video(...) (change 0015)
 mk.Prompt(template_id, version, sections: dict[str, str | Section], variables=None, system_sections=("system",))
 mk.Section(text, version=None)          # a section with its own version
 mk.YesNo(instructions), mk.Choice(options, instructions), mk.ScoreQ(instructions, scale=(1, 5), anchors=None)
-mk.session(provider="ollama")          # context manager: use the running server, else start it; stop only what it started
-mk.unload(model_id)                    # free VRAM now
+mk.session(provider="ollama")          # context manager: use the running server, else start it; stop only what it started ("ollama" | "comfyui")
+mk.unload(model_id)                    # free VRAM now (Ollama keep_alive 0; ComfyUI POST /free)
 mk.gpu.lease(name, vram_gb, *, timeout_s=None, trace=None)
 mk.gpu.status() -> GpuStatus           # total / used / free MB, leases held, leases waiting
 mk.gpu.GPU, mk.gpu.GpuScheduler(ledger, memory=..., processes=..., unload_others=False, stall_s=120)
@@ -49,7 +50,8 @@ mk.current_trace()
 mk.errors: HoneModelsError, ConfigError, CapabilityError, ContextOverflow, ProviderError, ModelTimeout, ValidationFailed
 mk.PORTS_VERSION
 hone_models.calls: find_calls(spans, since=..., model=...), call_stats(calls, by=...)
-hone_models.testing: FakeOllama(responder=None), FakeSpeech, FakeSpeech.like(model_id), check_record_sink
+hone_models.testing: FakeOllama(responder=None), FakeSpeech, FakeSpeech.like(model_id), FakeComfyUI(run_s=0, port=0, jobs_api=True),
+                     FakeMedia(model_id=None, kind="image"), FakeMedia.like(model_id), check_record_sink
 ```
 
 `mk.*` names are exactly those in `hone_models.__all__`. The examples use only these names, plus
@@ -104,6 +106,12 @@ with actor.session():             # load once, keep the lease, free at the end o
     for i, line in enumerate(lines):
         actor.synthesize(line, emotion="warm", out=f"line_{i}.wav")
 
+img = mk.image("z-image-turbo")   # images, music and video: one client, a ComfyUI workflow per entry
+r = img.generate("a lighthouse at dusk", size="1024x1024", seed=7, references=[Path("front.png")], out="shots/01.png")
+r.path, r.files, r.seed, r.error, r.error_kind, r.job_id, r.span_id, r.cost_usd
+with mk.music("ace-step-1.5-xl-turbo").session() as song:   # lease, server and model held for the block
+    song.generate("dark trap, 95 bpm", lyrics=text, duration_s=150, out="takes/take.flac")
+
 with mk.gpu.lease("whisper-turbo", vram_gb=6):
     run_whisper()                 # non-LLM GPU work takes part in scheduling
 
@@ -127,6 +135,24 @@ is synthesized whole, a longer one is split on sentences into chunks of about eq
 joined with 0.25 s of silence, paragraphs with 0.6 s. A plain call loads the model and frees it
 afterwards; `with tts.session():` holds the GPU lease for the block, loads the model on its first call
 and frees it once at the end (also on an exception); sessions do not nest.
+
+`generate(prompt, *, out, seed=None, timeout_s=None, trace=None, **inputs)` returns a `MediaResult` with
+`files` (a `MediaFile(path, sha256, bytes, mime, width, height, duration_s)` each, unknown values `None`),
+`path` (the first file or `None`), `model`, `seed`, `span_id`, `elapsed_s`, `error`, `error_kind`
+(`out_of_memory`, `refused`, `invalid_input`, `no_output`, `failed`), `job_id`, `cost_usd` (a naive flat
+estimate from `price.per_image` / `per_output_second`, `None` without a price), `cost_estimated`,
+`license` and `commercial_use` ([0015](changes/0015-generation-models.md)). Named inputs are the shared
+vocabulary (`negative`, `size`, `references`, `image`, `source`, `strength`, `lyrics`, `duration_s`,
+`n`, `steps`) plus the model's own; `client.inputs` lists what an entry takes. An input the model does
+not take, a missing file, a size or duration the entry does not declare, or too many references raise
+`ConfigError` / `CapabilityError` before any request or lease. `seed=None` takes `defaults.seed`, else a
+random seed; the seed used is on the result and the span. Several files are `<stem>_1<suffix>`, ...; an
+`out` without a suffix takes the provider's. A job that ran without usable output is a result (`error`,
+`error_kind`, no files, span status `error`); one that could not be submitted, run or fetched raises
+(`ConfigError` for ComfyUI `node_errors`, `ProviderError`, `ModelTimeout` after cancelling the job; any
+exception while waiting cancels the job too). A local model's call leases the GPU by itself
+(`capabilities.vram_gb`) and frees the model afterwards; `with client.session():` holds the lease, the
+server and the model for the block and frees them once at the end; sessions do not nest.
 
 - Problems with the model's **answer** (empty reply, thinking-only reply, JSON still invalid after
   retries, truncated reply) are reported on the result: `error` is set, nothing is silently empty.
@@ -173,11 +199,21 @@ api_key_env = "OPENAI_API_KEY"
 ```
 
 The packaged defaults are `gemma4-12b`, `qwen2.5vl-7b`, `deepseek-r1-8b`, `nomic-embed-text`, `jev`,
-`gpt-4.1-mini`, `kokoro-82m` and `chatterbox`. `kind` is `chat` (default), `embedding`, `decision` or
-`speech`; a vision model may declare an image's prompt cost (`image_tokens` flat, or `image_patch_px`);
+`gpt-4.1-mini`, `kokoro-82m` and `chatterbox`. `kind` is `chat` (default), `embedding`, `decision`,
+`speech`, `image`, `music`, `video` or `transcription` ([0015](changes/0015-generation-models.md)); a vision model may declare an image's prompt cost (`image_tokens` flat, or `image_patch_px`);
 a speech model lists its voices in `capabilities.voices` (the first is the default) and whether
 it applies emotion and intensity in `capabilities.expressive`.
 
+- **Generation entries.** A `comfyui` entry names an API-format `workflow` (a relative path is resolved
+  against the registry file declaring it), an `inputs` table mapping each named input to one or more
+  `"<node id>.<input>"` paths (`{ path, per_second, add }` converts seconds to frames; `width` / `height`
+  are filled from `size`; `references` is a list of slots) and optional `outputs` (node ids). Other
+  providers list extra input names in `inputs`. Capabilities `max_references`, `sizes`,
+  `max_duration_s`, `durations_s`, `word_timestamps`, `commercial_use` (information only, copied onto
+  results and spans) and `features`; `price.per_image` / `per_output_second`; `max_timeout_s` defaults
+  by kind (image 600 s, music 1800 s, video 3600 s, transcription 600 s). The keys `command`, `cwd`, `env`,
+  `lyrics_format`, `prompt_inputs`, `guide` and `install` are shape-checked on load; the providers and
+  features that use them follow in later steps of 0015.
 - **Unknown is not false.** Every capability defaults to unknown (`None`). Pre-call checks refuse only
   what the registry *declares* impossible; selection matches only declared values.
 - **Ad-hoc ids.** `provider:model` ids (`ollama:llama3.2:1b`, `openai:gpt-4.1`, `litellm:<model>`) work
@@ -200,6 +236,7 @@ it applies emotion and intensity in `capabilities.expressive`.
 | `litellm` (extra) | any model LiteLLM knows | same OpenAI-shaped body; LiteLLM retries transient errors itself |
 | `kokoro` (extra `speech`) | Kokoro-82M in-process (torch) | speech-only; English voices need spaCy's `en_core_web_sm`, installed by the user (not on PyPI): without it `synthesize` raises `ConfigError` before the lease ([0008](changes/0008-speech-extra-and-the-spacy-model.md)); weights from Hugging Face (`hexgrad/Kokoro-82M`) on first use into `HF_HOME`; loaded per call inside a GPU lease and freed afterwards; 24 kHz; `defaults.device` overrides CUDA / CPU |
 | `chatterbox` (extra `expressive`) | Chatterbox (Resemble AI, MIT) in-process (torch) | speech-only, expressive: intensity sets `exaggeration` (0.25 + intensity), the emotion sets `cfg_weight` (pacing); voices are packaged reference clips rendered by Kokoro's synthetic voices, plus the voice bundled with the weights; weights (about 3 GB) from `ResembleAI/chatterbox` on first use; loaded per call inside a 5 GB lease and freed afterwards; 24 kHz; `speed` by time-stretching; `defaults.seed` (0) |
+| `comfyui` | a ComfyUI server (`base_url`, else `HONE_COMFYUI_URL`, else `http://127.0.0.1:8188`): `/prompt`, `/history/{id}`, `/view`, `/upload/image`, `/api/jobs/{id}/cancel`, `/free` | image, music, video from one API-format workflow per entry; file inputs uploaded once per process under their SHA-256 name into `input/hone/`; unused reference slots removed with their links; `node_errors` -> `ConfigError`; `/history` polled every 1 s (2 s after a minute); on timeout or any exception the job is cancelled (older servers: `/queue` delete or `/interrupt`); `POST /free` after a plain call, once per session; each job noted in `${HONE_HOME}/models/comfyui-loaded.json` until the next `/free`; a release hook (`on_short("comfyui:<url>")`) registered on first use; only a session starts a server (`HONE_COMFYUI_START`) |
 | `jev` | TypeSafe AI's decision API | decision-only: a state and questions in, answers out; `TYPESAFE_API_KEY`; base URL configurable. The request / response mapping is built from public articles and **unverified** against the real API |
 
 All HTTP goes through `httpx`. Timeouts are `2 * max_tokens / speed`, never below 120 s and never above
@@ -302,14 +339,16 @@ probabilities over unknown options or summing above 1 become that question's `er
   (when known), `hone.models.gpu.unloaded` and `hone.models.gpu.released` (the hooks that ran).
 - **Model calls do not lease on their own.** Callers wrap GPU work in `mk.gpu.lease(...)`. Whether local
   model calls should lease automatically is an open question ([decisions.md](decisions.md), D-009).
+  Speech, image, music and video calls on local models are the exception: each takes its own lease
+  (or its session holds one), with the entry's `vram_gb` (1 GB when not declared).
 - `NullGpuLease` (never waits) and `FileLockGpuLease(path)` (one user at a time) have the same shape.
 
 ## 8. Records and replay
 
 ### 8.1 Spans
 
-Every call emits one span, `hone.models.chat`, `hone.models.decide`, `hone.models.embed` or
-`hone.models.speech` (kind
+Every call emits one span, `hone.models.chat`, `hone.models.decide`, `hone.models.embed`,
+`hone.models.speech`, `hone.models.image`, `hone.models.music` or `hone.models.video` (kind
 `client`); an emulated decision is a decide span with its chat call as a child. A span is a JSON object:
 
 ```json
@@ -348,7 +387,7 @@ OpenTelemetry GenAI names where they exist, `hone.models.*` otherwise:
 
 | Attribute | Content |
 |---|---|
-| `gen_ai.operation.name`, `gen_ai.provider.name` | `chat` / `embeddings` / `speech`; `ollama`, `openai`, `litellm`, `jev`, `kokoro`, `chatterbox` |
+| `gen_ai.operation.name`, `gen_ai.provider.name` | `chat` / `embeddings` / `speech` / `image` / `music` / `video`; `ollama`, `openai`, `litellm`, `jev`, `kokoro`, `chatterbox`, `comfyui` |
 | `gen_ai.request.model`, `gen_ai.response.model` | the provider's model name |
 | `gen_ai.request.{temperature,top_p,max_tokens,seed}` | |
 | `gen_ai.response.finish_reasons`, `gen_ai.usage.{input_tokens,output_tokens}` | |
@@ -367,9 +406,17 @@ OpenTelemetry GenAI names where they exist, `hone.models.*` otherwise:
 | `hone.models.speech.input` | speech spans: the text; content |
 | `hone.models.speech.{voice,speed,chars,chunks,paragraphs,expressive,session,loaded,duration_s,sample_rate}` | speech spans; `loaded`: this call loaded the model |
 | `hone.models.speech.{emotion,intensity}` | speech spans, only when given |
+| `hone.models.media.prompt` | image / music / video spans: the prompt; content |
+| `hone.models.media.inputs` | every other input; file inputs as `{"path", "sha256", "bytes"}`; its text values (lyrics) are content |
+| `hone.models.media.outputs` | `[{"path", "sha256", "bytes", "mime", "width", "height", "duration_s"}]` |
+| `hone.models.media.{job_id,workflow_sha256}` | the provider's job id; the ComfyUI workflow's SHA-256 |
+| `hone.models.media.{session,loaded,freed,server_started,queue_wait_ms}` | in a session; this call loaded the model / freed it / found the server started by its session; ms queued before running |
+| `hone.models.media.{error,error_kind}` | as on the result; the error is content |
+| `hone.models.media.{license,commercial_use,cost_estimated}` | from the registry; `cost_estimated` when `hone.models.cost_usd` is the naive flat-price estimate |
 | `hone.schema_version`, and `hone.run_id`, `hone.item`, `hone.step`, `hone.candidate_id`, `hone.scorer`, `hone.lens.finding_id` | on every span; the last six copied from the trace context when present |
 
-HTTP retries are `retry` events; structured-output retries are `structured_retry` events. Not recorded
+HTTP retries are `retry` events; structured-output retries are `structured_retry` events; a generation
+job cancelled at the provider is a `cancelled` event. No file bytes are recorded. Not recorded
 in 0.1: `hone.models.timing.*` (no streaming, so no time to first token) and
 `hone.models.gpu.vram_after_mb` (spans inside a lease end before the lease does).
 
@@ -417,8 +464,16 @@ queries are `hone_models.calls.find_calls` and `call_stats`.
 `ollama serve` is started with a **clean environment** (no `VIRTUAL_ENV`, `LD_LIBRARY_PATH`,
 `PYTHONPATH`, `PYTHONHOME`) and `OLLAMA_HOST` set to the URL it waits on, for up to 30 s; on exit only a
 server the session started is stopped. A remote `OLLAMA_HOST` is never started. The session yields the
-server URL. `mk.unload(model_id)` sends `keep_alive: 0`. Both are Ollama-only in 0.1 (`ConfigError` for
-other providers).
+server URL. `mk.unload(model_id)` sends `keep_alive: 0`.
+
+`mk.session("comfyui")` does the same for the ComfyUI server at `HONE_COMFYUI_URL` (default
+`http://127.0.0.1:8188`): when none answers `GET /system_stats` and `HONE_COMFYUI_START` holds a command
+line, it is started with the same clean environment in its own process group, waited for up to
+`HONE_COMFYUI_START_S` (300 s) and stopped (SIGTERM, then SIGKILL after 10 s) at the end; a running
+server is never stopped and a remote one never started. `client.session()` of a ComfyUI model starts
+the server the same way. A plain call never starts one: without a server it raises `ProviderError`
+saying to start ComfyUI or use a session. `mk.unload(model_id)` for a ComfyUI entry sends `POST /free`
+(ComfyUI frees every model at once). Other providers raise `ConfigError`.
 
 ## 10. Shapes other code can rely on
 
@@ -430,6 +485,7 @@ directly. `mk.PORTS_VERSION` is `"1"`.
 |---|---|
 | `mk.text(...)` | `complete(messages, *, schema=None, trace=None, **params) -> TextResult` (§2.2); unknown params are ignored |
 | `mk.decision(...)` | `decide(state, questions, *, images=(), trace=None) -> {name: answer}` (§6) |
+| `mk.image(...)`, `mk.music(...)`, `mk.video(...)` | `kind`, `model_id`, `inputs`, `generate(prompt, *, out, seed=None, timeout_s=None, trace=None, **inputs) -> MediaResult` (§2.2), `session()` |
 | `mk.embedder(...)` | `model_id`, `dimensions`, `embed(texts, *, trace=None) -> list[list[float]]`: L2-normalized, input order, `[]` for no input |
 | `mk.gpu`, `mk.gpu.GPU`, `NullGpuLease`, `FileLockGpuLease` | `lease(name, vram_gb, *, timeout_s=None, trace=None)` context manager, reentrant, `TimeoutError` on timeout (§7) |
 | `mk.replay.Replayer()` | `replay_call(span, overrides, *, trace=None) -> span` (§8.6) |
@@ -442,6 +498,7 @@ Entry points, so tools can load these by name without importing hone-models:
 | `hone.text_clients` | `hone_models` | `hone_models:text` (takes a model id) |
 | `hone.decision_clients` | `hone_models` | `hone_models:decision` (takes a model id) |
 | `hone.embedders` | `hone_models` | `hone_models:embedder` (takes a model id) |
+| `hone.image_clients`, `hone.music_clients`, `hone.video_clients` | `hone_models` | `hone_models:image`, `hone_models:music`, `hone_models:video` (take a model id) |
 | `hone.gpu_leases` | `hone_models` | `hone_models.gpu:GPU` |
 | `hone.replayers` | `hone_models` | `hone_models.replay:Replayer` (no arguments) |
 
@@ -477,6 +534,9 @@ models in `tests/gpu/`.
 | AC-20 | Examples | every `examples/*.py` runs offline, opens with a What / How / Why docstring, uses only the public API and is listed in `examples/README.md` |
 | AC-21 **[real]** | Speech: a minutes-long script with `FakeSpeech`; one sentence with `kokoro-82m` | one WAV of the right length and one `hone.models.speech` span, text hashed with capture off; the real WAV is non-silent and the GPU is freed afterwards |
 | AC-22 **[real]** | Expressive speech: paragraphs with an emotion and intensity each in one session (`FakeSpeech(expressive=True)`); one line calm and excited with `chatterbox` in one session | the span records emotion, intensity, `expressive`, `session` and paragraph count, a paragraph that fits is one chunk, and the session loads the model once; the real takes are non-silent, the excited one varies more in pitch and is louder and higher, and the GPU is freed afterwards |
+| AC-24 | An image through `FakeComfyUI` with a reference used twice; a song with `duration_s` mapped to two nodes; a video with seconds converted to frames | inputs land on the mapped nodes; the reference is uploaded once by hash; outputs written to `out` with hash, size and dimensions or duration; one span each with inputs, outputs and the workflow hash; a lease with the registry's `vram_gb`; `/free` after a plain call, once after a session |
+| AC-25 | Failures: unknown input; `node_errors`; `execution_error` (out of memory); a job that never ends; `KeyboardInterrupt` while waiting | `ConfigError` before any request; `ConfigError` naming the node; `result.error` with `error_kind = "out_of_memory"` and status `error`; the job cancelled and `ModelTimeout`; the job cancelled and the interrupt re-raised |
+| AC-28 | `mk.session("comfyui")` with no server and a fake start command; again with a running server; a plain call with no server | started once, reused by two clients, stopped at the end; a running server is never stopped; the plain call raises `ProviderError` saying to start ComfyUI or use a session, and starts nothing |
 | AC-23 | A lease inside another in the same thread; a lease no one can grant (fake memory) | the nested lease reserves only what the outer one does not cover and never waits for it; the impossible one raises `CapabilityError` after `stall_s`, naming the holders |
 
 ## 12. Examples
@@ -503,6 +563,18 @@ no GPU lease; it writes silence of about `words / 2.5` seconds and keeps each ca
 voices, expressiveness and chunk size ([0012](changes/0012-fake-speech-expressive-voices.md));
 `loads` / `frees` count what the real client would load and free.
 
+`hone_models.testing.FakeComfyUI` is a local ComfyUI server that sets `HONE_COMFYUI_URL` while it runs:
+`/system_stats`, `/prompt` (links to missing nodes come back as `node_errors`), `/history`,
+`/api/jobs/{id}` and `/cancel`, `/interrupt`, `/queue`, `/upload/image`, `/view`, `/free`. A job runs
+for `run_s` and writes, per save node, a black PNG of the workflow's `width` x `height`, a WAV of silence
+as long as its `seconds` / `duration` input, or a packaged one-second MP4; `queue(outcome, **details)`
+scripts `node_errors`, `execution_error`, `hang`, `no_output` or `ok`; `requests`, `submitted`,
+`uploads` and `frees` record what arrived; `jobs_api=False` acts like an older server;
+`python -m hone_models.testing.fake_comfyui --port N` serves one in the foreground.
+`hone_models.testing.FakeMedia` stands in for `mk.image` / `mk.music` / `mk.video`: same validation, span
+and result, no server, no lease; `FakeMedia.like(model_id)` copies an entry; `calls` keeps
+`(prompt, inputs, seed)`; `fail_next(message)` makes the next call a failed job.
+
 ## 13. Known limits of 0.1.0
 
 - The Jev request / response mapping is unverified against the real API; it is tested only against
@@ -511,8 +583,11 @@ voices, expressiveness and chunk size ([0012](changes/0012-fake-speech-expressiv
   very small. hone-models reports it as `result.error`, but the hint in that message ("pass
   think=False") is then not the fix; raising `max_tokens` is.
 - Model calls do not take GPU leases automatically (D-009, awaiting owner review).
-- Sessions and unloading are Ollama-only.
-- No streaming, async clients, `hone.models.timing.*` attributes or media generation other than speech.
+- Sessions and unloading cover Ollama and ComfyUI only.
+- No streaming, async clients or `hone.models.timing.*` attributes. Generation runs through ComfyUI
+  only so far: hosted images and video, `command` projects, transcription, model guides, common input
+  formats and the catalog are later steps of [0015](changes/0015-generation-models.md). ComfyUI jobs
+  report no progress (its HTTP API has none).
 - The `speech` extra (Kokoro) needs Python < 3.13 and loads the model on every call (about a second)
   outside a session.
 - The `expressive` extra (Chatterbox) needs Python < 3.13, uv overrides of its exact torch / numpy pins

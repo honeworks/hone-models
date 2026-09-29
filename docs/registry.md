@@ -10,7 +10,7 @@ TOML files are merged in this order (later ones override key by key):
 
 ```toml
 [models."gemma4-12b"]
-provider = "ollama"              # ollama | openai_compatible | litellm | jev
+provider = "ollama"              # ollama | openai_compatible | litellm | jev | kokoro | chatterbox | comfyui
 model    = "gemma4-12b:latest"   # the provider's name (defaults to the id)
 defaults = { temperature = 0.8 } # params used unless the call passes its own
 [models."gemma4-12b".capabilities]
@@ -83,5 +83,14 @@ registry; request timeouts grow with it: `2 * max_tokens / speed_tok_s`, at leas
 `max_timeout_s` (default 600 s). A local model that was never measured is assumed to make 10 tokens/s,
 so a long answer (`max_tokens=7000`) gets up to 600 s on a fresh machine; hosted models without a
 measurement get 120 s.
+
+**Generation models.** `kind` is `chat` (default), `embedding`, `decision`, `speech`, `image`, `music`,
+`video` or `transcription`. A `comfyui` entry adds `workflow`, an `inputs` table of workflow paths and
+`outputs`; generation capabilities are `max_references`, `sizes`, `max_duration_s`, `durations_s`,
+`word_timestamps`, `commercial_use` (information only: it never blocks a call, and it is copied onto every
+result) and `features`; `price` also takes `per_image` and `per_output_second`. `max_timeout_s` defaults
+by kind: image 600 s, music 1800 s, video 3600 s, transcription 600 s. The keys `lyrics_format`,
+`prompt_inputs`, `guide`, `install`, `command`, `cwd` and `env` are checked when the registry loads. See
+[generation.md](generation.md#comfyui-entries).
 
 **Runnable examples:** [registry.py](../examples/registry.py), [openai_compatible.py](../examples/openai_compatible.py), [litellm_provider.py](../examples/litellm_provider.py).

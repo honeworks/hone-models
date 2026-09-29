@@ -1,0 +1,218 @@
+# Images, music and video
+
+`mk.image(model_id)`, `mk.music(model_id)` and `mk.video(model_id)` generate files with a registered
+model. The three return the same client, `MediaClient`; the factory checks that the entry's `kind` is
+the one asked for (`ConfigError` otherwise).
+
+```python no-run
+import hone_models as mk
+from pathlib import Path
+
+img = mk.image("z-image-turbo")
+r = img.generate("a lighthouse at dusk, oil painting", size="1024x1024", seed=7, out="shots/01.png")
+r.path, r.files, r.seed, r.error, r.error_kind, r.span_id, r.cost_usd
+
+song = mk.music("ace-step-1.5-xl-turbo")
+with song.session():                        # lease, server and model held for the block
+    for i, seed in enumerate([1, 2, 3]):
+        song.generate("dark trap, 95 bpm, female vocals", lyrics=text, duration_s=150, seed=seed,
+                      out=f"takes/take_{i}.flac")
+
+clip = mk.video("wan2.2-i2v-14b")
+clip.generate("slow push-in, candle flicker", image=Path("shots/01.png"), duration_s=5, out="clips/01.mp4")
+```
+
+The packaged registry does not list generation models yet; until it does, add your own entries (below).
+
+## Calling
+
+`generate(prompt, *, out, seed=None, timeout_s=None, trace=None, **inputs) -> MediaResult`
+
+- **Named inputs.** Besides `prompt` and `seed` there is a small shared vocabulary: `negative`, `size`
+  (`"WxH"`), `references` (a list of image files), `image` (a start frame), `source` and `strength`
+  (audio or video to transform, 0-1), `lyrics`, `duration_s`, `n`, `steps`. A model may take more
+  (`bpm`, `key`, ...); `client.inputs` lists what it takes. **An input the model does not take raises
+  `ConfigError` before any request**, naming the ones it takes: a silently ignored `duration_s` would
+  waste minutes of GPU time. The entry's `defaults` fill inputs the call leaves out.
+- **Files.** A `pathlib.Path` value is a file input (for `references`, `image` and `source` a string is
+  a path too). A missing file raises `ConfigError` before anything runs; the span records each file as
+  `{"path", "sha256", "bytes"}`, never its bytes.
+- **Checks.** A size or duration the entry does not declare (`capabilities.sizes`, `durations_s`,
+  `max_duration_s`) or more references than `max_references` raise `CapabilityError` before the request.
+  Capabilities the entry leaves out are unknown, and unknown is allowed.
+- **Seed.** `seed=None` takes the entry's `defaults.seed`, else a random one. The seed used is on the
+  result and the span, so every output can be made again.
+- **Output.** `out` is the file to write (parent folders are created). Several files (`n > 1`, stems) are
+  `<stem>_1<suffix>`, `<stem>_2<suffix>`, ...; an `out` without a suffix takes the provider's.
+- **Timeout.** `timeout_s` defaults to the entry's `max_timeout_s` (by kind: image 600 s, music 1800 s,
+  video 3600 s). When it runs out the job is cancelled at the provider and `ModelTimeout` is raised; any
+  other exception while waiting (`Ctrl-C` included) cancels the job too, then goes on.
+
+## Results
+
+`MediaResult` has `files` (a `MediaFile` per file), `path` (the first file, or `None`), `model`,
+`seed`, `span_id`, `job_id` (the provider's), `elapsed_s`, `error`, `error_kind`, `cost_usd`,
+`cost_estimated`, `license` and `commercial_use` (both from the registry, `None` when not declared).
+`MediaFile` has `path`, `sha256`, `bytes`, `mime`, `width`, `height` and `duration_s`, each `None` when
+unknown or not applicable, never 0. Files are recognised by their content: images by their header, WAV
+and FLAC by their own headers, anything else (video) with `ffprobe` when it is on `PATH`.
+
+**A job that ran without usable output is a result, not an exception**: `files` is empty, `error` holds
+the provider's message and `error_kind` says what to do next:
+
+| `error_kind` | Meaning |
+|---|---|
+| `out_of_memory` | retry later, smaller, or after freeing memory |
+| `refused` | moderation or policy: change the prompt |
+| `invalid_input` | the model rejected a value while running: change the input |
+| `no_output` | the job finished without files |
+| `failed` | anything else |
+
+A job that could not be submitted, run or fetched raises: `ConfigError` for a workflow ComfyUI refuses
+(its `node_errors`, naming the node and the input), `ProviderError` for a server that is not there or a
+transport failure, `ModelTimeout` for a timeout.
+
+**Cost** is a naive estimate: one flat price per entry, `capabilities.price.per_image` times the images
+or `per_output_second` times the seconds of output; `cost_estimated` is `True` when it is set, and
+`cost_usd` is `None` without a price. Real hosted prices vary with size and quality.
+
+## GPU and sessions
+
+A local model's call takes a GPU lease by itself (`mk.gpu.lease(model_id, capabilities.vram_gb)`), so it
+waits for memory like any other lease; hosted models take none. A plain call frees the model when it is
+done (ComfyUI: `POST /free`). `with client.session():` holds the lease, the server and the loaded model
+for the calls in the block and frees them once at the end, also on an exception; sessions of one client
+do not nest.
+
+ComfyUI keeps its models in another process and can only free everything at once. `mk.unload(model_id)`
+for a ComfyUI entry sends `POST /free`, freeing every model that server holds. hone-models notes which
+registry models each server ran since it last freed them in `${HONE_HOME}/models/comfyui-loaded.json`.
+The first call to a server registers a release hook (`mk.gpu.on_short`), so a later lease in the same
+process that is short of memory can make ComfyUI let go.
+
+**Starting ComfyUI.** A plain call only uses a running server: without one it raises `ProviderError`
+saying to start ComfyUI or to use a session. A session (`client.session()` or `mk.session("comfyui")`)
+starts one when none answers and `HONE_COMFYUI_START` holds the command line that starts it:
+
+```bash
+export HONE_COMFYUI_START="$HOME/ComfyUI/start.sh --port 8188"   # your own start script
+export HONE_COMFYUI_URL="http://127.0.0.1:8188"                  # the default
+```
+
+It runs in its own process group with a clean environment (no `VIRTUAL_ENV`, `LD_LIBRARY_PATH`,
+`PYTHONPATH`, `PYTHONHOME`), hone-models waits up to `HONE_COMFYUI_START_S` seconds (300) for
+`/system_stats` to answer, and stops it at the end of the block. A server that was already running is
+never stopped, and a remote one is never started.
+
+```python no-run
+with mk.session("comfyui"):                 # one server for several clients
+    mk.image("z-image-turbo").generate("a harbour", out="a.png")
+    mk.music("ace-step-1.5-turbo").generate("lo-fi, rain", duration_s=30, out="b.flac")
+```
+
+Models that offload to system RAM (Wan 14B) can fill it; the lease does not schedule RAM, so do not run
+two such jobs at once.
+
+## ComfyUI entries
+
+A `comfyui` entry names a workflow exported from ComfyUI with **Export (API)** and maps each named input
+to one or more `"<node id>.<input>"` paths of that workflow. A relative `workflow` path is resolved
+against the registry file that declares it. The workflow's SHA-256 is recorded on every span, so a
+changed workflow file shows in the records.
+
+```toml
+[models."my-image"]
+provider = "comfyui"
+kind = "image"
+workflow = "workflows/my-image.json"           # relative to this file
+outputs = ["9"]                                 # the save nodes whose files are the result (default: all)
+defaults = { size = "1024x1024", steps = 8 }
+[models."my-image".inputs]
+prompt = "6.text"
+seed = "3.seed"
+steps = "3.steps"
+width = "13.width"                              # `size` fills width and height
+height = "13.height"
+references = ["78.image", "106.image"]          # slots, in order; an unused slot is removed with its links
+[models."my-image".capabilities]
+vram_gb = 7.0
+max_references = 2
+license = "Apache-2.0"
+commercial_use = true
+
+[models."my-video".inputs]
+duration_s = { path = "50.length", per_second = 16, add = 1 }   # seconds to frames: 5 s -> 81
+```
+
+- A file input is uploaded with `POST /upload/image` into `input/hone/` under its SHA-256 name, once per
+  process and server, so a reference used for 40 shots is sent once; this also works with a ComfyUI on
+  another host.
+- The outputs are fetched with `GET /view` and written to `out`; ComfyUI keeps its own copies in its
+  output folder (it has no delete endpoint), so save under a `hone/` prefix to find them.
+- The job is queued with `POST /prompt` and `GET /history/{id}` is polled every second (every two after
+  the first minute). ComfyUI's HTTP API reports no progress, so there are no progress events.
+- An entry without a `workflow` raises `ConfigError` saying so; a mapping to a node or input the workflow
+  does not have raises `ConfigError` naming it, before anything is queued.
+
+A test run through the packaged fake server, with a workflow of three nodes:
+
+```python
+import json
+from pathlib import Path
+
+import hone_models as mk
+from hone_models.testing import FakeComfyUI
+
+Path("flows").mkdir(exist_ok=True)
+Path("flows/tiny.json").write_text(json.dumps({
+    "3": {"class_type": "KSampler", "inputs": {"seed": 0, "positive": ["6", 0], "latent_image": ["13", 0]}},
+    "6": {"class_type": "CLIPTextEncode", "inputs": {"text": ""}},
+    "13": {"class_type": "EmptyLatentImage", "inputs": {"width": 512, "height": 512}},
+    "9": {"class_type": "SaveImage", "inputs": {"filename_prefix": "hone/tiny", "images": ["3", 0]}},
+}))
+Path("flows/models.toml").write_text("""
+[models.tiny]
+provider = "comfyui"
+kind = "image"
+workflow = "tiny.json"
+inputs = { prompt = "6.text", seed = "3.seed", width = "13.width", height = "13.height" }
+capabilities = { vram_gb = 0.5 }
+""")
+registry = mk.registry.load(["flows/models.toml"])
+with FakeComfyUI() as server:
+    r = mk.image("tiny", registry=registry).generate("a harbour", size="96x64", seed=3, out="shots/harbour.png")
+print(r.path, r.files[0].width, r.files[0].height, r.seed)
+assert server.submitted[0]["6"]["inputs"]["text"] == "a harbour"
+assert (r.files[0].width, r.files[0].height) == (96, 64)
+```
+
+## Records
+
+Each call records one span, `hone.models.image`, `hone.models.music` or `hone.models.video`, with
+`gen_ai.request.seed`, the prompt (`hone.models.media.prompt`, content), the inputs
+(`hone.models.media.inputs`: files as `{"path", "sha256", "bytes"}`, texts such as lyrics are content),
+the outputs (`hone.models.media.outputs`), the job id, the workflow hash, whether the call was in a
+session, loaded the model, freed it or started the server, the time it queued, the error and its kind,
+the license, `commercial_use`, and the naive cost. See [records-and-replay.md](records-and-replay.md).
+
+## Testing
+
+`hone_models.testing.FakeMedia` stands in for the clients in an application's tests: same validation,
+span and result, no server and no lease. `FakeMedia.like(model_id)` copies a registry entry (its id,
+kind, inputs, defaults and capabilities). It writes a black PNG of the requested `size`, silence of
+`duration_s` or a one-second MP4, keeps each call in `calls` as `(prompt, inputs, seed)`, and
+`fail_next(message)` makes the next call a failed job.
+
+```python
+from hone_models.testing import FakeMedia
+
+song = FakeMedia(kind="music")
+take = song.generate("lo-fi, rain", duration_s=3, seed=5, out="takes/take.wav")
+print(take.path, take.files[0].duration_s, song.calls[0])
+song.fail_next("CUDA out of memory")
+failed = song.generate("lo-fi, rain", duration_s=3, out="takes/take.wav")
+assert (failed.error_kind, failed.files) == ("out_of_memory", [])
+```
+
+`hone_models.testing.FakeComfyUI` is a local ComfyUI server for testing workflows and entries (see
+[testing.md](testing.md)).

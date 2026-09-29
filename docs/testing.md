@@ -65,6 +65,27 @@ with FakeOllama(responder=by_schema):
 `hone_models.testing.check_record_sink(sink, read_back)` is the contract check for a `RecordSink`
 implementation ([design/current.md §8.2](../design/current.md#82-sinks-and-the-sqlite-store)).
 
+## Generation without ComfyUI
+
+`hone_models.testing.FakeComfyUI` is a local ComfyUI server. It sets `HONE_COMFYUI_URL` while it runs,
+checks that every linked node of a submitted workflow exists (else it answers with `node_errors`), and a
+job writes a black PNG, a WAV of silence or a tiny MP4 for each save node of the workflow. `server.queue`
+scripts the next jobs (`"node_errors"`, `"execution_error"`, `"hang"`, `"no_output"`, `"ok"` with
+`run_s=`); `requests`, `submitted` (every filled workflow), `uploads` and `frees` show what the client
+did; `FakeComfyUI(jobs_api=False)` behaves like an older server. `python -m
+hone_models.testing.fake_comfyui --port 8188` serves one in the foreground, a stand-in for
+`HONE_COMFYUI_START`. `FakeMedia` and `FakeMedia.like(model_id)` stand in for the clients themselves
+([generation.md](generation.md#testing)).
+
+```python
+from hone_models.testing import FakeComfyUI
+
+with FakeComfyUI() as server:
+    server.queue("execution_error", message="CUDA out of memory")
+    # ... run the code under test; the next job fails with error_kind "out_of_memory"
+print(server.url)
+```
+
 ## Bring your own client
 Code written against the honeworks ports accepts anything with the same shape. A text client only needs
 `complete(messages, *, schema=None, trace=None, **params)` returning an object with `text`, `parsed`,

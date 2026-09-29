@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator, model_validator
 
+from ._env_file import apply_env_files
 from ._registry_select import PREFER
 from ._registry_select import unmet as unmet  # noqa: PLC0414 - re-exported for text.py
 from ._registry_shapes import (
@@ -67,6 +68,7 @@ class ModelConfig(BaseModel):
     model: str = ""
     kind: Kind = "chat"
     base_url: str | None = None
+    base_url_env: str | None = None  # a variable whose value, when set, replaces base_url (change 0017)
     api_key_env: str | None = None
     defaults: dict[str, Any] = {}
     capabilities: Capabilities = Capabilities()
@@ -94,6 +96,9 @@ class ModelConfig(BaseModel):
         if errors:
             raise ValueError("; ".join(errors))
         raw.setdefault("max_timeout_s", KIND_TIMEOUT_S.get(str(raw.get("kind", "chat")), 600.0))
+        url_env = raw.get("base_url_env")
+        if url_env and os.environ.get(url_env):  # the variable wins over `base_url` (change 0017)
+            raw["base_url"] = os.environ[url_env]
         features = feature_names(raw.get("guide"))
         if features:  # selection matches the guide's features (§3a); an explicit list wins
             given: Any = raw.get("capabilities") or {}
@@ -145,7 +150,13 @@ ADHOC: dict[str, dict[str, Any]] = {
 
 
 def require_client(cfg: ModelConfig) -> None:
-    """A `ConfigError` for a catalog entry of a kind hone-models cannot call yet (§3b)."""
+    """A `ConfigError` for a catalog entry of a kind hone-models cannot call yet (§3b), or one whose
+    `base_url_env` is unset and that has no `base_url` (change 0017)."""
+    if cfg.base_url_env and not cfg.base_url:
+        raise ConfigError(
+            f"model {cfg.id!r} needs a base URL: set the environment variable {cfg.base_url_env} "
+            "(or base_url in the registry)"
+        )
     if cfg.kind in NO_CLIENT_KINDS:
         raise ConfigError(
             f"no client for kind {cfg.kind!r} yet: model {cfg.id!r} is in the catalog (see "
@@ -224,7 +235,9 @@ def default_paths() -> list[Path]:
 
 
 def load(paths: Iterable[str | Path] | str | Path | None = None) -> Registry:
-    """Load the packaged defaults, then user and project files if present, then `paths` (must exist)."""
+    """Load the packaged defaults, then user and project files if present, then `paths` (must exist).
+    First exports the unset variables of `$HONE_ENV_FILE` and `./.env`, once per file per process."""
+    apply_env_files()
     merged = _with_workflow_paths(_packaged(), Path(str(resources.files("hone_models"))) / "data")
     if isinstance(paths, str | Path):
         paths = [paths]

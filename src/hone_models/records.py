@@ -4,7 +4,7 @@ Every sink applies the same two rules before storing a span:
 - content capture: when off (`capture_content=False`, or env `HONE_CAPTURE_CONTENT=0` when the sink
   option is left at `None`), message/output content is replaced by `{"sha256": ..., "len": ...}`;
 - secrets: any registered secret value (API keys read from the environment) and anything that looks
-  like a bearer token or `sk-` key is replaced by `"***"`.
+  like a bearer token, an `sk-` key or a URL's `user:password@` is replaced by `"***"`.
 
 Sinks never raise into the caller: failures are logged once and counted in `sink.failures`.
 
@@ -50,7 +50,10 @@ CONTENT_KEYS = (
 TEXT_CONTENT_KEYS = ("hone.models.media.inputs",)
 BLOB_THRESHOLD = 64 * 1024
 _SECRETS: set[str] = set()
-_SECRET_PATTERN = re.compile(r"(Bearer\s+)[A-Za-z0-9._~+/=-]+|\bsk-[A-Za-z0-9_-]{16,}")
+# a bearer token, an `sk-` key, or the `user:password` of a URL (change 0017)
+_SECRET_PATTERN = re.compile(
+    r"(Bearer\s+)[A-Za-z0-9._~+/=-]+|\bsk-[A-Za-z0-9_-]{16,}|(?<=://)[^/\s@\"]+(?=@)"
+)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta   (key TEXT PRIMARY KEY, value TEXT NOT NULL);

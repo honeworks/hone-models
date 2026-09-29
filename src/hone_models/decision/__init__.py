@@ -24,7 +24,7 @@ from ..errors import ConfigError
 from ..ports import RecordSink
 from ..providers import jev, model_attributes
 from ..records import default_sink
-from ..registry import ModelConfig, Registry, load
+from ..registry import ModelConfig, Registry, load, require_client
 from ..text import TextClient, inline_image, text, usage_attributes
 from .emulate import emulate
 from .questions import Choice, ScoreQ, YesNo, check_questions
@@ -103,6 +103,7 @@ def decision(
     if cfg.kind in ("embedding", "speech"):
         raise ConfigError(f"model {cfg.id!r} is a {cfg.kind} model; use mk.embedder() or mk.speech()")
     if cfg.kind == "decision":
+        require_client(cfg)
         register_key(cfg)
         return DecisionClient(cfg, sink)
     llm = text(model_id, registry=reg, sink=sink)

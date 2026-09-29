@@ -18,7 +18,7 @@ from hone_models.testing import FakeOllama
 pytestmark = pytest.mark.e2e
 runner = CliRunner()
 MODEL_KEYS = {
-    "id", "provider", "model", "name", "kind", "base_url", "api_key_env",
+    "id", "provider", "model", "name", "kind", "base_url", "base_url_env", "api_key_env",
     "defaults", "capabilities", "max_timeout_s", "local",
 }  # fmt: skip
 

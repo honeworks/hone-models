@@ -31,6 +31,12 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
   `per_output_second` prices; `FakeComfyUI` and `FakeMedia` for tests; entry points
   `hone.image_clients`, `hone.music_clients`, `hone.video_clients`
   ([0015](design/changes/0015-generation-models.md), step 1).
+- Hosted images and video through `openai_compatible` entries of kind `image` / `video`:
+  `/images/generations`, `/images/edits` with reference images, `b64_json` and `url` answers written to
+  `out`, `revised_prompt` recorded; `/videos` jobs polled with progress events, downloaded, deleted on
+  timeout or interrupt and never submitted twice; moderation refusals and failed jobs as `result.error`
+  (`refused` / `failed`); naive cost from `per_image` / `per_output_second`
+  ([0015](design/changes/0015-generation-models.md), step 2).
 - `THIRD_PARTY_NOTICES.md` (the Kokoro-rendered voice clips; copyleft dependencies of the optional
   speech extras), shipped in the wheel and sdist.
 - The context budget counts images (capabilities `image_tokens` / `image_patch_px`, else 1024 per

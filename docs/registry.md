@@ -90,7 +90,9 @@ measurement get 120 s.
 `word_timestamps`, `commercial_use` (information only: it never blocks a call, and it is copied onto every
 result) and `features`; `price` also takes `per_image` and `per_output_second`. `max_timeout_s` defaults
 by kind: image 600 s, music 1800 s, video 3600 s, transcription 600 s. The keys `lyrics_format`,
-`prompt_inputs`, `guide`, `install`, `command`, `cwd` and `env` are checked when the registry loads. See
-[generation.md](generation.md#comfyui-entries).
+`prompt_inputs`, `guide`, `install`, `command`, `cwd` and `env` are checked when the registry loads. An
+`openai_compatible` entry of kind `image` or `video` calls a hosted images or video API; its `inputs` is a
+list of extra input names sent as request fields. See [generation.md](generation.md#comfyui-entries) and
+[hosted entries](generation.md#hosted-images-and-video).
 
 **Runnable examples:** [registry.py](../examples/registry.py), [openai_compatible.py](../examples/openai_compatible.py), [litellm_provider.py](../examples/litellm_provider.py).

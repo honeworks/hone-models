@@ -30,7 +30,8 @@ src/hone_models/       public API in __init__.py (explicit __all__)
   embeddings.py        embedder
   speech.py            text to speech (kokoro: extra `speech`; chatterbox: extra `expressive`)
   media.py             images, music, video (`MediaClient`); _media_files.py measures outputs
-  providers/           one module per provider (Ollama, OpenAI-compatible, Jev, LiteLLM extra, ComfyUI)
+  providers/           one module per provider (Ollama, OpenAI-compatible, Jev, LiteLLM extra, ComfyUI);
+                       openai_media.py: OpenAI-compatible images and video
   registry.py data/    model registry and packaged defaults; _registry_shapes.py: an entry's tables
   gpu.py runtime/      GPU leases; Ollama and ComfyUI sessions and unload; _comfyui_loaded.py
   machine.py           machine state: snapshot, prepare, load (readers in _machine_read.py)

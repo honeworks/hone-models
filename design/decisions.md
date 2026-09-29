@@ -259,3 +259,37 @@ succeeds when the project is set up), next to `source`, `ollama`, `files` (`repo
 `size_gb`, `tier` (1, 2 or 3) and `note`; other keys are an error. The catalog step may add fields.
 Part of [0015](changes/0015-generation-models.md).
 No review needed.
+
+## D-030: hosted image and video requests: the inputs each kind takes, no `response_format`, no seed
+0015 §2 lists the request fields of the hosted images and video calls. The `openai_compatible` media row
+takes, besides `prompt` and `seed`, only what those endpoints use: images `size`, `n`, `references`;
+video `size`, `duration_s` (sent as the string `seconds`), `image` (multipart `input_reference`); plus
+the names an entry lists in `inputs`, sent as request fields. The rest of the shared vocabulary
+(`negative`, `steps`, `lyrics`, ...) raises `ConfigError` as for any model that does not take it. The
+record says to send `response_format = "b64_json"`; OpenAI's gpt-image models always answer in base64
+and do not take that parameter, while other models and gateways default to `url`. Both answers are
+handled (decoded, or downloaded without the API key), so nothing is sent by default; an entry that wants
+one lists `response_format` in `inputs` and sets it in `defaults`. The seed is recorded but not sent:
+the endpoints have no seed field. An `openai_compatible` media entry on this host (a local server) takes
+the GPU lease like any local model. Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-031: the per-second cost uses the asked-for duration when the file's cannot be read
+`cost_usd` for a `per_output_second` price multiplies the measured seconds of output. A video's duration
+is read with `ffprobe`, which may not be installed; the hosted API bills the seconds asked for anyway.
+So a file whose duration cannot be read counts the call's `duration_s` (including the entry's default);
+without either the cost stays `None`. Still the naive estimate of 0015 (`cost_estimated = True`). Part
+of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-032: hosted refusals, polling failures and signed URLs
+A moderation refusal at submission comes back from OpenAI as HTTP 400 (`moderation_blocked`); any 4xx
+whose text reads as a refusal (`error_kind` gives `refused`) becomes a result with `error_kind =
+"refused"` and no job id; other 4xx raise `ProviderError` as today. A failed video job's `error.code`
+and `error.message` are joined into `result.error`, and its kind is read from that text, so a
+moderation failure is `refused` too. Polling counts transport errors, 429, 5xx and unreadable JSON as
+transient; the fifth in a row raises `ProviderError` naming the job id (as ComfyUI's polling does);
+another 4xx raises at once. Either way, and on a timeout or interrupt, the job is deleted. Downloaded
+image URLs are signed; they are never put in an error message or the records. Part of
+[0015](changes/0015-generation-models.md).
+No review needed.

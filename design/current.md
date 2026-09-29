@@ -245,6 +245,22 @@ or `scoring` (catalog entries hone-models cannot call yet, provider `none`: ever
 a speech model lists its voices in `capabilities.voices` (the first is the default) and whether
 it applies emotion and intensity in `capabilities.expressive`.
 
+- **Endpoints and keys from the environment** ([0017](changes/0017-settings-from-the-environment.md)).
+  `api_key_env` names the variable holding an entry's API key; `base_url_env` names the variable holding
+  its base URL, which replaces `base_url` when set (non-empty). With the variable unset and no
+  `base_url`, calling the model raises `ConfigError` naming the variable, before any request.
+  `load()` first exports the variables of the file named by `HONE_ENV_FILE` (must exist) and then of
+  `./.env` that are not already set, each file once per process: `KEY=VALUE` lines, optional `export `,
+  `#` comment lines, values optionally in single or double quotes (literal, no escapes), an unquoted
+  value ending at ` #`. A malformed line is a `ConfigError` naming the file and line, never its text.
+  Hosted judges behind an OpenAI-compatible gateway use this:
+
+  ```toml
+  [models.fable]
+  provider = "openai_compatible"
+  base_url_env = "JUDGES_BASE_URL"   # e.g. https://gateway.example/v1, from the environment or .env
+  api_key_env = "JUDGES_API_KEY"
+  ```
 - **Generation entries.** A `comfyui` entry names an API-format `workflow` (a relative path is resolved
   against the registry file declaring it), an `inputs` table mapping each named input to one or more
   `"<node id>.<input>"` paths (`{ path, per_second, add }` converts seconds to frames; `width` / `height`
@@ -323,7 +339,7 @@ All HTTP goes through `httpx`. Timeouts are `2 * max_tokens / speed`, never belo
 `max_timeout_s` (600 s); the speed is the measured `speed_tok_s`, else 10 tokens/s for a local model
 ([0010](changes/0010-timeout-without-measured-speed.md)); a hosted model without one gets 120 s. Transient errors (connection errors, 429, 5xx) are retried with jittered
 backoff, 3 attempts in all, each retry recorded as a span event; other 4xx errors are not retried. API
-keys come only from environment variables named by `api_key_env`.
+keys come only from environment variables named by `api_key_env` (or a `.env` file, §3).
 
 ## 5. Structured output
 
@@ -556,8 +572,10 @@ in 0.1: `hone.models.timing.*` (no streaming, so no time to first token) and
 
 `HONE_CAPTURE_CONTENT=0`, or `SqliteSpanSink(path, capture_content=False)`, stores every attribute
 marked "content" above, and the params, only as `{"sha256", "len"}`. Headers are never recorded. The
-value of every `api_key_env` in use, anything shaped like a bearer token or `sk-...` key, and values
-registered with `mk.records.add_secret` are replaced with `***` before writing.
+value of every `api_key_env` in use, anything shaped like a bearer token or `sk-...` key, the
+`user:password` part of any URL (`https://***@host/...`), and values registered with
+`mk.records.add_secret` are replaced with `***` before writing. Values read from `.env` files are never
+logged ([0017](changes/0017-settings-from-the-environment.md)).
 
 ### 8.5 Trace context
 
@@ -684,6 +702,7 @@ models in `tests/gpu/`.
 | AC-32 **[real]** | `mk.machine.snapshot()` with a fake NVML (8 GB, one foreign process), FakeOllama with a model partly on the CPU, ComfyUI (fake) after a job, after `/free`, after a job hone-models did not run, and refused; no NVML and no `nvidia-smi`; Ollama answering 500; the lock held by another process, by our own `gpu-lock.sh`, and free | GB values and `vram_gb < size_gb` as scripted; ComfyUI named by registry id, dropped after `/free`, unnamed for a foreign job; a registry without `comfyui` entries checks none; `gpus` is `None`; Ollama `running: None` with an error and no entries; `held` / `mine` / `holder` right; the real card is reported |
 | AC-33 **[real]** | `prepare(["a"])` with Ollama holding `a` and `b` and ComfyUI a model not needed; with ComfyUI holding only needed models; with another process's lease (`if_busy` `"block"` and `"unload"`); with the lock held elsewhere; with the unload of `b` failing | `b` unloaded, ComfyUI freed, span recorded; ComfyUI kept; blocked: nothing sent, `blocked_by` names the holder; `"unload"`: `b` unloaded, `blocked_by` still reported; failure: in `errors`, span status `error`, `b` still loaded; on the real machine `prepare([])` leaves nothing loaded |
 | AC-34 | `load("a")` on FakeOllama; a model partly on the CPU; a server timing out; a `comfyui` entry; `GpuScheduler(unload_others=True, if_busy="block")` short of memory while another process holds a lease | an empty-prompt `/api/generate` with `keep_alive`, `loaded: True` with seconds; `vram_gb < size_gb`; `loaded: False` with the error; `loaded: None`, "not supported", no request; the other process's models are not unloaded and the lease times out as before |
+| AC-35 | An `openai_compatible` entry with `base_url_env` and `api_key_env`: the URL from the environment; the variable and a `base_url`; neither; `./.env` with `export`, quotes and comments while a variable is already set; `HONE_ENV_FILE`; a malformed `.env` line; a URL with `user:password@` and a key from `.env`, one call answered and one failing | the request goes to the variable's URL with the key; the variable wins, `base_url` when unset; `ConfigError` naming the variable and no request; the file's values exported, the existing one kept; the named file read first, a missing one a `ConfigError`; `ConfigError` naming file and line without the line's text; neither the key nor the password in the SQLite files, the URL stored as `https://***@...` ([0017](changes/0017-settings-from-the-environment.md)) |
 
 ## 12. Examples
 

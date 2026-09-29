@@ -2,8 +2,9 @@
 
 ## Status
 
-`accepted (2026-09-29, owner)`: "I can add Astra and Fable APIs through an OpenAI compatible source.
-These should be configurable through env or things like that. Maybe even a .env file."
+`implemented in 0.1.0` (accepted 2026-09-29, owner: "I can add Astra and Fable APIs through an OpenAI
+compatible source. These should be configurable through env or things like that. Maybe even a .env
+file.")
 
 ## Context
 

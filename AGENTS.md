@@ -36,7 +36,8 @@ src/hone_models/       public API in __init__.py (explicit __all__)
                        openai_media.py: OpenAI-compatible images and video
   registry.py data/    model registry; the packaged catalog in data/models/<kind>.toml, ComfyUI workflows in
                        data/workflows/<id>.json; _registry_shapes.py:
-                       an entry's tables; _registry_select.py: requirements and orderings
+                       an entry's tables; _registry_select.py: requirements and orderings;
+                       _env_file.py: `.env` files read at load
   guide.py formats.py catalog.py   model guides; lyrics formats and prompt inputs; installed / install
   gpu.py runtime/      GPU leases; Ollama and ComfyUI sessions and unload; _comfyui_loaded.py
   machine.py           machine state: snapshot, prepare, load (readers in _machine_read.py)

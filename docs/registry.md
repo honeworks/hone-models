@@ -27,7 +27,38 @@ vram_gb = 7.4
 provider = "openai_compatible"
 base_url = "http://localhost:8080/v1"
 api_key_env = "LLAMA_KEY"        # optional; the key is read from this variable and never recorded
+# base_url_env = "LLAMA_URL"     # optional; this variable, when set, replaces base_url
 ```
+
+**Endpoints and keys from the environment.** `api_key_env` names the variable that holds an entry's key;
+`base_url_env` names the variable that holds its base URL. When that variable is set it replaces
+`base_url` (which then serves as the fallback); with neither, calling the model raises `ConfigError`
+naming the variable before any request. A hosted judge behind an OpenAI-compatible gateway, committed
+without its URL or key:
+
+```toml
+# hone-models.toml
+[models.fable]
+provider = "openai_compatible"
+model = "fable"
+base_url_env = "JUDGES_BASE_URL"
+api_key_env = "JUDGES_API_KEY"
+```
+
+The values can live in a `.env` file in the directory the program runs from:
+
+```bash
+# .env: keep it out of git (add ".env" to .gitignore)
+JUDGES_BASE_URL=https://gateway.example/v1
+export JUDGES_API_KEY="your-key"   # "export" and quotes are optional
+```
+
+`mk.registry.load()` reads the file named by `HONE_ENV_FILE` (if set; it must exist) and then `./.env`,
+each once per process, and exports only variables that are not set yet: the shell's environment wins,
+then `HONE_ENV_FILE`, then `./.env`. Lines are `KEY=VALUE`; blank lines and `#` lines are skipped; a
+quoted value is taken literally (no escapes); an unquoted value ends at ` #`. A malformed line raises
+`ConfigError` naming the file and line number (never the line's text). Keys are never recorded, and
+neither is the `user:password` of a URL (stored as `https://***@...`).
 
 **Local tags.** An entry's `model` is the provider's name for it; override it in the user or project
 file to use the tag your machine has, keeping the registry id your code uses. For example, with Gemma 4

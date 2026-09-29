@@ -33,8 +33,8 @@ retries are `structured_retry` events. LiteLLM models retry inside LiteLLM, with
 messages, outputs, variables, params, decision content, and a generation call's prompt, error and text
 inputs (lyrics, for example; numbers and file records stay readable) only as `{"sha256", "len"}`.
 
-**Secrets.** Headers are never recorded; the value of every `api_key_env` in use, and anything shaped like
-a bearer token or `sk-...` key, is replaced with `***` before writing. Register other values with
+**Secrets.** Headers are never recorded; the value of every `api_key_env` in use, anything shaped like
+a bearer token or `sk-...` key, and the `user:password` of a URL are replaced with `***` before writing. Register other values with
 `mk.records.add_secret(value)`.
 
 **Reading records.** `mk.records.read_spans(path)` returns every span of a SQLite store, oldest first;

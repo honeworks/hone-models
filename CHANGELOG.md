@@ -23,6 +23,11 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
   GPU before decoding) fits an 8 GB card; new lyrics format `heartmula` (D-073, D-076).
 
 ### Added
+- Endpoints and keys from the environment ([0017](design/changes/0017-settings-from-the-environment.md)):
+  `base_url_env` on a registry entry names the variable holding its base URL (it wins over `base_url`;
+  unset with no `base_url` is a `ConfigError` before any request). `mk.registry.load()` exports the unset
+  variables of `$HONE_ENV_FILE` and `./.env`, once per file per process. Record sinks replace a URL's
+  `user:password` with `***` (AC-35).
 - Packaged ComfyUI workflows (`hone_models/data/workflows/<id>.json`) for every ComfyUI model installed on
   the reference machine: `z-image-turbo`, `ace-step-1.5-turbo` / `-xl-turbo` / `-xl-sft`,
   `minimax-music3`, `yue2-3b`, `stable-audio-open-1.0`,

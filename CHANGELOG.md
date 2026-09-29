@@ -12,6 +12,9 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
 [0003 examples set and a scriptable FakeOllama](design/changes/0003-examples-and-scriptable-fake-ollama.md).
 
 ### Changed
+- `disabled = "<reason>"` on a registry entry: the model stays in the catalog but every call refuses with the
+  reason and selection skips it; `songgeneration-v2-medium` is disabled until its runtime matches its
+  checkpoint (D-080).
 - `gemma4-12b`'s packaged licence is Apache-2.0 (Gemma 4's model card), not "Gemma Terms of Use". The
   machine snapshot checks only ComfyUI servers of entries that have a workflow
   ([decisions.md](design/decisions.md) D-066, D-067). With the packaged workflows it now checks the local

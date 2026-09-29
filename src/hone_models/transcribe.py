@@ -32,7 +32,7 @@ from .errors import CapabilityError, ConfigError
 from .ports import RecordSink
 from .providers import TRANSCRIBE, TRANSCRIBE_READY, lookup, model_attributes
 from .records import default_sink
-from .registry import ModelConfig, Registry, load
+from .registry import ModelConfig, Registry, load, require_client
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,4 +179,5 @@ def transcriber(
         raise ConfigError(
             f"model {cfg.id!r} is a {cfg.kind} model; mk.transcriber() takes transcription models"
         )
+    require_client(cfg)  # a disabled entry refuses here, like every other client factory (D-080)
     return Transcriber(cfg, sink or default_sink())

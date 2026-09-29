@@ -73,6 +73,7 @@ class ModelConfig(BaseModel):
     defaults: dict[str, Any] = {}
     capabilities: Capabilities = Capabilities()
     max_timeout_s: float = 600.0
+    disabled: str | None = None  # why this known entry must not be called now (a TODO); calls raise
     # generation entries (change 0015 §3): `inputs` is a table of workflow paths for `comfyui`, a list of
     # extra input names for the other providers
     workflow: str | None = None  # an API-format ComfyUI workflow; absolute once loaded
@@ -150,8 +151,11 @@ ADHOC: dict[str, dict[str, Any]] = {
 
 
 def require_client(cfg: ModelConfig) -> None:
-    """A `ConfigError` for a catalog entry of a kind hone-models cannot call yet (§3b), or one whose
-    `base_url_env` is unset and that has no `base_url` (change 0017)."""
+    """A `ConfigError` for a catalog entry of a kind hone-models cannot call yet (§3b), one marked
+    `disabled` with its reason, or one whose `base_url_env` is unset and that has no `base_url` (change
+    0017)."""
+    if cfg.disabled:
+        raise ConfigError(f"model {cfg.id!r} is disabled: {cfg.disabled}")
     if cfg.base_url_env and not cfg.base_url:
         raise ConfigError(
             f"model {cfg.id!r} needs a base URL: set the environment variable {cfg.base_url_env} "
@@ -210,7 +214,8 @@ class Registry:
         if prefer is not None and prefer not in PREFER:
             raise ConfigError(f"unknown prefer={prefer!r}; choose one of {sorted(PREFER)}")
         require = dict(require or {})
-        found = sorted((m for m in self.models.values() if m.kind == kind and not unmet(m, require)),
+        found = sorted((m for m in self.models.values()
+                        if m.kind == kind and not m.disabled and not unmet(m, require)),
                        key=lambda m: m.id)  # fmt: skip
         return sorted(found, key=PREFER[prefer]) if prefer else found
 

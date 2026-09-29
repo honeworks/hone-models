@@ -51,7 +51,7 @@ import hone_models as mk
 angles = mk.select({"features": ["camera angle"]}, kind="image")
 print([m.id for m in angles])  # ['qwen-image-edit-2511']
 songs = mk.select({"features": ["lyrics"]}, kind="music")
-assert "songgeneration-v2-medium" in [m.id for m in songs]
+assert "heartmula-3b" in [m.id for m in songs]  # a disabled entry (songgeneration-v2-medium) is skipped
 assert mk.select({"features": ["camera angle", "lyrics"]}, kind="image") == []
 ```
 

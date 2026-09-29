@@ -27,7 +27,7 @@ except ImportError as exc:  # pragma: no cover - tested in a subprocess
 from .calls import call_stats, duration_ms, find_calls
 from .errors import HoneModelsError
 from .records import default_store, read_spans
-from .registry import ModelConfig, load, remember_speed
+from .registry import GENERATION_KEYS, ModelConfig, load, remember_speed
 from .text import text
 
 app = typer.Typer(no_args_is_help=True, help="Inspect hone-models registry and call records.")
@@ -72,8 +72,10 @@ def show(data: Any, as_json: bool) -> None:
 
 
 def describe(cfg: ModelConfig) -> dict[str, Any]:
-    """The `--json` shape of one model: its config plus `name` and `local`."""
-    return {**cfg.model_dump(mode="json"), "name": cfg.name, "local": cfg.local}
+    """The `--json` shape of one model: its config plus `name` and `local`; the generation keys (change
+    0015) only when the entry sets them."""
+    unset = {key for key in GENERATION_KEYS if getattr(cfg, key) is None}
+    return {**cfg.model_dump(mode="json", exclude=unset), "name": cfg.name, "local": cfg.local}
 
 
 @models_app.command("list")

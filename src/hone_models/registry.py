@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import tomllib
 from collections.abc import Callable, Iterable, Mapping
 from importlib import resources
@@ -20,44 +21,35 @@ from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError, field_validator, model_validator
 
+from ._registry_shapes import (
+    Capabilities,
+    Guide,
+    Install,
+    NodeMapping,
+    PromptInput,
+    check_node_mapping,
+    shape_errors,
+)
+from ._registry_shapes import Price as Price  # noqa: PLC0414 - re-exported: `hone_models.registry.Price`
 from .errors import CapabilityError, ConfigError
 
-Provider = Literal["ollama", "openai_compatible", "litellm", "jev", "kokoro", "chatterbox"]
-Kind = Literal["chat", "embedding", "decision", "speech"]
+Provider = Literal[
+    "ollama", "openai_compatible", "litellm", "jev", "kokoro", "chatterbox",
+    "comfyui", "command", "faster_whisper",
+]  # fmt: skip
+Kind = Literal["chat", "embedding", "decision", "speech", "image", "music", "video", "transcription"]
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}  # noqa: S104 - a host name to compare, not a bind
-
-
-class Price(BaseModel):
-    """USD per million tokens."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-    input_per_mtok: float = 0.0
-    output_per_mtok: float = 0.0
-
-
-class Capabilities(BaseModel):
-    """What a model can do. `None` means unknown (not declared and not probed)."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-    vision: bool | None = None
-    thinking: bool | None = None
-    json_schema: bool | None = None
-    logprobs: bool | None = None
-    max_input_tokens: int | None = None
-    max_output_tokens: int | None = None
-    vram_gb: float | None = None
-    license: str | None = None
-    dimensions: int | None = None
-    questions: list[str] | None = None
-    calibrated: bool | None = None
-    price: Price | None = None
-    speed_tok_s: float | None = None
-    voices: list[str] | None = None
-    expressive: bool | None = None
-    image_tokens: int | None = None  # a flat prompt cost per image (change 0013)
-    image_patch_px: int | None = None  # else one token per square of this many pixels (Qwen2.5-VL: 28)
+MEDIA_KINDS = ("image", "music", "video")
+# `max_timeout_s` when an entry does not set it (change 0015 §3): generation takes minutes.
+KIND_TIMEOUT_S = {"image": 600.0, "music": 1800.0, "video": 3600.0, "transcription": 600.0}
+COMFYUI_URL = "http://127.0.0.1:8188"
+# Entry keys of generation models, all `None` on other entries.
+GENERATION_KEYS = (
+    "workflow", "inputs", "outputs", "command", "cwd", "env",
+    "lyrics_format", "prompt_inputs", "guide", "install",
+)  # fmt: skip
 
 
 class ModelConfig(BaseModel):
@@ -73,6 +65,35 @@ class ModelConfig(BaseModel):
     defaults: dict[str, Any] = {}
     capabilities: Capabilities = Capabilities()
     max_timeout_s: float = 600.0
+    # generation entries (change 0015 §3): `inputs` is a table of workflow paths for `comfyui`, a list of
+    # extra input names for the other providers
+    workflow: str | None = None  # an API-format ComfyUI workflow; absolute once loaded
+    inputs: dict[str, NodeMapping] | list[str] | None = None
+    outputs: list[str] | None = None
+    command: list[str] | None = None
+    cwd: str | None = None
+    env: dict[str, str] | None = None
+    lyrics_format: Literal["sections", "levo", "plain"] | None = None
+    prompt_inputs: dict[str, PromptInput] | None = None
+    guide: Guide | None = None
+    install: Install | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _by_kind_and_provider(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        raw: dict[str, Any] = dict(data)  # pyright: ignore[reportUnknownArgumentType]
+        errors = shape_errors(str(raw.get("provider")), raw)
+        if errors:
+            raise ValueError("; ".join(errors))
+        raw.setdefault("max_timeout_s", KIND_TIMEOUT_S.get(str(raw.get("kind", "chat")), 600.0))
+        return raw
+
+    @field_validator("inputs")
+    @classmethod
+    def _inputs(cls, value: dict[str, NodeMapping] | list[str] | None) -> Any:
+        return check_node_mapping(value) if isinstance(value, dict) else value
 
     @property
     def name(self) -> str:
@@ -81,12 +102,20 @@ class ModelConfig(BaseModel):
 
     @property
     def local(self) -> bool:
-        """True when the model runs on this machine (Ollama, or an OpenAI-compatible server on localhost)."""
-        if self.provider in ("ollama", "kokoro", "chatterbox"):
+        """True when the model runs on this machine: Ollama, the in-process and `command` models, and a
+        ComfyUI or OpenAI-compatible server on this host."""
+        if self.provider in ("ollama", "kokoro", "chatterbox", "command", "faster_whisper"):
             return True
+        if self.provider == "comfyui":
+            return urlparse(self.comfyui_url).hostname in LOCAL_HOSTS
         if self.provider == "openai_compatible" and self.base_url:
             return urlparse(self.base_url).hostname in LOCAL_HOSTS
         return False
+
+    @property
+    def comfyui_url(self) -> str:
+        """A `comfyui` entry's server: `base_url`, else `HONE_COMFYUI_URL`, else `COMFYUI_URL`."""
+        return (self.base_url or os.environ.get("HONE_COMFYUI_URL") or COMFYUI_URL).rstrip("/")
 
 
 # Prefixes accepted in ad-hoc ids ("ollama:llama3.2:1b") and the config they imply.
@@ -186,7 +215,9 @@ def default_paths() -> list[Path]:
 def load(paths: Iterable[str | Path] | str | Path | None = None) -> Registry:
     """Load the packaged defaults, then user and project files if present, then `paths` (must exist)."""
     packaged = resources.files("hone_models").joinpath("data/models.toml").read_text(encoding="utf-8")
-    merged: dict[str, Any] = tomllib.loads(packaged).get("models", {})
+    merged = _with_workflow_paths(
+        tomllib.loads(packaged).get("models", {}), Path(str(resources.files("hone_models"))) / "data"
+    )
     if isinstance(paths, str | Path):
         paths = [paths]
     explicit = [Path(p) for p in paths or ()]
@@ -208,7 +239,16 @@ def _read_models(path: Path) -> dict[str, Any]:
         raise ConfigError(
             f"registry file {path}: unknown top-level keys {sorted(unknown)}; use [models.<id>]"
         )
-    return data.get("models", {})
+    return _with_workflow_paths(data.get("models", {}), path.parent)
+
+
+def _with_workflow_paths(models: dict[str, Any], folder: Path) -> dict[str, Any]:
+    """`models` with each relative `workflow` made absolute against the folder of the file declaring it."""
+    for model_id, entry in models.items():
+        raw: dict[str, Any] = entry if isinstance(entry, dict) else {}  # pyright: ignore[reportUnknownVariableType]
+        if isinstance(raw.get("workflow"), str):  # an absolute path stays as is
+            models[model_id] = {**raw, "workflow": str(folder / Path(raw["workflow"]).expanduser())}
+    return models
 
 
 def _parse(model_id: str, raw: Mapping[str, Any]) -> ModelConfig:

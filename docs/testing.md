@@ -75,7 +75,8 @@ scripts the next jobs (`"node_errors"`, `"execution_error"`, `"hang"`, `"no_outp
 did; `FakeComfyUI(jobs_api=False)` behaves like an older server. `python -m
 hone_models.testing.fake_comfyui --port 8188` serves one in the foreground, a stand-in for
 `HONE_COMFYUI_START`. `FakeMedia` and `FakeMedia.like(model_id)` stand in for the clients themselves
-([generation.md](generation.md#testing)).
+([generation.md](generation.md#testing)). `FakeTranscriber` does the same for `mk.transcriber`
+([transcription.md](transcription.md#testing)).
 
 ```python
 from hone_models.testing import FakeComfyUI

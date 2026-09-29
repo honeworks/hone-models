@@ -32,6 +32,9 @@ records every call so you can see and replay what happened.
   entry per model: named inputs mapped onto workflow nodes, files uploaded once by hash, a GPU lease per
   call or session, failed jobs as results with an `error_kind`
   ([docs/generation.md](https://github.com/honeworks/hone-models/blob/main/docs/generation.md)).
+- **Transcription with word timestamps** (`mk.transcriber`, extra `transcribe`) with faster-whisper, in
+  process, a GPU lease per call or session
+  ([docs/transcription.md](https://github.com/honeworks/hone-models/blob/main/docs/transcription.md)).
 - **Every call recorded** as an OpenTelemetry-style span in a local SQLite file, prompt sections included,
   and replayable with changes.
 
@@ -54,6 +57,7 @@ The core needs only pydantic and httpx. Optional extras:
 | `litellm` | hosted models through LiteLLM | the provider's API key in an environment variable |
 | `speech` | local text to speech with Kokoro-82M | Python < 3.13, torch; spaCy's English model ([docs/speech.md](https://github.com/honeworks/hone-models/blob/main/docs/speech.md)) |
 | `expressive` | expressive speech with Chatterbox (emotion and intensity) | Python < 3.13, torch; dependency overrides ([docs/speech.md](https://github.com/honeworks/hone-models/blob/main/docs/speech.md)) |
+| `transcribe` | transcription with word timestamps (faster-whisper) | on a GPU, the CUDA 12 cuBLAS and cuDNN 9 wheels ([docs/transcription.md](https://github.com/honeworks/hone-models/blob/main/docs/transcription.md)) |
 
 `jev` is an empty extra: the Jev decision provider needs nothing beyond the core (it calls the API over httpx).
 

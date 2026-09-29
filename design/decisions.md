@@ -259,3 +259,33 @@ succeeds when the project is set up), next to `source`, `ollama`, `files` (`repo
 `size_gb`, `tier` (1, 2 or 3) and `note`; other keys are an error. The catalog step may add fields.
 Part of [0015](changes/0015-generation-models.md).
 No review needed.
+
+## D-050: transcription details the record left open
+The span also records `hone.models.transcribe.prompt` (content, only when given), because Whisper's
+`initial_prompt` changes what is heard, and `session` / `loaded` as speech spans do.
+`hone.models.transcribe.language` is set to the language asked for when the span opens and to the
+language of the transcript when it ends, so a failed call still shows what was asked. `Transcript.text`
+joins the segments' texts with a space; segment and word texts are stripped of faster-whisper's leading
+spaces; times are rounded to milliseconds. `timeout_s` cannot interrupt CTranslate2 mid-segment, so
+decoding stops between segments (faster-whisper decodes while its segment generator is read) and
+`ModelTimeout` is raised; a segment covers at most 30 s of audio. `FakeTranscriber` hears a scripted
+`text` (one segment per line, words 0.4 s apart) rather than reading the audio. The user guide is its own
+page, `docs/transcription.md`. Part of [0015](changes/0015-generation-models.md).
+No review needed.
+
+## D-051: how faster-whisper finds the CUDA 12 cuBLAS and cuDNN 9 libraries
+CTranslate2's Linux wheel does not link cuBLAS or cuDNN; it `dlopen`s `libcublas.so.12` and
+`libcudnn.so.9` by name the first time a model runs on CUDA, and fails in the middle of the call when
+they are missing (this machine has only CUDA 13 system-wide). Before the GPU lease, when the entry runs
+on CUDA (`defaults.device`, or `auto` with `ctranslate2.get_cuda_device_count() > 0`), the provider loads
+each library with `ctypes.CDLL(..., RTLD_GLOBAL)`: first by name (the system library path,
+`LD_LIBRARY_PATH`, or a library torch already loaded), then from `nvidia/cublas/lib` and
+`nvidia/cudnn/lib` under each `sys.path` entry, where the `nvidia-cublas-cu12` / `nvidia-cudnn-cu12`
+wheels put them (they carry `RUNPATH=$ORIGIN`, so cuBLASLt and cuDNN's sub-libraries load next to them).
+A library loaded this way satisfies CTranslate2's later `dlopen` by name. When neither place has one,
+`ConfigError` names the missing libraries and the wheels to install, or `defaults.device = "cpu"`. The
+wheels are not in the `transcribe` extra: they are Linux-only, large, and already present wherever a
+CUDA 12 torch is installed (the speech extras); as with Kokoro's spaCy model in
+[0008](changes/0008-speech-extra-and-the-spacy-model.md), the user installs them and the call checks
+first. Found libraries are remembered for the process. Part of [0015](changes/0015-generation-models.md).
+No review needed.

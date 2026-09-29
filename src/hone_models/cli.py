@@ -4,7 +4,8 @@ hone-models models list [--kind K] [--feature F] [--installed | --missing] [--ti
 hone-models models show <id> [--json]
 hone-models models guide [<id>] [--json] [--stale DAYS]   what a model takes; guides not checked lately
 hone-models models install <id> [--run]      print the commands that fetch a model (--run: run them)
-hone-models models check <id> [--json]        smoke call; measured tokens/s saved as speed_tok_s
+hone-models models check <id> [--json]        smoke call: chat tokens/s saved as speed_tok_s; media: a
+                                              tiny job, its output and peak GPU memory
 hone-models calls list [--since 1d] [--model X] [--json]
 hone-models calls show <span_id>
 hone-models calls stats [--by model|provider|tag] [--json]
@@ -26,12 +27,13 @@ try:
 except ImportError as exc:  # pragma: no cover - tested in a subprocess
     raise SystemExit("the hone-models CLI needs the 'cli' extra: pip install 'hone-models[cli]'") from exc
 
-from . import catalog
+from . import _media_check, catalog
 from .calls import call_stats, duration_ms, find_calls
 from .errors import HoneModelsError
 from .guide import build, stale
+from .media import image, music, video
 from .records import default_store, read_spans
-from .registry import GENERATION_KEYS, ModelConfig, Registry, load, remember_speed, unmet
+from .registry import GENERATION_KEYS, MEDIA_KINDS, ModelConfig, Registry, load, remember_speed, unmet
 from .text import text
 
 app = typer.Typer(no_args_is_help=True, help="Inspect hone-models registry and call records.")
@@ -199,10 +201,26 @@ def _install_plan(cfg: ModelConfig) -> list[str]:
 
 
 @models_app.command("check")
-def models_check(model_id: str, registry: RegistryOption = None, as_json: JsonOption = False) -> None:
-    """Smoke-call a chat model; save the measured tokens/s to the user registry as speed_tok_s."""
+def models_check(
+    model_id: str,
+    registry: RegistryOption = None,
+    as_json: JsonOption = False,
+    out: Annotated[
+        Path | None, typer.Option(help="Media: folder for the tiny output ($HONE_HOME/models/checks).")
+    ] = None,
+) -> None:
+    """Smoke-call a model. Chat: save the measured tokens/s to the user registry as speed_tok_s. Image,
+    music, video: run a tiny job in a session and report the output and the peak GPU memory."""
     with user_errors():
         reg = load(registry)
+        kind = reg.get(model_id).kind
+        if kind in MEDIA_KINDS:
+            client = {"image": image, "music": music, "video": video}[kind](model_id, registry=reg)
+            found = _media_check.check(client, out or _media_check.default_out_dir())
+            if found["error"]:
+                raise fail(f"{model_id}: {found['error']}")
+            show(found, as_json)
+            return
         llm = text(model_id, registry=reg)
         start = time.monotonic()
         r = llm.complete(SMOKE_PROMPT, max_tokens=64)

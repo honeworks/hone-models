@@ -53,7 +53,8 @@ def test_a_file_that_is_not_utf8(tmp_path: Path) -> None:
 
 def test_each_file_is_read_once_and_never_overwrites(isolated: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     for name in ("ENVF_A", "ENVF_B"):
-        monkeypatch.delenv(name, raising=False)
+        monkeypatch.setenv(name, "")  # registers a restore, so a value set later is removed
+        monkeypatch.delenv(name)
     monkeypatch.setenv("ENVF_B", "shell")
     path = write(isolated, "ENVF_A=first\nENVF_B=file\n")
     apply_env_files()
@@ -73,7 +74,8 @@ def judge(base_url: str | None = None) -> ModelConfig:
 
 
 def test_base_url_env_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("ENVF_URL", raising=False)
+    monkeypatch.setenv("ENVF_URL", "")  # registers a restore, so a value set later is removed
+    monkeypatch.delenv("ENVF_URL")
     unset = judge()
     assert unset.base_url is None
     with pytest.raises(ConfigError, match="ENVF_URL"):
@@ -93,7 +95,8 @@ def test_url_credentials_are_scrubbed() -> None:
 
 
 def test_a_decision_model_needs_its_url_variable_too(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("ENVF_URL", raising=False)
+    monkeypatch.setenv("ENVF_URL", "")  # registers a restore, so a value set later is removed
+    monkeypatch.delenv("ENVF_URL")
     cfg = ModelConfig(id="j", provider="jev", kind="decision", base_url_env="ENVF_URL")
     registry = Registry({"j": cfg})
     with pytest.raises(ConfigError, match="ENVF_URL"):

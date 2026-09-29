@@ -26,7 +26,8 @@ NAMES = ("JUDGES_BASE_URL", "JUDGES_API_KEY", "AC35_QUOTED", "AC35_SINGLE", "AC3
 def env(isolated: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """No judge variables set; any a `.env` file sets are removed after the test."""
     for name in NAMES:
-        monkeypatch.delenv(name, raising=False)
+        monkeypatch.setenv(name, "")  # registers a restore, so a value set later is removed
+        monkeypatch.delenv(name)
     return isolated
 
 

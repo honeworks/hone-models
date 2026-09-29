@@ -57,5 +57,7 @@ def test_kill_mid_write_then_reopen(tmp_path: Path) -> None:
 
 def test_a_store_still_being_created_has_no_committed_spans(tmp_path: Path) -> None:
     db = tmp_path / "s.db"
-    sqlite3.connect(db).execute("PRAGMA journal_mode=WAL")  # the writer's first step: a file, no tables yet
+    conn = sqlite3.connect(db)
+    conn.execute("PRAGMA journal_mode=WAL")  # the writer's first step: a file, no tables yet
+    conn.close()
     assert committed_spans(db) == 0

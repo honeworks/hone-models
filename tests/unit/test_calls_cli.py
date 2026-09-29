@@ -2,6 +2,7 @@ import json
 import tomllib
 from datetime import UTC, datetime
 
+import httpx
 import pytest
 import respx
 from typer.testing import CliRunner
@@ -208,3 +209,30 @@ def test_user_registry_round_trips_any_text() -> None:
         "m": {"provider": "ollama", "license": 'café 😀 "q" \\ \x7f\n', "defaults": {"stop": ["a", "b"]}}
     }
     assert tomllib.loads(to_toml(models)) == {"models": models}
+
+
+def test_models_check_warm_call_failure_exits_and_saves_nothing(isolated, monkeypatch) -> None:
+    ticks = iter([0.0, 2.0, 2.0, 4.0])
+    monkeypatch.setattr("hone_models.cli.time.monotonic", lambda: next(ticks))
+    monkeypatch.setattr("hone_models._http.time.sleep", lambda s: None)  # retries without waiting
+    user = isolated / "home" / ".config" / "hone" / "models.toml"
+    with respx.mock(base_url=URL) as mock:
+        mock.post("/api/chat").side_effect = [respx.MockResponse(json=reply("OK", tokens=10))] + [
+            httpx.ConnectError("dropped")
+        ] * 10
+        result = runner.invoke(app, ["models", "check", "gemma4-12b", "--json"])
+    assert result.exit_code == 1  # a transport failure is an exception, not a result.error
+    assert not user.exists()
+
+
+def test_models_check_load_time_is_never_negative(isolated, monkeypatch) -> None:
+    ticks = iter([0.0, 0.1, 0.1, 1.1])  # a smoke call faster than its tokens at the warm speed
+    monkeypatch.setattr("hone_models.cli.time.monotonic", lambda: next(ticks))
+    with respx.mock(base_url=URL) as mock:
+        mock.post("/api/chat").side_effect = [
+            respx.MockResponse(json=reply("OK", tokens=50)),
+            respx.MockResponse(json=reply("The sea ...", tokens=100)),
+        ]
+        result = runner.invoke(app, ["models", "check", "gemma4-12b", "--json"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["load_s"] == 0.0

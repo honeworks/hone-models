@@ -244,7 +244,9 @@ def _chat_check(llm: TextClient) -> dict[str, Any]:
     smoke, first_s = _timed(llm, SMOKE_PROMPT, SMOKE_TOKENS)
     if smoke.error:
         raise fail(f"{llm.config.id}: {smoke.error}")
-    timed, seconds = _timed(llm, SPEED_PROMPT, SPEED_TOKENS)  # cut at the limit or thinking-only: still timed
+    # a transport failure raises (like the smoke call); an answer problem (cut at the limit, thinking only)
+    # still produced tokens, which is what is timed
+    timed, seconds = _timed(llm, SPEED_PROMPT, SPEED_TOKENS)
     tokens = timed.usage.get("output_tokens")
     speed = tokens / seconds if tokens and seconds > 0 else None
     smoke_tokens = smoke.usage.get("output_tokens")

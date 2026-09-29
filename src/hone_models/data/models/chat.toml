@@ -112,6 +112,7 @@ provider = "ollama"
 kind = "chat"
 model = "hf.co/bartowski/Altworld_Hemmingway-1-GGUF:Q4_K_M"
 [models."hemmingway-1".capabilities]
+thinking = true
 license = "CC-BY-NC-4.0"
 commercial_use = false     # owner (2026-09-29): still a real option for published songs
 [models."hemmingway-1".install]
@@ -131,6 +132,7 @@ provider = "ollama"
 kind = "chat"
 model = "muse-glimmer:latest"
 [models."muse-glimmer-30b".capabilities]
+thinking = true
 license = "Apache-2.0"
 commercial_use = true
 [models."muse-glimmer-30b".install]
@@ -335,6 +337,7 @@ provider = "ollama"
 kind = "chat"
 model = "hf.co/mradermacher/Qwen3.6-35B-A3B-StyleTune-GGUF:Q4_K_M"
 [models."qwen3.6-35b-a3b-styletune".capabilities]
+thinking = true
 license = "Apache-2.0"
 commercial_use = true
 [models."qwen3.6-35b-a3b-styletune".install]
@@ -391,6 +394,7 @@ provider = "ollama"
 kind = "chat"
 model = "hf.co/mradermacher/Nemotron-3.5-30B-A3B-Antislop-FTPO-GGUF:Q4_K_M"
 [models."nemotron-3.5-30b-a3b-antislop".capabilities]
+thinking = true
 license = "OpenMDW-1.1"
 commercial_use = true
 [models."nemotron-3.5-30b-a3b-antislop".install]
@@ -428,6 +432,7 @@ provider = "ollama"
 kind = "chat"
 model = "qwen3.8:27b"
 [models."qwen3.8-27b".capabilities]
+thinking = true
 license = "Apache-2.0"
 commercial_use = true
 [models."qwen3.8-27b".install]
@@ -447,6 +452,7 @@ provider = "ollama"
 kind = "chat"
 model = "qwen3.6-27b:latest"
 [models."qwen3.6-27b".capabilities]
+thinking = true
 license = "Apache-2.0"
 commercial_use = true
 [models."qwen3.6-27b".install]
@@ -465,6 +471,7 @@ provider = "ollama"
 kind = "chat"
 model = "qwen3.6-35b-a3b:latest"
 [models."qwen3.6-35b-a3b".capabilities]
+thinking = true
 license = "Apache-2.0"
 commercial_use = true
 [models."qwen3.6-35b-a3b".install]
@@ -483,6 +490,7 @@ provider = "ollama"
 kind = "chat"
 model = "gemma4-26b-a4b:latest"
 [models."gemma4-26b-a4b".capabilities]
+thinking = true
 license = "Apache-2.0"
 commercial_use = true
 [models."gemma4-26b-a4b".install]
@@ -501,6 +509,7 @@ provider = "ollama"
 kind = "chat"
 model = "gemma4:31b"
 [models."gemma4-31b".capabilities]
+thinking = true
 license = "Apache-2.0"
 commercial_use = true
 [models."gemma4-31b".install]
@@ -519,6 +528,7 @@ provider = "ollama"
 kind = "chat"
 model = "nemotron-3.5-lightning:latest"
 [models."nemotron-3.5-lightning".capabilities]
+thinking = true
 license = "OpenMDW-1.1"
 commercial_use = true
 [models."nemotron-3.5-lightning".install]
@@ -594,6 +604,7 @@ provider = "ollama"
 kind = "chat"
 model = "ornith-1.5:9b"
 [models."ornith-1.5-9b".capabilities]
+thinking = true
 license = "MIT"
 commercial_use = true
 [models."ornith-1.5-9b".install]
@@ -612,6 +623,7 @@ provider = "ollama"
 kind = "chat"
 model = "ornith-1.5:35b"
 [models."ornith-1.5-35b".capabilities]
+thinking = true
 license = "MIT"
 commercial_use = true
 [models."ornith-1.5-35b".install]

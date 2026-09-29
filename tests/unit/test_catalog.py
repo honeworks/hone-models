@@ -257,3 +257,18 @@ def test_a_packaged_id_declared_twice_is_refused(monkeypatch: pytest.MonkeyPatch
     with pytest.raises(ConfigError, match=r"\['same'\] declared again in data/models/b.toml"):
         mk.registry.load()
     assert os.environ.get("HONE_COMFYUI_DIR")  # the test isolation keeps installed checks offline
+
+
+THINKING = [  # Ollama's /api/show lists `thinking` for these (the tunes not installed here: their base)
+    "gemma4-12b", "gemma4-26b-a4b", "gemma4-31b", "deepseek-r1-8b", "deepseek-r1-14b", "deepseek-r1-32b",
+    "gpt-oss-20b", "hemmingway-1", "muse-glimmer-30b", "qwen3.8-27b", "qwen3.6-27b", "qwen3.6-35b-a3b",
+    "qwen3.6-35b-a3b-styletune", "pantheon-reasoning-26b-a4b", "nemotron-3.5-lightning",
+    "nemotron-3.5-30b-a3b-antislop", "ornith-1.5-9b", "ornith-1.5-35b",
+]  # fmt: skip
+
+
+def test_thinking_models_declare_it_so_think_false_is_sent() -> None:
+    chat = {m.id: m for m in mk.registry.load().models.values() if m.kind == "chat"}
+    assert [i for i in THINKING if not chat[i].capabilities.thinking] == []
+    others = [i for i, m in chat.items() if m.capabilities.thinking and i not in THINKING]
+    assert others == []  # e.g. the Gemma 4 StyleTunes: Ollama reports no thinking for them

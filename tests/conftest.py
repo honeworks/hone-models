@@ -5,6 +5,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import shutil
 import urllib.request
 from collections.abc import Iterator
 from pathlib import Path
@@ -102,3 +103,13 @@ def ollama_model(gpu_lock: None):
             urllib.request.urlopen(req, timeout=30).read()  # noqa: S310
         except OSError:
             pass
+
+
+@pytest.fixture
+def real_out(request: pytest.FixtureRequest) -> Iterator[Path]:
+    """A folder for the files a real model writes, under the repository's `.hone/`; removed afterwards."""
+    folder = REAL_OUT / request.node.name.replace("/", "_")
+    shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir(parents=True)
+    yield folder
+    shutil.rmtree(folder, ignore_errors=True)

@@ -1,0 +1,18 @@
+{
+  "created": 1759132800,
+  "background": "opaque",
+  "output_format": "png",
+  "quality": "low",
+  "size": "1024x1024",
+  "data": [
+    {
+      "b64_json": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAAAAAA6mKC9AAAADUlEQVR4nGNgGAXIAAABEAABoJMRpQAAAABJRU5ErkJggg==",
+      "revised_prompt": "A lighthouse on a rocky coast at dusk, painted in thick oil strokes."
+    }
+  ],
+  "usage": {
+    "input_tokens": 12,
+    "output_tokens": 272,
+    "total_tokens": 284
+  }
+}

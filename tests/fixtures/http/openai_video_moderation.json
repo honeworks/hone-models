@@ -1,0 +1,14 @@
+{
+  "id": "video_68d7512d07848190b3e45da0ecbebcde",
+  "object": "video",
+  "created_at": 1759132800,
+  "model": "sora-2",
+  "seconds": "4",
+  "size": "720x1280",
+  "status": "failed",
+  "progress": 0,
+  "error": {
+    "code": "moderation_blocked",
+    "message": "Your request was blocked by our moderation system."
+  }
+}

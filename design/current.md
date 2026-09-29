@@ -251,7 +251,7 @@ it applies emotion and intensity in `capabilities.expressive`.
 | Provider | Talks to | Notes |
 |---|---|---|
 | `ollama` | `/api/chat`, `/api/embed`, `/api/show`, `/api/tags` | `think` handling; `format=<schema>`; images as base64; `options.num_ctx` from the context budget; `keep_alive` for unload |
-| `openai_compatible` | `/v1/chat/completions`, `/v1/embeddings` | `response_format` JSON schema when supported; token logprobs when returned; covers llama.cpp, vLLM, LM Studio, Ollama's `/v1`, OpenAI |
+| `openai_compatible` | `/v1/chat/completions`, `/v1/embeddings`; for image and video entries `/v1/images/generations`, `/v1/images/edits`, `/v1/videos` | `response_format` JSON schema when supported; token logprobs when returned; covers llama.cpp, vLLM, LM Studio, Ollama's `/v1`, OpenAI. Images: `references` go to `/images/edits` as multipart `image[]`; a `b64_json` answer is decoded to the output file, a `url` answer downloaded without the API key; `revised_prompt` recorded; inputs `size`, `n`, `references` plus the names the entry lists (`quality`, `background`), sent as request fields; no `response_format` is sent unless the entry lists and sets it (D-030). Video: inputs `size`, `duration_s` (sent as `seconds`), `image` (multipart `input_reference`); `GET /videos/{id}` polled every 5 s with a `progress` event per 10 %, then `/videos/{id}/content`; a submitted job is never submitted again, polling gives up after 5 transient errors in a row (`ProviderError` naming the job id); on timeout or any exception while waiting `DELETE /videos/{id}`; a moderation refusal (HTTP 4xx at submission, or a failed job) and a `failed` job are `result.error` (`refused` / `failed`) ([0015](changes/0015-generation-models.md)) |
 | `litellm` (extra) | any model LiteLLM knows | same OpenAI-shaped body; LiteLLM retries transient errors itself |
 | `kokoro` (extra `speech`) | Kokoro-82M in-process (torch) | speech-only; English voices need spaCy's `en_core_web_sm`, installed by the user (not on PyPI): without it `synthesize` raises `ConfigError` before the lease ([0008](changes/0008-speech-extra-and-the-spacy-model.md)); weights from Hugging Face (`hexgrad/Kokoro-82M`) on first use into `HF_HOME`; loaded per call inside a GPU lease and freed afterwards; 24 kHz; `defaults.device` overrides CUDA / CPU |
 | `chatterbox` (extra `expressive`) | Chatterbox (Resemble AI, MIT) in-process (torch) | speech-only, expressive: intensity sets `exaggeration` (0.25 + intensity), the emotion sets `cfg_weight` (pacing); voices are packaged reference clips rendered by Kokoro's synthetic voices, plus the voice bundled with the weights; weights (about 3 GB) from `ResembleAI/chatterbox` on first use; loaded per call inside a 5 GB lease and freed afterwards; 24 kHz; `speed` by time-stretching; `defaults.seed` (0) |
@@ -474,7 +474,7 @@ OpenTelemetry GenAI names where they exist, `hone.models.*` otherwise:
 | `hone.models.media.prompt` | image / music / video spans: the prompt; content |
 | `hone.models.media.inputs` | every other input; file inputs as `{"path", "sha256", "bytes"}`; its text values (lyrics) are content |
 | `hone.models.media.outputs` | `[{"path", "sha256", "bytes", "mime", "width", "height", "duration_s"}]` |
-| `hone.models.media.{job_id,workflow_sha256}` | the provider's job id; the ComfyUI workflow's SHA-256 |
+| `hone.models.media.{job_id,workflow_sha256,revised_prompt}` | the provider's job id; the ComfyUI workflow's SHA-256; a hosted image model's rewrite of the prompt (content) |
 | `hone.models.media.{session,loaded,freed,server_started,queue_wait_ms}` | in a session; this call loaded the model / freed it / found the server started by its session; ms queued before running |
 | `hone.models.media.{error,error_kind}` | as on the result; the error is content |
 | `hone.models.media.{license,commercial_use,cost_estimated}` | from the registry; `cost_estimated` when `hone.models.cost_usd` is the naive flat-price estimate |
@@ -484,7 +484,8 @@ OpenTelemetry GenAI names where they exist, `hone.models.*` otherwise:
 | `hone.schema_version`, and `hone.run_id`, `hone.item`, `hone.step`, `hone.candidate_id`, `hone.scorer`, `hone.lens.finding_id` | on every span; the last six copied from the trace context when present |
 
 HTTP retries are `retry` events; structured-output retries are `structured_retry` events; a generation
-job cancelled at the provider is a `cancelled` event. No file bytes are recorded. Not recorded
+job cancelled at the provider is a `cancelled` event; a hosted video job's progress is a `progress` event
+(`percent`, `status`) at most once per 10 %. No file bytes are recorded. Not recorded
 in 0.1: `hone.models.timing.*` (no streaming, so no time to first token) and
 `hone.models.gpu.vram_after_mb` (spans inside a lease end before the lease does).
 
@@ -608,6 +609,7 @@ models in `tests/gpu/`.
 | AC-22 **[real]** | Expressive speech: paragraphs with an emotion and intensity each in one session (`FakeSpeech(expressive=True)`); one line calm and excited with `chatterbox` in one session | the span records emotion, intensity, `expressive`, `session` and paragraph count, a paragraph that fits is one chunk, and the session loads the model once; the real takes are non-silent, the excited one varies more in pitch and is louder and higher, and the GPU is freed afterwards |
 | AC-24 | An image through `FakeComfyUI` with a reference used twice; a song with `duration_s` mapped to two nodes; a video with seconds converted to frames | inputs land on the mapped nodes; the reference is uploaded once by hash; outputs written to `out` with hash, size and dimensions or duration; one span each with inputs, outputs and the workflow hash; a lease with the registry's `vram_gb`; `/free` after a plain call, once after a session |
 | AC-25 | Failures: unknown input; `node_errors`; `execution_error` (out of memory); a job that never ends; `KeyboardInterrupt` while waiting | `ConfigError` before any request; `ConfigError` naming the node; `result.error` with `error_kind = "out_of_memory"` and status `error`; the job cancelled and `ModelTimeout`; the job cancelled and the interrupt re-raised |
+| AC-26 | Hosted images (generation, edit with references, b64 and url) and video (polled, then downloaded; `failed`; timeout) through respx | files written, no bytes in the SQLite file, cost from `per_image` / `per_output_second`, `failed` as `result.error`, `DELETE` sent on timeout, the planted `OPENAI_API_KEY` never stored; a size or duration the model does not declare raises before any request |
 | AC-28 | `mk.session("comfyui")` with no server and a fake start command; again with a running server; a plain call with no server | started once, reused by two clients, stopped at the end; a running server is never stopped; the plain call raises `ProviderError` saying to start ComfyUI or use a session, and starts nothing |
 | AC-29 | Transcription with the fake module, capture on and off | words with times on the result; one span; text and words hashed with capture off |
 | AC-23 | A lease inside another in the same thread; a lease no one can grant (fake memory) | the nested lease reserves only what the outer one does not cover and never waits for it; the impossible one raises `CapabilityError` after `stall_s`, naming the holders |
@@ -670,8 +672,8 @@ copies an entry.
   unloads another process can load a model or take a lease (the state after is read again).
   `FileLockGpuLease` writes no `.holder` file, so a Python holder of the lock shows as `holder: None`.
 - No streaming, async clients or `hone.models.timing.*` attributes. Generation runs through ComfyUI
-  only so far (transcription runs in-process through faster-whisper): hosted images and video,
-  `command` projects, hosted transcription, model guides, common input
+  and hosted OpenAI-compatible images and video so far (transcription runs in-process through
+  faster-whisper): `command` projects, hosted transcription, model guides, common input
   formats and the catalog are later steps of [0015](changes/0015-generation-models.md). ComfyUI jobs
   report no progress (its HTTP API has none).
 - The `speech` extra (Kokoro) needs Python < 3.13 and loads the model on every call (about a second)

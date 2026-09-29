@@ -74,8 +74,8 @@ the provider's message and `error_kind` says what to do next:
 | `failed` | anything else |
 
 A job that could not be submitted, run or fetched raises: `ConfigError` for a workflow ComfyUI refuses
-(its `node_errors`, naming the node and the input), `ProviderError` for a server that is not there or a
-transport failure, `ModelTimeout` for a timeout.
+(its `node_errors`, naming the node and the input), `ProviderError` for a server that is not there, a
+transport failure or an HTTP error, `ModelTimeout` for a timeout.
 
 **Cost** is a naive estimate: one flat price per entry, `capabilities.price.per_image` times the images
 or `per_output_second` times the seconds of output; `cost_estimated` is `True` when it is set, and
@@ -200,6 +200,71 @@ assert server.submitted[0]["6"]["inputs"]["text"] == "a harbour"
 assert (r.files[0].width, r.files[0].height) == (96, 64)
 ```
 
+## Hosted images and video
+
+An `openai_compatible` entry of kind `image` or `video` calls a hosted API with OpenAI's endpoints:
+OpenAI itself, or any gateway that serves the same ones. The API key comes from the variable named by
+`api_key_env` and is never recorded. Hosted models take no GPU lease.
+
+```toml
+[models."gpt-image-1.5"]
+provider = "openai_compatible"
+kind = "image"
+model = "gpt-image-1.5"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+inputs = ["quality", "background"]              # extra inputs, sent as request fields
+[models."gpt-image-1.5".capabilities]
+sizes = ["1024x1024", "1536x1024", "1024x1536"]
+price = { per_image = 0.04 }                    # a naive flat estimate
+
+[models."sora-2"]
+provider = "openai_compatible"
+kind = "video"
+model = "sora-2"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+defaults = { duration_s = 4, size = "720x1280" }
+[models."sora-2".capabilities]
+sizes = ["720x1280", "1280x720"]
+durations_s = [4, 8, 12]
+price = { per_output_second = 0.10 }
+```
+
+```python no-run
+import hone_models as mk
+from pathlib import Path
+
+img = mk.image("gpt-image-1.5")
+img.generate("a lighthouse at dusk, oil painting", size="1024x1024", quality="low", out="shots/01.png")
+img.generate("the same lighthouse in winter", references=[Path("shots/01.png")], out="shots/02.png")
+
+clip = mk.video("sora-2")
+r = clip.generate("slow push-in", image=Path("shots/01.png"), duration_s=8, out="clips/01.mp4")
+r.job_id, r.cost_usd, r.cost_estimated  # 'video_...', 0.8, True
+```
+
+- **Images** take `size`, `n` and `references`, plus the names the entry lists in `inputs`. Without
+  references the call is `POST /images/generations`; with them `POST /images/edits`, one `image[]` part
+  per reference. The images come back as `b64_json` (decoded straight to `out`) or as a `url`
+  (downloaded; the API key is not sent to that host). No `response_format` is sent: models that can
+  answer either way choose; to ask for one, list `response_format` in `inputs` and set it in `defaults`.
+  A rewritten prompt (`revised_prompt`) is recorded on the span.
+- **Video** takes `size`, `duration_s` (sent as `seconds`) and `image` (a start frame, sent as
+  `input_reference`). The job is created with `POST /videos`, `GET /videos/{id}` is polled every
+  5 seconds (a `progress` event on the span at most once per 10 %), and the file is fetched from
+  `GET /videos/{id}/content`. `result.job_id` is the provider's id.
+- **Sizes and durations** the entry declares are checked before the request, so Sora's "4, 8 or 12
+  seconds" fails at once (`CapabilityError`) instead of after a paid request.
+- **Failures.** Submitting retries connection errors, 429 and 5xx like every other call. A submitted
+  video job is never submitted again: polling tolerates transient errors, and after five in a row
+  raises `ProviderError` with the job id, so you can fetch the video yourself later. On a timeout, or
+  any exception while waiting (`Ctrl-C` included), the job is deleted (`DELETE /videos/{id}`). A
+  moderation refusal, at submission or as a failed job, is a result with `error_kind = "refused"`; a job
+  with status `failed` is a result with the provider's message.
+- **Cost** is naive: `per_image` times the images, or `per_output_second` times the seconds of video
+  (measured with `ffprobe`, else the `duration_s` asked for); real prices vary by size and quality.
+
 ## Records
 
 Each call records one span, `hone.models.image`, `hone.models.music` or `hone.models.video`, with
@@ -207,7 +272,8 @@ Each call records one span, `hone.models.image`, `hone.models.music` or `hone.mo
 (`hone.models.media.inputs`: files as `{"path", "sha256", "bytes"}`, texts such as lyrics are content),
 the outputs (`hone.models.media.outputs`), the job id, the workflow hash, whether the call was in a
 session, loaded the model, freed it or started the server, the time it queued, the error and its kind,
-the license, `commercial_use`, and the naive cost. See [records-and-replay.md](records-and-replay.md).
+the license, `commercial_use`, and the naive cost; a hosted image model's `revised_prompt` (content) and a
+hosted video job's `progress` events. See [records-and-replay.md](records-and-replay.md).
 
 ## Testing
 

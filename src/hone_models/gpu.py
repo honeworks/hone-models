@@ -38,6 +38,7 @@ from typing import Any
 from ._gpu_locks import FileLockGpuLease, NullGpuLease
 from ._gpu_memory import MemoryReader, ProcessReader, free_mb, read_memory, read_processes
 from ._gpu_room import (
+    IfBusy,
     busy_elsewhere,
     check_if_busy,
     comfyui_free,
@@ -135,7 +136,7 @@ class GpuScheduler:
         unload_others: bool = False,
         processes: ProcessReader = read_processes,
         stall_s: float = STALL_S,
-        if_busy: str = "unload",
+        if_busy: IfBusy = "unload",
     ) -> None:
         self._ledger = Path(ledger) if ledger else None
         self.memory = memory

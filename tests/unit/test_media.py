@@ -1,5 +1,6 @@
 """The media client: input checks, seeds, cost, sessions, factories, records; and FakeMedia."""
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -90,7 +91,9 @@ def test_naive_cost_per_image_and_per_second(reg: mk.registry.Registry, tmp_path
     attrs = spans(img)[0]["attributes"]
     assert (attrs["hone.models.cost_usd"], attrs["hone.models.media.cost_estimated"]) == (0.08, True)
     clip = FakeMedia.like("test-sora", registry=reg).generate("a wave", duration_s=4, out=tmp_path / "c.mp4")
-    assert clip.cost_usd is None or clip.cost_usd == pytest.approx(0.1)  # 1 s packaged clip when ffprobe runs
+    # the packaged clip is 1 s when ffprobe reads it; without ffprobe the 4 s asked for are billed (D-031)
+    expected = 0.1 if shutil.which("ffprobe") else 0.4
+    assert clip.cost_usd == pytest.approx(expected)
     song = FakeMedia(kind="music").generate("hum", duration_s=2, out=tmp_path / "s.wav")
     assert (song.cost_usd, song.cost_estimated) == (None, False)
 

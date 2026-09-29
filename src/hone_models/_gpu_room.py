@@ -11,7 +11,7 @@ import gc
 import importlib
 import os
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
@@ -21,6 +21,8 @@ from .providers import ollama
 from .records import log
 
 _HOOKS: dict[str, Callable[[], object]] = {}
+
+IfBusy = Literal["block", "unload"]  # what to do while another process uses the GPU
 
 
 def on_short(name: str, release: Callable[[], object] | None) -> None:
@@ -68,11 +70,11 @@ def torch_empty_cache() -> None:
 IF_BUSY = ("block", "unload")
 
 
-def check_if_busy(if_busy: str) -> str:
+def check_if_busy(if_busy: str) -> IfBusy:
     """`if_busy` itself, or `ConfigError` for a value other than "block" and "unload"."""
     if if_busy not in IF_BUSY:
         raise ConfigError(f"if_busy must be one of {list(IF_BUSY)}, not {if_busy!r}")
-    return if_busy
+    return "block" if if_busy == "block" else "unload"
 
 
 def busy_elsewhere(leases: list[dict[str, Any]]) -> bool:

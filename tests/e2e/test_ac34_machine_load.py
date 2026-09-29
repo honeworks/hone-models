@@ -101,4 +101,4 @@ def test_ac34_short_lease_leaves_other_processes_models_alone(
             pass
         assert [r["body"]["model"] for r in server.requests if r["path"] == "/api/generate"] == ["b:7b"]
     with pytest.raises(mk.errors.ConfigError, match="if_busy"):
-        mk.gpu.GpuScheduler(if_busy="wait")
+        mk.gpu.GpuScheduler(if_busy="wait")  # type: ignore[arg-type]  # an untyped caller

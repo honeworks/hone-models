@@ -22,7 +22,7 @@ import httpx
 from . import _comfyui_loaded
 from ._gpu_locks import machine_lock_path, probe_lock
 from ._gpu_memory import GpusReader, ProcessReader, read_gpus, read_processes
-from ._gpu_room import check_if_busy, comfyui_free
+from ._gpu_room import IfBusy, check_if_busy, comfyui_free
 from ._http import bearer_headers, request_json
 from ._machine_read import (
     Models,
@@ -89,7 +89,7 @@ class Machine:
             "leases": self._leases(),
         }
 
-    def prepare(self, needed: Sequence[str], *, if_busy: str = "block") -> dict[str, Any]:
+    def prepare(self, needed: Sequence[str], *, if_busy: IfBusy = "block") -> dict[str, Any]:
         """Make the model servers hold only the `needed` registry ids; report what was done and the state
         after. With another process using the GPU (the lock, or a lease), `if_busy="block"` unloads
         nothing and `"unload"` unloads anyway; both report `blocked_by`. Never loads, never waits."""
@@ -107,7 +107,7 @@ class Machine:
                 span["status"] = {"code": "error", "message": "; ".join(e["error"] for e in result["errors"])}
         return result
 
-    def _prepare(self, registry: Registry, configs: list[ModelConfig], if_busy: str) -> dict[str, Any]:
+    def _prepare(self, registry: Registry, configs: list[ModelConfig], if_busy: IfBusy) -> dict[str, Any]:
         before = servers(registry)
         errors = _unanswered(before)
         blocked_by = self._blocked_by()

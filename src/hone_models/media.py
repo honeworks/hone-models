@@ -113,15 +113,7 @@ class MediaClient:
         named = self._checked(provider, inputs)
         seed = seed if seed is not None else int(cfg.defaults.get("seed", secrets.randbelow(2**32)))
         caps = cfg.capabilities
-        attrs = {
-            **model_attributes(cfg, cfg.kind),
-            "gen_ai.request.seed": seed,
-            "hone.models.media.prompt": prompt,
-            "hone.models.media.inputs": _recorded(named),
-            "hone.models.media.session": self._state is not None,
-            "hone.models.media.license": caps.license,
-            "hone.models.media.commercial_use": caps.commercial_use,
-        }
+        attrs = _attributes(cfg, prompt, named, seed, in_session=self._state is not None)
         started = time.monotonic()
         with start_span(f"hone.models.{cfg.kind}", self.sink, attrs, trace=trace) as span:
             job = MediaJob(
@@ -223,6 +215,21 @@ def _check_capabilities(cfg: ModelConfig, named: dict[str, Any]) -> None:
     references: list[Any] = named.get("references") or []
     if caps.max_references is not None and len(references) > caps.max_references:
         raise CapabilityError(f"model {model!r} takes at most {caps.max_references} references")
+
+
+def _attributes(
+    cfg: ModelConfig, prompt: str, named: dict[str, Any], seed: int, *, in_session: bool
+) -> dict[str, Any]:
+    """The span attributes known before the job runs."""
+    return {
+        **model_attributes(cfg, cfg.kind),
+        "gen_ai.request.seed": seed,
+        "hone.models.media.prompt": prompt,
+        "hone.models.media.inputs": _recorded(named),
+        "hone.models.media.session": in_session,
+        "hone.models.media.license": cfg.capabilities.license,
+        "hone.models.media.commercial_use": cfg.capabilities.commercial_use,
+    }
 
 
 def _recorded(named: dict[str, Any]) -> dict[str, Any]:

@@ -22,7 +22,6 @@ foreground (a stand-in for `HONE_COMFYUI_START`).
 from __future__ import annotations
 
 import argparse
-import email.parser
 import json
 import os
 import posixpath
@@ -214,15 +213,7 @@ class FakeComfyUI:
             key = SAVE_NODES.get(spec.get("class_type"))
             if key is None:
                 continue
-            if key == "images":
-                data, ext = (
-                    _fake_files.png(int(values.get("width", 64)), int(values.get("height", 64))),
-                    "png",
-                )
-            elif key == "audio":
-                data, ext = _fake_files.wav(float(values.get("seconds", values.get("duration", 1.0)))), "wav"
-            else:
-                data, ext = _fake_files.mp4(), "mp4"
+            data, ext = _fake_files.for_save_node(key, values)
             prefix = str(spec.get("inputs", {}).get("filename_prefix", "ComfyUI"))
             subfolder, stem = posixpath.split(prefix)
             name = f"{stem}_{len(self._files) + 1:05d}_.{ext}"
@@ -231,15 +222,9 @@ class FakeComfyUI:
         return outputs
 
     def _upload(self, body: bytes, content_type: str) -> Reply:
-        head = f"Content-Type: {content_type}\r\n\r\n".encode()
-        message = email.parser.BytesParser().parsebytes(head + body)
-        fields: dict[str, Any] = {}
-        for part in message.walk():
-            name = part.get_param("name", header="content-disposition")
-            if name:
-                fields[str(name)] = (part.get_filename(), part.get_payload(decode=True))
-        filename, data = fields["image"]
-        subfolder = (fields.get("subfolder") or (None, b""))[1].decode()
+        fields = _fake_files.form_fields(body, content_type)
+        filename, data = str(fields["image"][0]), fields["image"][1]
+        subfolder = fields.get("subfolder", (None, b""))[1].decode()
         self.uploads[posixpath.join(subfolder, filename)] = data
         self._files[(subfolder, filename, "input")] = data
         return 200, {"name": filename, "subfolder": subfolder, "type": "input"}

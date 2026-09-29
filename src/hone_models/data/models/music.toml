@@ -387,6 +387,10 @@ checked = 2026-09-29
 [models."songgeneration-v2-medium"]
 provider = "command"
 kind = "music"
+# TODO(owner, 2026-09-29): the v2-medium checkpoint and the SongGeneration-Runtime tokenizer on disk
+# disagree (type_info embedding 151652 vs 151646 rows); re-download the runtime or use the upstream code,
+# prove it with `hone-models models check`, then remove `disabled` (design/decisions.md D-080).
+disabled = "its checkpoint and the SongGeneration runtime on disk do not match yet (TODO, D-080); use another music model, e.g. ace-step-1.5-xl-turbo"
 command = ["$HONE_LEVO2_DIR/.venv/bin/python", "{adapter:levo2}", "{request}"]
 cwd = "$HONE_LEVO2_DIR"
 # The project's generate.py torch.loads its bundled tools/new_prompt.pt, a pickle torch >= 2.6 refuses

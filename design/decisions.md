@@ -616,3 +616,13 @@ has 1024 tokens, because `deepseek-r1:8b` thinks even with `think=false` (§13) 
 Timing on the client works for every provider; Ollama's own `load_duration` / `eval_duration` would need
 new fields on `TextResult` for one provider.
 No review needed.
+
+## D-080: `disabled` marks a known entry that must not be called yet
+An entry may carry `disabled = "<reason>"`: it stays in the catalog (listed, guided, installable), but every
+client factory raises `ConfigError` "model '<id>' is disabled: <reason>" before any job, and selection
+(`mk.select`, `mk.text(require=...)`) skips it. The owner (2026-09-29) disabled `songgeneration-v2-medium`
+with a TODO: its v2-medium checkpoint and the SongGeneration runtime tokenizer on disk disagree (the
+`type_info` embedding has 151652 rows in the checkpoint, 151646 built from `third_party/Qwen2-7B`, D-077).
+To enable it: re-download `lglg666/SongGeneration-Runtime` or move to the upstream code, prove it with
+`hone-models models check songgeneration-v2-medium`, then remove `disabled`.
+No review needed.

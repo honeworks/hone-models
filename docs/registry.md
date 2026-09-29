@@ -124,7 +124,8 @@ name the model when you call one (`mk.text("gemma4-12b")`) rather than relying o
 `hone-models models check <id>` makes a smoke call to a chat model (which loads it), times a warm
 ~200-token reply and saves that `speed_tok_s` to the user registry; it prints the load time apart (for an image, music or video entry it runs a tiny job and reports the peak GPU memory
 for `vram_gb`: [generation.md](generation.md#packaged-comfyui-models)); request timeouts grow with it: `2 * max_tokens / speed_tok_s`, at least 120 s, at most
-`max_timeout_s` (default 600 s). A local model that was never measured is assumed to make 10 tokens/s,
+`disabled = "<reason>"` keeps an entry in the catalog but refuses every call with that reason and leaves
+it out of selection (for a model that is known but broken, with a TODO). `max_timeout_s` (default 600 s). A local model that was never measured is assumed to make 10 tokens/s,
 so a long answer (`max_tokens=7000`) gets up to 600 s on a fresh machine; hosted models without a
 measurement get 120 s.
 

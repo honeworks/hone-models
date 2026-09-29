@@ -83,8 +83,8 @@ def show(data: Any, as_json: bool) -> None:
 
 def describe(cfg: ModelConfig) -> dict[str, Any]:
     """The `--json` shape of one model: its config plus `name` and `local`; the generation keys (change
-    0015) only when the entry sets them."""
-    unset = {key for key in GENERATION_KEYS if getattr(cfg, key) is None}
+    0015) and `disabled` only when the entry sets them."""
+    unset = {key for key in (*GENERATION_KEYS, "disabled") if getattr(cfg, key) is None}
     return {**cfg.model_dump(mode="json", exclude=unset), "name": cfg.name, "local": cfg.local}
 
 

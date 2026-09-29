@@ -41,7 +41,8 @@ assert g.commercial_use is True
 print("camera angle:", [m.id for m in mk.select({"features": ["camera angle"]}, kind="image")])
 singers = [m.id for m in mk.select({"features": ["lyrics"]}, kind="music")]
 print("lyrics:", singers)
-assert {"ace-step-1.5-turbo", "songgeneration-v2-medium"} <= set(singers)
+assert {"ace-step-1.5-turbo", "heartmula-3b"} <= set(singers)
+assert "songgeneration-v2-medium" not in singers  # disabled until its runtime matches (D-080)
 
 # 3. Lyrics written once in the common format, received by each model in its own form.
 lyrics = "[intro]\n[verse]\nNeon on the water\nWe run until the morning\n[chorus]\nHold on\n[outro]\n"

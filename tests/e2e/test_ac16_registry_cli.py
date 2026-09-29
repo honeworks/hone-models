@@ -48,9 +48,10 @@ def test_ac16_models_list_json(isolated: Path) -> None:
     result = runner.invoke(app, ["models", "list", "--json", "--registry", str(extra)])
     assert result.exit_code == 0, result.output
     rows = json.loads(result.output)
-    # the generation keys (change 0015) only where an entry sets them; `installed` on every row
+    # the generation keys (change 0015) and `disabled` only where an entry sets them; `installed` on every row
     assert all(
-        MODEL_KEYS | {"installed"} <= set(r) <= MODEL_KEYS | {"installed", *GENERATION_KEYS} for r in rows
+        MODEL_KEYS | {"installed"} <= set(r) <= MODEL_KEYS | {"installed", "disabled", *GENERATION_KEYS}
+        for r in rows
     )
     assert (
         set(

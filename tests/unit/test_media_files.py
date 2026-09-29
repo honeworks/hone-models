@@ -103,8 +103,8 @@ def test_comfyui_loaded_file(isolated: Path) -> None:
     data = _comfyui_loaded.read()
     assert [e["model_id"] for e in data["http://127.0.0.1:8188"]] == ["z-image-turbo", "ace-step"]
     assert set(data["http://127.0.0.1:8188"][0]) == {"model_id", "job_id", "pid", "time"}
-    assert _comfyui_loaded.path() == isolated / ".hone" / "models" / "comfyui-loaded.json"
+    assert _comfyui_loaded._path() == isolated / ".hone" / "models" / "comfyui-loaded.json"
     _comfyui_loaded.clear("http://127.0.0.1:8188")
     assert _comfyui_loaded.read() == {}
-    _comfyui_loaded.path().write_text("not json")
+    _comfyui_loaded._path().write_text("not json")
     assert _comfyui_loaded.read() == {}

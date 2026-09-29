@@ -7,7 +7,7 @@ import pytest
 import respx
 
 import hone_models as mk
-from hone_models import _comfyui_loaded, gpu
+from hone_models import gpu
 from hone_models._tracing import scope_attributes
 
 COMFY = "http://127.0.0.1:8188"
@@ -63,13 +63,10 @@ def test_registering_again_replaces_and_none_removes() -> None:
 
 
 def test_comfyui_free_posts_to_free() -> None:
-    _comfyui_loaded.add(COMFY, "z-image-turbo", "job-1")
-    _comfyui_loaded.add("http://other:8188", "ace-step", "job-2")
     with respx.mock(base_url=COMFY) as mock:
         route = mock.post("/free").respond(status_code=200)
         mk.gpu.comfyui_free(COMFY + "/")()
     assert route.calls.last.request.content == b'{"unload_models":true,"free_memory":true}'
-    assert list(_comfyui_loaded.read()) == ["http://other:8188"]  # the freed server's list is cleared
 
 
 def test_torch_empty_cache(monkeypatch: pytest.MonkeyPatch) -> None:

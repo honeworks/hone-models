@@ -1,0 +1,11 @@
+{
+  "3": {"class_type": "KSampler", "inputs": {"seed": 0, "steps": 8, "model": ["4", 0], "positive": ["20", 0], "latent_image": ["13", 0]}},
+  "4": {"class_type": "UNETLoader", "inputs": {"unet_name": "test-image.safetensors"}},
+  "6": {"class_type": "CLIPTextEncode", "inputs": {"text": "", "clip": ["4", 1]}},
+  "8": {"class_type": "VAEDecode", "inputs": {"samples": ["3", 0]}},
+  "9": {"class_type": "SaveImage", "inputs": {"filename_prefix": "hone/test-image", "images": ["8", 0]}},
+  "13": {"class_type": "EmptyLatentImage", "inputs": {"width": 1024, "height": 1024, "batch_size": 1}},
+  "20": {"class_type": "TextEncodeWithReferences", "inputs": {"conditioning": ["6", 0], "image1": ["78", 0], "image2": ["106", 0]}},
+  "78": {"class_type": "LoadImage", "inputs": {"image": "placeholder.png"}},
+  "106": {"class_type": "LoadImage", "inputs": {"image": "placeholder.png"}}
+}

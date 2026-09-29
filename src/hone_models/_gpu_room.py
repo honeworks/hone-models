@@ -14,7 +14,6 @@ from collections.abc import Callable
 
 import httpx
 
-from . import _comfyui_loaded
 from .errors import CapabilityError, ProviderError
 from .providers import ollama
 from .records import log
@@ -44,13 +43,11 @@ def run_hooks() -> list[str]:
 
 
 def comfyui_free(url: str) -> Callable[[], object]:
-    """A release hook asking the ComfyUI server at `url` to unload its models (`POST /free`); the server's
-    list of loaded models (`comfyui-loaded.json`, change 0015) is cleared once it has."""
+    """A release hook asking the ComfyUI server at `url` to unload its models (`POST /free`)."""
 
     def free() -> None:  # ComfyUI answers 200 with an empty body
         payload = {"unload_models": True, "free_memory": True}
         httpx.post(f"{url.rstrip('/')}/free", json=payload, timeout=30).raise_for_status()
-        _comfyui_loaded.clear(url)
 
     return free
 

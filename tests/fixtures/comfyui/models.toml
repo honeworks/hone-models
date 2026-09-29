@@ -1,0 +1,52 @@
+# Generation entries for the tests: API-format workflows next to this file.
+
+[models."test-image"]
+provider = "comfyui"
+kind = "image"
+workflow = "image.json"
+outputs = ["9"]
+defaults = { size = "512x512", steps = 8 }
+[models."test-image".inputs]
+prompt = "6.text"
+seed = "3.seed"
+steps = "3.steps"
+width = "13.width"
+height = "13.height"
+references = ["78.image", "106.image"]
+[models."test-image".capabilities]
+vram_gb = 6.5
+max_references = 2
+license = "Apache-2.0"
+commercial_use = true
+
+[models."test-music"]
+provider = "comfyui"
+kind = "music"
+workflow = "music.json"
+outputs = ["111"]
+[models."test-music".inputs]
+prompt = "94.tags"
+lyrics = "94.lyrics"
+seed = "109.value"
+duration_s = ["94.duration", "98.seconds"]
+bpm = "94.bpm"
+key = "94.keyscale"
+[models."test-music".capabilities]
+vram_gb = 7.0
+max_duration_s = 600
+
+[models."test-video"]
+provider = "comfyui"
+kind = "video"
+workflow = "video.json"
+[models."test-video".inputs]
+prompt = "6.text"
+negative = "7.text"
+seed = "57.noise_seed"
+image = "52.image"
+duration_s = { path = "50.length", per_second = 16, add = 1 }
+width = "50.width"
+height = "50.height"
+[models."test-video".capabilities]
+vram_gb = 7.5
+max_duration_s = 5

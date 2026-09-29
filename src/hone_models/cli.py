@@ -4,8 +4,9 @@ hone-models models list [--kind K] [--feature F] [--installed | --missing] [--ti
 hone-models models show <id> [--json]
 hone-models models guide [<id>] [--json] [--stale DAYS]   what a model takes; guides not checked lately
 hone-models models install <id> [--run]      print the commands that fetch a model (--run: run them)
-hone-models models check <id> [--json]        smoke call: chat tokens/s saved as speed_tok_s; media: a
-                                              tiny job, its output and peak GPU memory
+hone-models models check <id> [--json]        chat: a smoke call (loads the model), then a timed warm reply
+                                              whose tokens/s is saved as speed_tok_s; media: a tiny job,
+                                              its output and peak GPU memory
 hone-models calls list [--since 1d] [--model X] [--json]
 hone-models calls show <span_id>
 hone-models calls stats [--by model|provider|tag] [--json]
@@ -34,7 +35,7 @@ from .guide import build, stale
 from .media import image, music, video
 from .records import default_store, read_spans
 from .registry import GENERATION_KEYS, MEDIA_KINDS, ModelConfig, Registry, load, remember_speed, unmet
-from .text import text
+from .text import TextClient, TextResult, text
 
 app = typer.Typer(no_args_is_help=True, help="Inspect hone-models registry and call records.")
 models_app = typer.Typer(no_args_is_help=True, help="Registered models.")
@@ -51,6 +52,9 @@ DbOption = Annotated[
     Path | None, typer.Option("--db", help="Span store (default: $HONE_HOME/models/spans.db).")
 ]
 SMOKE_PROMPT = [{"role": "user", "content": "Say OK."}]
+SMOKE_TOKENS = 1024  # deepseek-r1:8b thinks even with think=false and answers only with room to
+SPEED_PROMPT = [{"role": "user", "content": "Describe the sea at dawn in about 200 words."}]
+SPEED_TOKENS = 200
 SinceOption = Annotated[str | None, typer.Option(help="30m, 12h, 1d, 2w or an ISO time.")]
 
 
@@ -222,18 +226,37 @@ def models_check(
             show(found, as_json)
             return
         llm = text(model_id, registry=reg)
-        start = time.monotonic()
-        r = llm.complete(SMOKE_PROMPT, max_tokens=64)
-        seconds = time.monotonic() - start
-    if r.error:
-        raise fail(f"{model_id}: {r.error}")
-    tokens = r.usage.get("output_tokens")
-    speed = tokens / seconds if tokens and seconds > 0 else None
-    result: dict[str, Any] = {"id": llm.config.id, "text": r.text, "seconds": round(seconds, 2)}
-    result["speed_tok_s"] = round(speed, 1) if speed else None
-    if speed:
+        result = _chat_check(llm)
+    if speed := result["speed_tok_s"]:
         result["saved_to"] = str(remember_speed(llm.config, speed, registered=llm.config.id in reg.models))
     show(result, as_json)
+
+
+def _timed(llm: TextClient, prompt: list[dict[str, Any]], max_tokens: int) -> tuple[TextResult, float]:
+    start = time.monotonic()
+    r = llm.complete(prompt, max_tokens=max_tokens)
+    return r, time.monotonic() - start
+
+
+def _chat_check(llm: TextClient) -> dict[str, Any]:
+    """A smoke call that loads the model, then a ~200-token reply timed warm: the speed leaves the load
+    out; `load_s` is the smoke call less its own tokens at that speed."""
+    smoke, first_s = _timed(llm, SMOKE_PROMPT, SMOKE_TOKENS)
+    if smoke.error:
+        raise fail(f"{llm.config.id}: {smoke.error}")
+    timed, seconds = _timed(llm, SPEED_PROMPT, SPEED_TOKENS)  # cut at the limit or thinking-only: still timed
+    tokens = timed.usage.get("output_tokens")
+    speed = tokens / seconds if tokens and seconds > 0 else None
+    smoke_tokens = smoke.usage.get("output_tokens")
+    load = max(first_s - smoke_tokens / speed, 0.0) if speed and smoke_tokens else None
+    return {
+        "id": llm.config.id,
+        "text": smoke.text,
+        "load_s": round(load, 2) if load is not None else None,
+        "seconds": round(seconds, 2),
+        "output_tokens": tokens,
+        "speed_tok_s": round(speed, 1) if speed else None,
+    }
 
 
 def _spans(db: Path | None) -> list[dict[str, Any]]:

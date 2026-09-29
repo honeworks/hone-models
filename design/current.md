@@ -302,8 +302,8 @@ it applies emotion and intensity in `capabilities.expressive`.
   `--missing`, `--tier N`; `guide` prints the guide (`--json`; `--stale DAYS` lists guides not checked
   lately); `install` prints the commands that would fetch the model (`ollama pull`, `hf download ...
   --local-dir <ComfyUI>/models/<folder>`, clone and setup) with the size and the free disk and downloads
-  nothing (`--run` runs them, for the owner). `check` sends a short smoke call, measures tokens per second
-  and writes `speed_tok_s` to the user registry.
+  nothing (`--run` runs them, for the owner). `check` sends a smoke call (which loads the model), then times a
+  ~200-token reply and writes that warm `speed_tok_s` to the user registry; the load time is reported apart.
 
 ## 4. Providers
 
@@ -731,7 +731,7 @@ copies an entry.
   recorded fixtures ([decisions.md](decisions.md), D-019).
 - `deepseek-r1:8b` on Ollama can return only thinking text even with `think=false` when `max_tokens` is
   very small. hone-models reports it as `result.error`, but the hint in that message ("pass
-  think=False") is then not the fix; raising `max_tokens` is.
+  think=False") is then not the fix; raising `max_tokens` is (`models check` gives its smoke call 1024).
 - Model calls do not take GPU leases automatically (D-009, awaiting owner review).
 - Sessions and unloading cover Ollama and ComfyUI only (speech and transcription clients have their own
   `session()`).

@@ -106,8 +106,9 @@ client later.
 
 Proposed: API option 2, ComfyUI option 2, projects option 2, in-process faster-whisper. The design reuses
 what speech introduced (a kind, a provider table, a loaded engine, a lease per call or per session, a span
-per call, a fake) and adds two ideas: **named inputs mapped onto a workflow**, and **a guide per model**
-in the registry that says what the model can take (§3a).
+per call, a fake) and adds three ideas: **named inputs mapped onto a workflow**, **a guide per model**
+in the registry that says what the model can take (§3a), and **the registry as the catalog** of every model
+we use or may use, installed or not (§3b).
 
 The principle (owner, 2026-09-29): everything about calling a model (its inputs and their formats, the
 adapters that reach it, starting and stopping what serves it, its GPU memory) belongs in hone-models.
@@ -449,31 +450,76 @@ commercial_use = true
 `<LoRA phrase>` values are placeholders: the real phrases are copied from the LoRA's model card when the
 entry is written.)
 
-**What ships in the package** (owner: "more; make sure every model we have is included"). The packaged
-registry gets an entry, a workflow and a guide for every generation model on this machine, checked on
-2026-09-29. Every one of these uses ComfyUI's official file names, so the entries work on any machine that
-has the same files:
+### 3b. The catalog: every model we use or may use, installed or not
 
-| Kind | Packaged entries (ComfyUI unless noted) |
-|---|---|
-| image | `z-image-turbo`; `flux.2-klein-4b` and `qwen-image-edit-2511` (+ Multiple-Angles LoRA) once downloaded |
-| music | `ace-step-1.5-turbo`, `ace-step-1.5-xl-turbo`, `ace-step-1.5-xl-sft`, `minimax-music3`, `yue2-3b` (non-commercial), `heartmula-3b`, `heartmula-rl-3b` (custom node `ComfyUI_FL-HeartMuLa`), `stable-audio-open-1.0` (downloaded; sound effects and loops, 47 s max); `songgeneration-v2-medium` (`command`) |
-| video | `wan2.2-i2v-14b` (lightx2v 4-step), `wan2.2-ti2v-5b`, `ltx-video-2b-0.9.5` |
-| transcription | `faster-whisper-large-v3-turbo`, `faster-whisper-large-v3`, `faster-whisper-medium` (all in the HF cache) |
-| hosted (`openai_compatible`) | `gpt-image-1.5`, `sora-2`, `sora-2-pro` against OpenAI's endpoint; other gateways by a user or project entry that overrides `base_url` and `api_key_env` |
+Owner: "We should have all the possible models in hone-models, even the ones that are promising but are
+not installed yet." So the packaged registry becomes the **catalog**: one entry for every model we
+use, and for every model worth trying, whether or not this machine has it. Being installed is a fact
+hone-models checks on the machine, not something the entry claims.
+
+**What an entry adds for this:**
+
+```toml
+[models."flux.2-klein-4b"]
+provider = "comfyui"
+kind = "image"
+workflow = "workflows/flux.2-klein-4b.json"
+# ... inputs, capabilities, guide as in §3 and §3a ...
+[models."flux.2-klein-4b".install]
+source = "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
+files = [{ repo = "Comfy-Org/flux2-klein", file = "flux-2-klein-4b.safetensors", to = "diffusion_models" }]
+size_gb = 7.8
+tier = 1                                   # 1: test first; 2: worth a try; 3: to learn the ceiling
+note = "generation and reference editing in one small model; fits the GPU"
+```
+
+- `install` says where the model comes from and what to fetch: an Ollama name (`ollama = "hf.co/..."`),
+  Hugging Face files with their ComfyUI folder, or a project to clone and set up (`command` entries), plus
+  the size, a tier and a one-line note on why it is in the catalog. Every entry has one, installed or not.
+- `hone-models models list` gains an `installed` column (`yes`, `no`, `unknown`) and the filters
+  `--installed`, `--missing`, `--tier N` (with the existing `--kind`, `--feature`). What "installed" means
+  per provider: Ollama `/api/tags` names the model; the ComfyUI files exist under `HONE_COMFYUI_DIR` (or
+  the server's `/object_info` lists them); the Hugging Face files are in the cache; a `command` project's
+  folder variable points at a folder whose check command succeeds. Unknown when the server does not
+  answer or the variable is unset, never "no" by guess.
+- `hone-models models install <id>` **prints** the commands that would fetch the model (an `ollama pull`,
+  `hf download ... --local-dir ~/ComfyUI/models/<folder>`, the clone and setup steps) with the size and
+  the free disk space; it downloads nothing (owner: downloads are started by the owner). `--run` exists
+  for the owner to run them from the tool, never used by code or agents without the owner asking.
+- A call to a model that is not installed fails before any job, with `ConfigError` naming the entry and
+  saying `hone-models models install <id>`.
+- Kinds hone-models cannot call yet (the scoring models, until the change that adds them) are still
+  catalog entries: they have `install`, a guide and a license, and calling them raises `ConfigError`
+  "no client for kind '<kind>' yet". Knowing a model and calling it are separate steps.
+
+**Contents.** The packaged catalog holds every model in the owner's research catalog of 2026-09-29 and
+every model on this machine, with its license and `commercial_use` flag. No machine paths: folders come
+from variables (`HONE_COMFYUI_DIR`, `HONE_LEVO2_DIR`, ...). The workspace's `hone-models.toml` only
+overrides (prices, another gateway, measured `vram_gb`, project-local models).
+
+| Kind | Installed here (2026-09-29) | In the catalog, not installed |
+|---|---|---|
+| chat: writers | hemmingway-1 (non-commercial; owner: a real option), muse-glimmer-30b, styletune-12b / 26b-a4b / 31b, equinox-31b, hearthfire-24b, meromero-26b-a4b, meromero-v2-31b, cydonia-24b | orion-26b-a4b, artemis-31b, qwen3.6-35b-a3b-styletune, pantheon-reasoning-26b-a4b, gemma4-writer-31b-d, nemotron-3.5-30b-a3b-antislop, gemma-3-27b-antislop |
+| chat: general, reasoning, vision | qwen3.8-27b, qwen3.6-27b, qwen3.6-35b-a3b, gemma4-12b / 26b-a4b / 31b, nemotron-3.5-lightning, gpt-oss-20b, deepseek-r1-8b / 14b / 32b, ornith-1.5-9b / 35b, qwen2.5vl-7b | |
+| embedding | nomic-embed-text | |
+| image | z-image-turbo | flux.2-klein-4b, qwen-image-edit-2511 (+ multiple-angles LoRA), krea-2-turbo, ming-image-0.1-design, character-sheet LoRA; ceiling only (non-commercial): flux.2-klein-9b, flux.2-dev, qwen-image-2.1 |
+| music | ace-step-1.5-turbo / xl-turbo / xl-sft, minimax-music3, yue2-3b (non-commercial), heartmula-3b, heartmula-rl-3b, stable-audio-open-1.0, songgeneration-v2-medium | diffrhythm2 (weights here, no environment yet), stable-audio-3-small-music / medium, mulacover (non-commercial) |
+| video | wan2.2-i2v-14b (+ lightx2v), wan2.2-ti2v-5b, ltx-video-2b-0.9.5 | minimax-h3, ltx-2.5, scail-2 |
+| speech | kokoro-82m, chatterbox | |
+| transcription | faster-whisper-large-v3-turbo, large-v3, medium | |
+| hosted (`openai_compatible`) | gpt-image-1.5, sora-2, sora-2-pro, gpt-4.1-mini, jev (existing) | other gateways' models by a user or project entry |
+| scoring (callable later) | skywork-reward-v2-0.6b, litbench-rm-3b, dinov2-small, audiobox-aesthetics, muq-mulan-large, muq-large-msd, htdemucs, mel-band-roformer, depth-anything-v2-small | story-reward-8b, beat-this, songeval, florence-2, paddleocr-vl-1.6, hpsv3, pickscore, aesthetic-v2.5, seedvr2-3b / 7b, rife |
+
+The packaged registry is split by kind (`hone_models/data/models/<kind>.toml`), one file per kind, so
+the catalog stays readable at this size. Adding a promising model is one entry with `install`, a guide
+and, for ComfyUI, a workflow; it needs no code. A generation entry's workflow is written and proven with
+`hone-models models check <id>` (a tiny job) when the model is first installed; until then the entry
+carries `workflow = None`, and calling it says the workflow is missing.
 
 Machine paths are not in the package: a `command` entry reads its project folder from a variable
 (`HONE_LEVO2_DIR` for SongGeneration), and a missing folder or variable is a `ConfigError` naming it. An
 entry whose ComfyUI model file or custom node is missing fails at `/prompt` validation with a message naming
-the file, like any other `node_errors`. `hone-models models check <id>` for a generation entry runs a tiny
-job (a 256×256 image, 5 s of audio, a short clip) to prove the entry works on this machine. The
-workspace's `hone-models.toml` only overrides (prices, another gateway, measured `vram_gb`).
-
-Models on this machine that are not generation models are listed for completeness: the Ollama chat
-models and `nomic-embed-text` (already reachable as `ollama:` ids or entries), Kokoro and Chatterbox
-(speech, already entries), and the scoring models hone-taste loads itself (DINOv2, audiobox-aesthetics,
-MuQ, Demucs, Mel-Band RoFormer, Depth Anything, two reward models). Whether those scoring models move
-behind hone-models too is open question 1.
+the file, like any other `node_errors`.
 
 ### 3a. Model guides: what each model can take
 
@@ -657,7 +703,7 @@ Acceptance cases (0016 takes AC-32 and AC-33):
 | AC-28 | `mk.session("comfyui")` with no server and a fake start command; again with a running server; a plain call with no server | started once, reused by two clients, stopped at the end; a running server is never stopped; the plain call raises `ProviderError` saying to start ComfyUI or use a session, and starts nothing |
 | AC-29 | Transcription with the fake module, capture on and off | words with times on the result; one span; text and words hashed with capture off |
 | AC-30 **[real]** | Under `scripts/gpu-lock.sh`: a 512×512 `z-image-turbo` image, 10 s of `ace-step-1.5-turbo`, a Kokoro sentence transcribed by `faster-whisper-large-v3-turbo` | non-empty outputs; the transcript contains the sentence's words in order; GPU memory back to where it started; ComfyUI started only if the test started it, and stopped |
-| AC-31 | Guides and formats: lyrics in the common format sent to a `sections` and a `levo` entry; `camera_angle` with a known and an unknown choice; `mk.guide`, `as_text()`, `models guide --json`, `models list --feature`; `require={"features": [...]}`; an entry without a guide | the two entries receive their own lyric forms; the phrase appended to the prompt, the unknown choice a `ConfigError` listing the choices; the guide lists every accepted input with its note, features with examples and source; selection returns only the models declaring the feature; the bare entry's guide is built from its inputs |
+| AC-31 | Guides, formats and the catalog: `models list --installed` / `--missing` with FakeOllama tags, a fake ComfyUI folder and a fake HF cache; `models install <id>` for an Ollama, a ComfyUI and a `command` entry; a call to a model that is not installed; a catalog entry of a kind with no client; lyrics in the common format sent to a `sections` and a `levo` entry; `camera_angle` with a known and an unknown choice; `mk.guide`, `as_text()`, `models guide --json`, `models list --feature`; `require={"features": [...]}`; an entry without a guide | the two entries receive their own lyric forms; the phrase appended to the prompt, the unknown choice a `ConfigError` listing the choices; the guide lists every accepted input with its note, features with examples and source; selection returns only the models declaring the feature; the bare entry's guide is built from its inputs; installed is `yes` / `no` / `unknown` as the fakes say (a server that does not answer is `unknown`); `install` prints the pull, download or setup commands with the size and downloads nothing; the uninstalled call and the client-less kind raise `ConfigError` before any job, naming what to do |
 
 Video and the standalone projects get `gpu` tests marked `slow`, run by hand.
 
@@ -666,11 +712,12 @@ Video and the standalone projects get `gpu` tests marked `slow`, run by hand.
 | Now (this change) | Later, same pattern, no API change |
 |---|---|
 | kinds image, music, video, transcription; `MediaClient`, `Transcriber`, sessions | image masks for edits; video remix (`/videos/{id}/remix`) as named inputs |
-| `comfyui`: every model on this machine (§3 table), each with a workflow and a guide; FLUX.2-klein-4B and Qwen-Image-Edit-2511 as entries once downloaded | MiniMax-H3, LTX-2.5 and later downloads: new entries, workflows and guides |
+| the catalog (§3b): every model in the research catalog and on this machine, installed or not, with `install`, license and guide; workflows for the installed ComfyUI models | a workflow for each catalog model when it is installed; new promising models as entries |
 | ACE-Step cover / repaint (`source`, `strength`) as its own entry with its own workflow | |
 | `openai_compatible` images and video: gpt-image and Sora 2 on OpenAI; gemini image, FLUX, Qwen image, Seedream, Veo 3.1 and Runway wherever a gateway serves them with the same endpoints | hosted transcription (`/audio/transcriptions` with word timestamps) as an `openai_compatible` transcription entry |
 | `command` with the SongGeneration v2 adapter | DiffRhythm2: an adapter once its environment exists (it needs `espeak-ng`, which may need a user-space build: no sudo) |
-| `faster_whisper` (extra `transcribe`) | the scoring models, if open question 1 says so |
+| `faster_whisper` (extra `transcribe`) | calling the scoring models (their entries exist now), if open question 1 says so |
+| `models list --installed / --missing / --tier`, `models install <id>` (prints; `--run` for the owner) | |
 | guides, `lyrics_format` (`sections`, `levo`, `plain`), `prompt_inputs`, `mk.guide`, `models guide`, `--feature` | more converters when a second model shares a format |
 | 0016 adapted as in §7 | media replay; per-call RAM scheduling |
 
@@ -708,8 +755,9 @@ dependency.
 ## Migration and compatibility
 
 Additive: new factories (`mk.image`, `mk.music`, `mk.video`, `mk.transcriber`), `mk.guide`, result types,
-registry kinds, providers, capabilities and keys (`guide`, `lyrics_format`, `prompt_inputs`), the
-`models guide` command and `--kind` / `--feature` filters, `price` fields (defaulting to 0 as the existing ones do), span
+registry kinds, providers, capabilities and keys (`guide`, `lyrics_format`, `prompt_inputs`, `install`),
+the `models guide` and `models install` commands and the `--kind` / `--feature` / `--installed` /
+`--missing` / `--tier` filters, the packaged registry split into one file per kind, `price` fields (defaulting to 0 as the existing ones do), span
 names and attributes, entry-point groups, the `transcribe` extra, fakes and acceptance cases. Existing
 registries, spans, clients and the lease are unchanged; `mk.session` and `mk.unload` accept one more
 provider. `mk.gpu.comfyui_free` stays.
@@ -730,7 +778,8 @@ JSON files move next to its `hone-models.toml`. The UI-format templates it conve
 4. Free after each call: **yes** for a plain call; a session keeps the model loaded until it ends (§2).
 5. Accepted jobs that fail are results, out of memory included: **yes**, and the result must say enough
    for the caller to decide what to do: `error_kind` (§1).
-6. What ships: **more; every model on the machine** (§3 table), with machine paths from variables.
+6. What ships: **more; every model on the machine** and, later in review, **every promising model not
+   installed yet**: the catalog (§3b), with machine paths from variables.
 7. Standalone-project adapters: **in hone-models**. Everything about calling a model with the inputs it
    takes, and managing its resources, belongs in hone-models (Decision).
 8. `commercial_use`: **yes**, as information that never blocks a call, on every result and span, and
@@ -742,10 +791,10 @@ JSON files move next to its `hone-models.toml`. The UI-format templates it conve
 
 ## Open questions for the owner
 
-1. **Scoring models.** hone-taste loads its own models (DINOv2, audiobox-aesthetics, MuQ, Demucs,
-   Mel-Band RoFormer, Depth Anything, two reward models). By the rule "every model through hone-models"
-   they belong here too, as new kinds (`image_embedding`, `audio_score`, `separation`, ...). That is a
-   separate change record after this one; agreed, or are scorers hone-taste's own business?
+1. **Calling the scoring models.** They are catalog entries now (§3b). hone-taste still loads them
+   itself. By the rule "every model through hone-models" calling them belongs here too, as new kinds
+   (`image_embedding`, `audio_score`, `separation`, ...) in a separate change record after this one.
+   Agreed?
 2. **Guides for hosted models that change often.** The proposal keeps a few samples and the source link,
    checked by hand. Enough, or should `models guide --refresh` fetch the source page and show what
    changed (network, and a page format that breaks)? Recommended: by hand for now.

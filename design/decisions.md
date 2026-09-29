@@ -205,3 +205,24 @@ yet because the applications built on this machine resolve `gemma4-12b` through 
 **Awaiting owner review:** before publishing, change `model` to `gemma4:12b` in
 `src/hone_models/data/models.toml`, and keep the local tag on the development machine with a user
 registry alias (`[models."gemma4-12b"] model = "gemma4-12b:latest"`).
+
+## D-023: details of `mk.machine` the record left open
+Choices made while building [0016](changes/0016-machine-state.md), each the simplest reading of it:
+- A lock file that does not exist is not held (`held: False`); only a file that exists but cannot be
+  opened is unknown (`held: None`). `held: None` does not block `prepare`, since nobody is known to hold
+  the lock. The probe never creates the file.
+- Per-process GPU memory comes from the existing GPU 0 reader, so `processes` is filled for GPU 0 and
+  `None` (unknown) for other GPUs.
+- An unnamed ComfyUI entry has `name: None` and `model_id: None`. It is added when the newest `/history`
+  job is not in the loaded-models file, or when the server holds torch memory and the file lists nothing.
+  A server with no torch memory lists nothing, whatever the file says.
+- `released` lists server names (`"comfyui"`), as in the record, not URLs.
+- `missing` lists only needed Ollama and ComfyUI ids: hosted and in-process models are never "loaded"
+  on a server, so listing them would always mark them missing.
+- `need_gb` sums the `vram_gb` of the needed entries that use this GPU (`local`, `comfyui`, `command`);
+  hosted entries count 0.
+- `load` sends the entry's `defaults.keep_alive`, else `"5m"` (Ollama's own default, which every chat
+  call resets to anyway), and notes the model as loaded by this process, so a short lease may unload it.
+- `GpuScheduler(if_busy="block")` checks the lock at `HONE_GPU_LOCK` (else `/tmp/honeworks-gpu.lock`),
+  only when it is about to unload other processes' models.
+No review needed.

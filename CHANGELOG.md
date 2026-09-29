@@ -12,6 +12,13 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
 [0003 examples set and a scriptable FakeOllama](design/changes/0003-examples-and-scriptable-fake-ollama.md).
 
 ### Added
+- `mk.machine`: `snapshot()` reports every GPU (name, memory, utilization, processes), the Ollama and
+  ComfyUI servers and the models they hold (partly on the CPU or not), the machine-wide GPU lock and the
+  leases, with `None` for anything unknown; `prepare(needed, if_busy=...)` unloads every model not needed
+  unless another process is using the GPU; `load(model_id)` warms an Ollama model up. `Machine` is
+  hone-select's `MachineProbe` (entry point `hone.machine_probes`); spans `hone.models.machine.prepare` /
+  `.load`. `GpuScheduler(if_busy="block")` leaves other processes' models alone while they use the GPU
+  ([0016](design/changes/0016-machine-state.md)).
 - `THIRD_PARTY_NOTICES.md` (the Kokoro-rendered voice clips; copyleft dependencies of the optional
   speech extras), shipped in the wheel and sdist.
 - The context budget counts images (capabilities `image_tokens` / `image_patch_px`, else 1024 per

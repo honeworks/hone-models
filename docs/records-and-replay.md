@@ -21,7 +21,9 @@ Main attributes (full list in [design/current.md §8.3](../design/current.md#83-
 `hone.models.model_id`, `hone.models.model_digest`, `hone.models.prompt.*`,
 `hone.models.structured.{path,attempts,schema}`, `hone.models.context.{limit,estimated_prompt_tokens}`,
 `hone.models.cost_usd`, `hone.models.request.params`, `hone.models.gpu.*`, `hone.models.replay_of`,
-`hone.models.decision.{state,questions,answers}`. HTTP retries are `retry` events; structured-output
+`hone.models.decision.{state,questions,answers}`. `mk.machine.prepare` and `mk.machine.load` record
+`hone.models.machine.prepare` / `hone.models.machine.load` spans (kind `internal`) with
+`hone.models.machine.*` attributes. HTTP retries are `retry` events; structured-output
 retries are `structured_retry` events. LiteLLM models retry inside LiteLLM, without events.
 
 **Content capture.** `HONE_CAPTURE_CONTENT=0` or `SqliteSpanSink(path, capture_content=False)` stores

@@ -9,7 +9,7 @@
 | [decisions.md](decisions.md) | `mk.decision`, questions and answers, Jev, logprob calibration |
 | [embeddings.md](embeddings.md) | `mk.embedder` |
 | [speech.md](speech.md) | `mk.speech`, voices, long narration, `FakeSpeech` |
-| [gpu-and-sessions.md](gpu-and-sessions.md) | `mk.gpu.lease`, `mk.gpu.status`, `mk.session`, `mk.unload` |
+| [gpu-and-sessions.md](gpu-and-sessions.md) | `mk.gpu.lease`, `mk.gpu.status`, `mk.machine`, `mk.session`, `mk.unload` |
 | [records-and-replay.md](records-and-replay.md) | span attributes, sinks, content capture, secrets, replay |
 | [cli.md](cli.md) | `hone-models models ...` and `hone-models calls ...` |
 | [testing.md](testing.md) | `FakeOllama`, `FakeSpeech`, the record sink contract, bringing your own client |

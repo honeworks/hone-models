@@ -47,8 +47,61 @@ print(mk.gpu.status())
   `hone.models.gpu.lease_wait_ms`, `.vram_before_mb`, `.unloaded` and `.released`.
 - `mk.gpu.NullGpuLease()` (never waits) and `mk.gpu.FileLockGpuLease(path)` (one user at a time) implement
   the same `GpuLease` port.
+- `mk.gpu.GpuScheduler(unload_others=True, if_busy="block")` unloads other processes' models only while
+  no other process holds a lease or the machine-wide GPU lock; the default `if_busy="unload"` unloads
+  them anyway, as before.
 
 Model calls do not take a lease on their own ([design decision D-009](../design/decisions.md#d-009-no-automatic-gpu-lease-around-model-calls)): wrap them when you need scheduling.
+
+## Machine state: what is loaded, and only what is needed
+
+`mk.machine` answers "what does this machine hold right now?" and "make it hold only what this run
+needs" in one call each. A model left loaded by an earlier run takes VRAM, so the model you measure is
+partly offloaded to the CPU, runs slower and times out; `mk.machine` makes that visible and fixes it
+without breaking another run.
+
+```python no-run
+snap = mk.machine.snapshot()  # plain, JSON-able data
+result = mk.machine.prepare(["gemma4-12b"])  # unload everything else, unless another run is using the GPU
+warm = mk.machine.load("gemma4-12b")  # load now, so the first measured call does not pay for it
+```
+
+**`snapshot()`** reads, never changes anything, and never raises for a missing reader or a dead server.
+Sizes are GB with two decimals; `None` always means unknown, never 0.
+
+| Key | What |
+|---|---|
+| `time` | when it was read (UTC) |
+| `gpus` | every GPU: `index`, `name`, `memory_total_gb`, `memory_used_gb`, `memory_free_gb`, `utilization_pct`, `processes` (`[{pid, memory_gb, mine}]`, GPU 0 only); `None` when neither NVML nor `nvidia-smi` answers |
+| `servers` | `{server, url, running, error}` for Ollama (`OLLAMA_HOST`) and each ComfyUI server (with `vram_gb`, its torch memory). `running` is `True` (answered), `False` (not running, so it holds nothing) or `None` (timed out or failed: unknown, `error` says why) |
+| `loaded_models` | `{server, name, model_id, size_gb, vram_gb}`; `model_id` is the registry id (else `None`); `vram_gb < size_gb` means partly on the CPU. Complete only when no server has `running: None` |
+| `gpu_lock` | the machine-wide lock of `scripts/gpu-lock.sh`: `{path, held, mine, holder}`; `mine` when our own `gpu-lock.sh` holds it (`HONE_GPU_LOCK_HELD=1`) |
+| `leases` | the GPU leases on this machine: `{name, pid, vram_gb, mine}` |
+
+ComfyUI servers are checked only when the registry names one (the `base_url` of its `comfyui` entries)
+or `HONE_COMFYUI_URL` is set. ComfyUI cannot name the models it holds, so they are the registry ids
+hone-models ran there since the last `/free`, with an entry whose `model_id` is `None` for a job or memory
+it cannot name.
+
+**`prepare(needed, *, if_busy="block")`** takes registry ids and unloads every Ollama model not needed
+(whoever loaded it) and frees a ComfyUI server that holds anything not needed (ComfyUI can only free
+everything). When another process holds the GPU lock or a lease, it is doing GPU work right now: with
+`if_busy="block"` nothing is unloaded and `blocked_by` names the holders; `if_busy="unload"` unloads
+anyway. Your own leases and your own `gpu-lock.sh` do not block. It never loads and never waits: whether
+to wait is your policy. It returns `needed`, `blocked_by`, `unloaded`, `released`, `if_busy`, `errors`
+(failed unloads and servers that did not answer, never raised), `missing` (needed but not loaded),
+`loaded_models` (read again afterwards) and `need_gb` (the needed models' registry `vram_gb`, `None` if
+one is unknown), and records a `hone.models.machine.prepare` span.
+
+**`load(model_id)`** warms an Ollama model up (an empty `/api/generate` with the entry's
+`defaults.keep_alive`, default `5m`) and returns `{model_id, loaded, seconds, size_gb, vram_gb, error}`.
+For ComfyUI, command and hosted models loading means running a job, and speech models load in-process
+inside a session, so `load` returns `loaded: None` with the reason. It records a
+`hone.models.machine.load` span.
+
+Call `prepare` and `load` inside your own lease or `scripts/gpu-lock.sh`. `mk.machine.Machine(lock_path=,
+registry=, sink=)` makes a probe with its own settings; `mk.machine.MACHINE` is the default one, and it
+has the shape of hone-select's `MachineProbe` (entry point `hone.machine_probes`).
 
 ## Sessions and unloading
 
@@ -62,4 +115,5 @@ A server the session started runs with a clean environment (no `VIRTUAL_ENV`, `L
 `PYTHONPATH`, `PYTHONHOME`) and is stopped on exit; one that was already running is left alone. A remote
 `OLLAMA_HOST` is never started.
 
-**Runnable examples:** [gpu_lease.py](../examples/gpu_lease.py), [sessions.py](../examples/sessions.py).
+**Runnable examples:** [gpu_lease.py](../examples/gpu_lease.py), [sessions.py](../examples/sessions.py),
+[machine_state.py](../examples/machine_state.py).

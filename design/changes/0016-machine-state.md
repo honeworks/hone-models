@@ -2,7 +2,8 @@
 
 ## Status
 
-`accepted` (2026-09-29, owner: "start implementing"; open questions take the proposed answers)
+`implemented in 0.1.0` (accepted 2026-09-29, owner: "start implementing"; open questions take the
+proposed answers; details in [decisions.md](../decisions.md) D-023)
 
 ## Context
 

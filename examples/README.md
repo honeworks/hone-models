@@ -59,6 +59,7 @@ section of [design/current.md](../design/current.md) that the example illustrate
 |---|---|---|---|
 | [gpu_lease.py](gpu_lease.py) | `mk.gpu.lease` | Reserving VRAM across processes, waiting and timeouts, nested leases, unloading idle models, release hooks for other GPU servers, lease attributes. | §7 |
 | [sessions.py](sessions.py) | `mk.session`, `mk.unload` | Use or start the Ollama server for a block; free a model's memory now. | §9 |
+| [machine_state.py](machine_state.py) | `mk.machine` | What the machine holds (GPUs, servers, loaded models, the GPU lock, leases), warming a model up, unloading leftovers, standing back while another run holds the GPU. | §7, §10 |
 
 ## Testing
 

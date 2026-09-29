@@ -38,9 +38,13 @@ mk.session(provider="ollama")          # context manager: use the running server
 mk.unload(model_id)                    # free VRAM now
 mk.gpu.lease(name, vram_gb, *, timeout_s=None, trace=None)
 mk.gpu.status() -> GpuStatus           # total / used / free MB, leases held, leases waiting
-mk.gpu.GPU, mk.gpu.GpuScheduler(ledger, memory=..., processes=..., unload_others=False, stall_s=120)
+mk.gpu.GPU, mk.gpu.GpuScheduler(ledger, memory=..., processes=..., unload_others=False, stall_s=120, if_busy="unload")
 mk.gpu.NullGpuLease(), mk.gpu.FileLockGpuLease(path)
 mk.gpu.on_short(name, release | None), mk.gpu.comfyui_free(url), mk.gpu.torch_empty_cache   # release hooks
+mk.machine.snapshot() -> dict          # GPUs, model servers, loaded models, the GPU lock, leases (§7)
+mk.machine.prepare(needed, *, if_busy="block") -> dict   # only the needed models loaded
+mk.machine.load(model_id) -> dict      # warm an Ollama model up
+mk.machine.Machine(*, lock_path=None, registry=None, sink=None, gpus=..., processes=..., scheduler=None), mk.machine.MACHINE
 mk.registry.load(paths=None) -> Registry
 mk.replay.Replayer(sink=None, registry=None)
 mk.records.SqliteSpanSink(path), JsonlSpanSink(path), MemorySink(), NullSink()
@@ -303,6 +307,46 @@ probabilities over unknown options or summing above 1 become that question's `er
 - **Model calls do not lease on their own.** Callers wrap GPU work in `mk.gpu.lease(...)`. Whether local
   model calls should lease automatically is an open question ([decisions.md](decisions.md), D-009).
 - `NullGpuLease` (never waits) and `FileLockGpuLease(path)` (one user at a time) have the same shape.
+- **Other processes' models** ([0016](changes/0016-machine-state.md)). `GpuScheduler(unload_others=True,
+  if_busy="block")` unloads other processes' models only while no other process holds a lease or the
+  machine-wide lock; `"unload"` (the default) unloads them anyway.
+- **Machine state** ([0016](changes/0016-machine-state.md)). `mk.machine` reports and controls which models
+  the machine holds; `Machine` has the shape of hone-select's `MachineProbe` (§10), `MACHINE` is the
+  default instance, and the module functions are its methods. Sizes are GB with two decimals; `None` always
+  means unknown, never 0; nothing waits, retries or decides a policy.
+  - `snapshot()` (no side effects, never raises for a missing reader or a dead server) returns `time`;
+    `gpus` (every device from NVML, else one `nvidia-smi --query-gpu=index,name,memory.total,memory.used,utilization.gpu`:
+    `index`, `name`, `memory_{total,used,free}_gb`, `utilization_pct`, `processes` `[{pid, memory_gb, mine}]`
+    for GPU 0, else `None`; the whole list `None` without a reader); `servers` (`{server, url, running,
+    error}` for Ollama at `OLLAMA_HOST` and each ComfyUI server, plus `vram_gb` = the sum of
+    `/system_stats` `torch_vram_total`; `running` `True` answered, `False` connection refused, `None` timed
+    out or failed, with `error`; 2 s timeout); `loaded_models` (`{server, name, model_id, size_gb,
+    vram_gb}`: Ollama from `/api/ps`, `model_id` the registry id whose name, with `:latest` added when it
+    has no tag, matches; ComfyUI from the loaded-models file, sizes `None`, dropped when the server holds
+    no torch memory, plus an entry with `model_id: None` when the newest `/history` job is not in the file
+    or memory is held with nothing named); `gpu_lock` (`{path, held, mine, holder}`: a non-blocking `flock`
+    released at once, `None` when the file cannot be opened, not held when it does not exist; `mine` from
+    `HONE_GPU_LOCK_HELD=1`; `holder` from `<lock>.holder`, read only when held); `leases` (the ledger:
+    `{name, pid, vram_gb, mine}`).
+  - ComfyUI servers checked: the distinct `base_url`s of the registry's `comfyui` entries (default
+    `HONE_COMFYUI_URL`, else `http://127.0.0.1:8188`) plus `HONE_COMFYUI_URL` when set; none otherwise.
+    The loaded-models file is `${HONE_HOME}/models/comfyui-loaded.json` (`{url: [{model_id, job_id, pid,
+    time}]}`, guarded by `flock`).
+  - `prepare(needed, *, if_busy="block")` resolves the ids (`ConfigError` for an unknown id or `if_busy`),
+    reads the servers, and finds `blocked_by`: the lock held and not `mine`, and live leases of other
+    processes. Unless blocked with `"block"`, it unloads every Ollama model not needed (`keep_alive: 0`)
+    and sends ComfyUI `/free` when it holds a model not needed or unnamed (then clears that server's list
+    in the file), then reads the servers again. It returns `needed`, `blocked_by` (`None` or strings),
+    `unloaded` (`[{server, name}]`), `released` (server names), `if_busy`, `errors` (`[{server, name,
+    error}]`: failed unloads or frees, servers with `running: None`; never raised), `missing` (needed
+    Ollama or ComfyUI ids not loaded), `loaded_models` (after) and `need_gb` (the sum of `vram_gb` of the
+    needed models that use this GPU: `local`, `comfyui`, `command`; `None` if one is unknown). It takes
+    no lease or lock and never loads or waits.
+  - `load(model_id)` warms an Ollama model up: `POST /api/generate` with an empty prompt and
+    `defaults.keep_alive` (default `"5m"`), then `/api/ps`; returns `{model_id, loaded, seconds, size_gb,
+    vram_gb, error}`, `loaded: False` with the error when the server fails or times out. Other providers:
+    `loaded: None` and `error: "not supported for <provider>: ..."` (run a small job in a session; speech
+    and transcription models load in-process inside a session), with no request.
 
 ## 8. Records and replay
 
@@ -310,7 +354,9 @@ probabilities over unknown options or summing above 1 become that question's `er
 
 Every call emits one span, `hone.models.chat`, `hone.models.decide`, `hone.models.embed` or
 `hone.models.speech` (kind
-`client`); an emulated decision is a decide span with its chat call as a child. A span is a JSON object:
+`client`); an emulated decision is a decide span with its chat call as a child. `mk.machine.prepare` and
+`mk.machine.load` emit `hone.models.machine.prepare` / `hone.models.machine.load` (kind `internal`);
+`snapshot` emits none. A span is a JSON object:
 
 ```json
 {
@@ -367,6 +413,8 @@ OpenTelemetry GenAI names where they exist, `hone.models.*` otherwise:
 | `hone.models.speech.input` | speech spans: the text; content |
 | `hone.models.speech.{voice,speed,chars,chunks,paragraphs,expressive,session,loaded,duration_s,sample_rate}` | speech spans; `loaded`: this call loaded the model |
 | `hone.models.speech.{emotion,intensity}` | speech spans, only when given |
+| `hone.models.machine.{needed,if_busy,unloaded,released,blocked_by,errors,missing}` | `hone.models.machine.prepare` spans, as returned; status `error` when `errors` is not empty |
+| `hone.models.machine.{model_id,loaded,seconds,vram_gb}` | `hone.models.machine.load` spans; status `error` when `loaded` is `False` |
 | `hone.schema_version`, and `hone.run_id`, `hone.item`, `hone.step`, `hone.candidate_id`, `hone.scorer`, `hone.lens.finding_id` | on every span; the last six copied from the trace context when present |
 
 HTTP retries are `retry` events; structured-output retries are `structured_retry` events. Not recorded
@@ -434,6 +482,7 @@ directly. `mk.PORTS_VERSION` is `"1"`.
 | `mk.gpu`, `mk.gpu.GPU`, `NullGpuLease`, `FileLockGpuLease` | `lease(name, vram_gb, *, timeout_s=None, trace=None)` context manager, reentrant, `TimeoutError` on timeout (§7) |
 | `mk.replay.Replayer()` | `replay_call(span, overrides, *, trace=None) -> span` (§8.6) |
 | a record sink | `emit(span)`, `flush()`, `close()` (§8.2); `hone_models.testing.check_record_sink` checks one |
+| `mk.machine.Machine()`, `mk.machine.MACHINE` | `snapshot() -> dict`, `prepare(needed, *, if_busy="block") -> dict`, `load(model_id) -> dict`, with the keys in §7 (hone-select's `MachineProbe`) |
 
 Entry points, so tools can load these by name without importing hone-models:
 
@@ -444,6 +493,7 @@ Entry points, so tools can load these by name without importing hone-models:
 | `hone.embedders` | `hone_models` | `hone_models:embedder` (takes a model id) |
 | `hone.gpu_leases` | `hone_models` | `hone_models.gpu:GPU` |
 | `hone.replayers` | `hone_models` | `hone_models.replay:Replayer` (no arguments) |
+| `hone.machine_probes` | `hone_models` | `hone_models.machine:Machine` (no arguments: the default probe) |
 
 The contract checks for these shapes run in the test suite against the real implementations with fake
 transports (AC-17).
@@ -471,13 +521,16 @@ models in `tests/gpu/`.
 | AC-14 | Content capture off | messages stored as hashes and lengths only |
 | AC-15 | Replay with a section removed | new span with `replay_of`; the request lacks the section; other params identical |
 | AC-16 | Registry merge, ad-hoc ids, `models list/show` CLI | merged view; `--json` output |
-| AC-17 | Contract checks for the text client, decision client, embedder, GPU lease, replayer and record sink | all pass with fake transports |
+| AC-17 | Contract checks for the text client, decision client, embedder, GPU lease, replayer, record sink and machine probe | all pass with fake transports |
 | AC-18 **[real]** | Ollama: chat, JSON schema and decision emulation on a text model; a vision model on a generated PNG; embeddings; think handling on a thinking model | all succeed under the GPU lock; contract checks pass; models unloaded afterwards |
 | AC-19 **[real]** | GPU lease with real NVML | status reports real memory; the lease / unload cycle works |
 | AC-20 | Examples | every `examples/*.py` runs offline, opens with a What / How / Why docstring, uses only the public API and is listed in `examples/README.md` |
 | AC-21 **[real]** | Speech: a minutes-long script with `FakeSpeech`; one sentence with `kokoro-82m` | one WAV of the right length and one `hone.models.speech` span, text hashed with capture off; the real WAV is non-silent and the GPU is freed afterwards |
 | AC-22 **[real]** | Expressive speech: paragraphs with an emotion and intensity each in one session (`FakeSpeech(expressive=True)`); one line calm and excited with `chatterbox` in one session | the span records emotion, intensity, `expressive`, `session` and paragraph count, a paragraph that fits is one chunk, and the session loads the model once; the real takes are non-silent, the excited one varies more in pitch and is louder and higher, and the GPU is freed afterwards |
 | AC-23 | A lease inside another in the same thread; a lease no one can grant (fake memory) | the nested lease reserves only what the outer one does not cover and never waits for it; the impossible one raises `CapabilityError` after `stall_s`, naming the holders |
+| AC-32 **[real]** | `mk.machine.snapshot()` with a fake NVML (8 GB, one foreign process), FakeOllama with a model partly on the CPU, ComfyUI (fake) after a job, after `/free`, after a job hone-models did not run, and refused; no NVML and no `nvidia-smi`; Ollama answering 500; the lock held by another process, by our own `gpu-lock.sh`, and free | GB values and `vram_gb < size_gb` as scripted; ComfyUI named by registry id, dropped after `/free`, unnamed for a foreign job; a registry without `comfyui` entries checks none; `gpus` is `None`; Ollama `running: None` with an error and no entries; `held` / `mine` / `holder` right; the real card is reported |
+| AC-33 **[real]** | `prepare(["a"])` with Ollama holding `a` and `b` and ComfyUI a model not needed; with ComfyUI holding only needed models; with another process's lease (`if_busy` `"block"` and `"unload"`); with the lock held elsewhere; with the unload of `b` failing | `b` unloaded, ComfyUI freed, span recorded; ComfyUI kept; blocked: nothing sent, `blocked_by` names the holder; `"unload"`: `b` unloaded, `blocked_by` still reported; failure: in `errors`, span status `error`, `b` still loaded; on the real machine `prepare([])` leaves nothing loaded |
+| AC-34 | `load("a")` on FakeOllama; a model partly on the CPU; a server timing out; a `comfyui` entry; `GpuScheduler(unload_others=True, if_busy="block")` short of memory while another process holds a lease | an empty-prompt `/api/generate` with `keep_alive`, `loaded: True` with seconds; `vram_gb < size_gb`; `loaded: False` with the error; `loaded: None`, "not supported", no request; the other process's models are not unloaded and the lease times out as before |
 
 ## 12. Examples
 
@@ -512,6 +565,10 @@ voices, expressiveness and chunk size ([0012](changes/0012-fake-speech-expressiv
   think=False") is then not the fix; raising `max_tokens` is.
 - Model calls do not take GPU leases automatically (D-009, awaiting owner review).
 - Sessions and unloading are Ollama-only.
+- `mk.machine` sees only `flock` users of the lock file and lease holders; a process using the GPU with
+  neither shows only in `gpus[].processes` and does not block `prepare`. Between `prepare`'s read and its
+  unloads another process can load a model or take a lease (the state after is read again).
+  `FileLockGpuLease` writes no `.holder` file, so a Python holder of the lock shows as `holder: None`.
 - No streaming, async clients, `hone.models.timing.*` attributes or media generation other than speech.
 - The `speech` extra (Kokoro) needs Python < 3.13 and loads the model on every call (about a second)
   outside a session.

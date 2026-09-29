@@ -32,6 +32,7 @@ src/hone_models/       public API in __init__.py (explicit __all__)
   providers/           one module per provider (Ollama, OpenAI-compatible, Jev, LiteLLM extra)
   registry.py data/    model registry and packaged defaults
   gpu.py runtime/      GPU leases; Ollama sessions and unload
+  machine.py           machine state: snapshot, prepare, load (readers in _machine_read.py)
   records.py _tracing.py replay.py calls.py cli.py   spans, trace context, replay, call queries, CLI
   testing/             FakeOllama, FakeSpeech and the record-sink contract check
 tests/unit|contract|integration|e2e|gpu

@@ -22,7 +22,9 @@ records every call so you can see and replay what happened.
   tells you which (`structured_path`) and never hides a truncated reply.
 - **Decision questions:** yes/no, choice and score questions answered by a decision model (Jev) or
   emulated on any LLM, with calibrated probabilities from token logprobs when available.
-- **Embeddings, GPU leases and local model lifecycle** (`mk.gpu.lease`, `mk.session`, `mk.unload`).
+- **Embeddings, GPU leases and local model lifecycle** (`mk.gpu.lease`, `mk.session`, `mk.unload`), and
+  **machine state**: which models every server holds, partly on the CPU or not, and unloading all but the
+  needed ones without breaking another run (`mk.machine.snapshot()`, `prepare()`, `load()`).
 - **Local text to speech** (`mk.speech("kokoro-82m")`, extra `speech`): long narration into one WAV file;
   expressive narration with an emotion and intensity per paragraph (`mk.speech("chatterbox")`, extra
   `expressive`).
@@ -90,6 +92,7 @@ structurally (it imports none of them):
 | `Embedder` | `mk.embedder(...)` | `hone.embedders` |
 | `GpuLease` | `mk.gpu.GPU` / `mk.gpu.lease` | `hone.gpu_leases` |
 | `Replayer` | `mk.replay.Replayer()` | `hone.replayers` (no argument) |
+| `MachineProbe` (hone-select) | `mk.machine.Machine()` / `mk.machine.MACHINE` | `hone.machine_probes` (no argument) |
 
 For example, `hone-select` judges and `hone-taste` panels take `mk.decision("gemma4-12b")` as their
 decision client, and `hone-flow` steps take `mk.gpu.GPU` as their GPU lease. Spans follow the shared

@@ -494,8 +494,8 @@ runs one job in `client.session()` (so it starts ComfyUI from `HONE_COMFYUI_STAR
 and stops it after) with the smallest inputs every packaged model accepts: 256x256 for images, 10 s of
 audio (HeartMuLa's sampler takes at least 10 s), 1 s at 256x256 for video, from a generated gradient PNG
 when the entry takes `image`; a line of lyrics when it takes `lyrics`; seed 1. Only the inputs the entry
-takes are passed. The file goes to `--out` (default `$HONE_HOME/models/checks/<id>/tiny.<suffix>`: the
-provider's suffix, because ids such as `ace-step-1.5-turbo` look like they have one). It prints the time,
+takes are passed. The file goes to `--out` (default `$HONE_HOME/models/checks/`) as `<id>.<suffix>`, the provider's suffix
+(a dot in an id such as `ace-step-1.5-turbo` is not taken for one, D-075). It prints the time,
 the measured file and `peak_vram_gb`: GPU 0's used memory sampled every 0.25 s (NVML, else `nvidia-smi`)
 minus the memory in use at the start; the whole card, because ComfyUI is another process. Unlike the chat
 check it saves nothing to the user registry: the value is for the entry's `vram_gb`, which a person sets.
@@ -526,3 +526,12 @@ server as `running: False` with the connection error, which is true and costs on
 A registry that should not look (a machine without ComfyUI) can point `HONE_COMFYUI_URL` elsewhere or
 override the entries. Part of [0015](changes/0015-generation-models.md).
 Awaiting owner review (keep the row, or skip servers whose entries' files are not installed).
+
+## D-075: which suffix of `out` counts
+`output_paths` read `Path.suffix`, so `takes/ace-step-1.5-turbo` was taken to end in `.5-turbo` and the
+file was written without the provider's suffix. Now only a suffix in `_media_files.MEDIA_SUFFIXES` (images,
+audio, video, compared without case) or one of the provider's own suffixes for the job counts as `out`'s;
+anything else is part of the name and the provider's suffix is appended. A fixed list rather than
+`mimetypes`, whose table depends on the machine. `models check` no longer works around it (it wrote
+`<id>/tiny.<suffix>`) and writes `<id>.<suffix>`. Part of [0015](changes/0015-generation-models.md).
+No review needed.

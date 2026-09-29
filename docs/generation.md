@@ -53,7 +53,9 @@ converted per model, and inputs such as `camera_angle` become the model's own ph
 - **Seed.** `seed=None` takes the entry's `defaults.seed`, else a random one. The seed used is on the
   result and the span, so every output can be made again.
 - **Output.** `out` is the file to write (parent folders are created). Several files (`n > 1`, stems) are
-  `<stem>_1<suffix>`, `<stem>_2<suffix>`, ...; an `out` without a suffix takes the provider's.
+  `<stem>_1<suffix>`, `<stem>_2<suffix>`, ...; an `out` without a suffix takes the provider's. Only a media
+  suffix (`.png`, `.flac`, `.mp4`, ...) or the provider's own counts, so `takes/ace-step-1.5-turbo` becomes
+  `takes/ace-step-1.5-turbo.flac`.
 - **Timeout.** `timeout_s` defaults to the entry's `max_timeout_s` (by kind: image 600 s, music 1800 s,
   video 3600 s). When it runs out the job is cancelled at the provider and `ModelTimeout` is raised; any
   other exception while waiting (`Ctrl-C` included) cancels the job too, then goes on.
@@ -248,13 +250,13 @@ runs one tiny job in a session (so with `HONE_COMFYUI_START` set it starts Comfy
 and stops it afterwards): a 256x256 image, 10 s of audio, or a 1 s 256x256 clip from a generated start
 frame, passing only the inputs the entry takes. It prints the time, the measured file and `peak_vram_gb`
 (the whole card's used memory, sampled while the job runs, minus what was in use before), and exits 1
-with the error when the job fails. The file goes to `--out` (default `$HONE_HOME/models/checks/<id>/`).
+with the error when the job fails. The file is `<id>.<suffix>` in `--out` (default `$HONE_HOME/models/checks/`).
 Put the peak into the entry's `capabilities.vram_gb`; the command saves nothing itself.
 
 ```text
 $ hone-models models check z-image-turbo --json
 {"id": "z-image-turbo", "kind": "image", "seconds": 13.1, "inputs": {"size": "256x256"}, "error": null,
- "path": ".hone/models/checks/z-image-turbo/tiny.png", "mime": "image/png", "width": 256, "height": 256,
+ "path": ".hone/models/checks/z-image-turbo.png", "mime": "image/png", "width": 256, "height": 256,
  "peak_vram_gb": 6.29, ...}
 ```
 

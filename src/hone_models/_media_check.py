@@ -50,7 +50,7 @@ def check(client: MediaClient, out_dir: Path, *, seed: int = 1) -> dict[str, Any
         inputs["image"] = start_frame(out_dir / "start-frame.png", 256, 256)
     started = time.monotonic()
     with peak_gpu_mb() as peak, client.session():
-        r = client.generate(PROMPTS[client.kind], out=out_dir / client.model_id / "tiny", seed=seed, **inputs)
+        r = client.generate(PROMPTS[client.kind], out=out_dir / client.model_id, seed=seed, **inputs)
     first = r.files[0] if r.files else None
     return {
         "id": client.model_id,

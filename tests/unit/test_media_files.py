@@ -41,6 +41,26 @@ def test_output_paths(tmp_path: Path) -> None:
     ]
 
 
+def test_output_paths_a_dot_in_the_name_is_not_a_suffix(tmp_path: Path) -> None:
+    takes = tmp_path / "takes"
+    assert output_paths(takes / "ace-step-1.5-turbo", [".flac"]) == [takes / "ace-step-1.5-turbo.flac"]
+    assert output_paths(tmp_path / "clips" / "v1.2", [".mp4", ".mp4"]) == [
+        tmp_path / "clips" / "v1.2_1.mp4",
+        tmp_path / "clips" / "v1.2_2.mp4",
+    ]
+    assert output_paths(takes / "song.v2", [".flac", ".wav"]) == [
+        takes / "song.v2_1.flac",
+        takes / "song.v2_2.wav",
+    ]
+
+
+def test_output_paths_keep_a_media_suffix_or_the_providers(tmp_path: Path) -> None:
+    assert output_paths(tmp_path / "take.1.WAV", [".flac"]) == [tmp_path / "take.1.WAV"]  # the caller's
+    shots = output_paths(tmp_path / "shot.webp", [".png", ".png"])
+    assert shots == [tmp_path / "shot_1.webp", tmp_path / "shot_2.webp"]
+    assert output_paths(tmp_path / "scene.xyz", [".xyz"]) == [tmp_path / "scene.xyz"]  # the provider's
+
+
 def test_measure_png_and_wav_by_content(tmp_path: Path) -> None:
     image = tmp_path / "shot.bin"  # recognised by its bytes, not its name
     image.write_bytes(png(40, 30))

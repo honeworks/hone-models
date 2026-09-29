@@ -157,7 +157,7 @@ vocabulary (`negative`, `size`, `references`, `image`, `source`, `strength`, `ly
 not take, a missing file, a size or duration the entry does not declare, or too many references raise
 `ConfigError` / `CapabilityError` before any request or lease. `seed=None` takes `defaults.seed`, else a
 random seed; the seed used is on the result and the span. Several files are `<stem>_1<suffix>`, ...; an
-`out` without a suffix takes the provider's. A job that ran without usable output is a result (`error`,
+`out` without a media suffix takes the provider's (a dot in a name such as `v1.2` is not a suffix). A job that ran without usable output is a result (`error`,
 `error_kind`, no files, span status `error`); one that could not be submitted, run or fetched raises
 (`ConfigError` for ComfyUI `node_errors`, `ProviderError` (a `command` program's non-zero exit included),
 `ModelTimeout` after cancelling the job; any exception while waiting cancels the job too). A local model's call leases the GPU by itself

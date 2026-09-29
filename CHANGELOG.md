@@ -150,6 +150,9 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
 - Docs (`docs/`) and a real-model test suite (`tests/gpu/`, run through `scripts/gpu-lock.sh`).
 
 ### Fixed (before release)
+- An `out` without a file suffix whose name has a dot (`takes/ace-step-1.5-turbo`, `clips/v1.2`) gets the
+  provider's suffix; only a media suffix or the provider's own counts as `out`'s (D-075). `models check`
+  writes `<id>.<suffix>`.
 - ComfyUI video results are fetched: a `SaveVideo` history entry lists `"animated": [true]` next to its
   files, which made the output reader fail.
 - The default test suite never reaches a real ComfyUI on the machine (it freed the local server).

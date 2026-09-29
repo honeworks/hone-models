@@ -50,7 +50,7 @@ def test_image_check_runs_a_tiny_job_and_reports_the_peak(
     found = json.loads(result.output)
     assert (found["id"], found["kind"], found["inputs"]) == ("test-image", "image", {"size": "256x256"})
     assert (found["width"], found["height"], found["mime"]) == (256, 256, "image/png")
-    assert Path(found["path"]) == tmp_path / "test-image" / "tiny.png"
+    assert Path(found["path"]) == tmp_path / "test-image.png"
     assert found["peak_vram_gb"] == round((6700 - 300) / 1024, 2)
     assert found["error"] is None
     submitted = server.submitted[0]

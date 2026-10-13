@@ -63,7 +63,7 @@ assert mk.guide("z-image-turbo").pose == "none"  # it takes no reference picture
 
 `capabilities.pose` says how a model takes a pose: `none` (pose pictures are not useful), `reference` (a
 skeleton or a mannequin picture goes in as an ordinary reference, which works less exactly than a
-control) or `control` (a pose skeleton is a control input, the entry's `pose` input). The packaged image
+control) or `control` (a control input of the model; none of the packaged models has one yet). The packaged image
 models that take references are `reference`.
 
 In a catalog entry:

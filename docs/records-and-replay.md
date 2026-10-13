@@ -26,7 +26,7 @@ Main attributes (full list in [design/current.md §8.3](../design/current.md#83-
 ([generation.md](generation.md#records)). Generated files are recorded by path and hash, never their
 bytes. `mk.machine.prepare` and `mk.machine.load` record
 `hone.models.machine.prepare` / `hone.models.machine.load` spans (kind `internal`) with
-`hone.models.machine.*` attributes. A cancelled job is a `cancelled` event, and a call the caller cancelled (`cancel=`) has `error_kind = "cancelled"`; a hosted video job's progress is a `progress` event. HTTP retries are `retry` events; structured-output
+`hone.models.machine.*` attributes. A cancelled job is a `cancelled` event, and a call the caller cancelled (`cancel=`) has `error_kind = "cancelled"` (or `cancel_late = true` when the result had already come back); a hosted video job's progress is a `progress` event. HTTP retries are `retry` events; structured-output
 retries are `structured_retry` events. LiteLLM models retry inside LiteLLM, without events.
 
 **Content capture.** `HONE_CAPTURE_CONTENT=0` or `SqliteSpanSink(path, capture_content=False)` stores

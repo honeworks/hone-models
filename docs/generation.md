@@ -60,9 +60,12 @@ converted per model, and inputs such as `camera_angle` become the model's own ph
   video 3600 s). When it runs out the job is cancelled at the provider and `ModelTimeout` is raised; any
   other exception while waiting (`Ctrl-C` included) cancels the job too, then goes on.
 - **Cancel.** `cancel` takes a `threading.Event`; set it from another thread (a Pause or Stop button) to
-  stop the call with `mk.errors.Cancelled`. A ComfyUI job is cancelled at the server within a second (the
-  event is checked while polling); a hosted or `command` job finishes first, then the call raises. An
-  event already set when the call starts runs nothing. The span records `error_kind = "cancelled"`.
+  stop the call with `mk.errors.Cancelled`, at once: while it waits for the GPU lease, before ComfyUI
+  queues the job or fetches its files, while a ComfyUI job, a `command` program or a hosted video job
+  runs (the job is cancelled, the program's processes killed). An event already set when the call starts
+  runs nothing. A hosted image request cannot be stopped mid-way; a result a provider already returned
+  is kept, and the span says the cancel came late (`hone.models.media.cancel_late`). Otherwise the span
+  records `error_kind = "cancelled"`.
 
 ```python
 import threading

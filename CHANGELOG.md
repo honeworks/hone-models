@@ -35,8 +35,12 @@ First release. Design: [0001 initial design](design/changes/0001-initial-design.
   `vram_gb`. Guides gain `notes` per situation (`[[models.<id>.guide.notes]]`: `about`, `says`, `source`,
   `checked`), `ModelGuide.notes_about(about)` and the notes grouped in `as_text()`; the five local image
   models carry notes drawn from measured evidence. `capabilities.pose` (`none`, `reference`, `control`).
-  `generate(..., cancel=threading.Event)` raises the new `mk.errors.Cancelled` (ComfyUI cancels its job
-  while polling; other providers finish first). AC-36.
+  `generate(..., cancel=threading.Event)` raises the new `mk.errors.Cancelled` at once: while waiting for
+  the GPU lease, and while a ComfyUI, `command` or hosted video job runs (the job is cancelled); a result
+  already returned is kept (`cancel_late`). `hone-models models check` gives an entry that needs a
+  reference a generated one. AC-36.
+  **Not additive for `z-image-turbo`:** it now declares `sizes`, so a size outside the list is refused
+  with `CapabilityError`; add the size to `capabilities.sizes` in your own registry file to use it.
 - Endpoints and keys from the environment ([0017](design/changes/0017-settings-from-the-environment.md)):
   `base_url_env` on a registry entry names the variable holding its base URL (it wins over `base_url`;
   unset with no `base_url` is a `ConfigError` before any request). `mk.registry.load()` exports the unset

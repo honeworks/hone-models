@@ -632,13 +632,16 @@ No review needed.
 0020 asks every callable image entry to declare `sizes`, and a declared list is enforced (a size not in
 it is a `CapabilityError`). The five local image entries (`z-image-turbo`, `flux.2-klein-4b`,
 `flux.2-klein-4b-text`, `qwen-image-edit-2511`, `qwen-image-2.1-turbo`) share one list: the sizes
-hone-frame and hone-music-video use on the 8 GB reference machine (1024x1024; the 16:9, 9:16, 1:1 and 4:5
-start frames 1024x576, 576x1024, 768x768, 704x880; full figures 832x1248; four-figure sheets 2048x1024),
-plus 256x256 and 512x512, which `models check` and AC-30 use. On the owner's request (2026-10-13) the list
+hone-frame and hone-music-video ask for on the 8 GB reference machine (1024x1024; the 16:9, 9:16, 1:1 and
+4:5 start frames 1024x576, 576x1024, 768x768, 704x880; full figures 832x1248; four-figure sheets
+2048x1024), plus 256x256 and 512x512, which `models check` and AC-30 use. Of these, only 1024x1024 (every
+model), 1024x576 (z-image-turbo; qwen-image-edit-2511 with hone-music-video's 4-step workflow; Qwen-Image
+2.1 Turbo), 832x1248 and 2048x1024 (Qwen-Image 2.1 Turbo, z-image-turbo's sheets), 256x256 and 512x512
+(z-image-turbo) were run; the 9:16, 1:1 and 4:5 frame sizes never were (hone-music-video D-030). On the owner's request (2026-10-13) the list
 also holds the common sizes, every side a multiple of 16: 1280x720 and 720x1280, 1344x768, 1664x928 and
 1328x1328 (Qwen-Image's native 16:9 and 1:1), 4:3 (1024x768, 1152x864), 3:2 (1216x832, 1536x1024),
-1152x896, 21:9 (1536x640) and their portrait forms. Not every model was run at every size: the
-notes about `sizes` say which were proven for each. A caller that needs another size adds it in its own
+1152x896, 21:9 (1536x640) and their portrait forms. Every declared size is allowed; those not run above
+are unproven, and each model's notes about `sizes` say which were run for it. A caller that needs another size adds it in its own
 registry file (a later list replaces the packaged one). The catalog-only image entries (no workflow) keep
 only what is known (licence, `commercial_use`); their `vram_gb` and sizes are unmeasured.
 No review needed.
@@ -666,10 +669,14 @@ No review needed.
 
 ## D-084: cancelling a media call
 `cancel` is a `threading.Event` on `MediaClient.generate` and `MediaJob`. The client raises `Cancelled`
-when it is set before the job starts (nothing runs) or by the time the provider returns (a hosted or
-`command` job, which cannot be stopped from here, finishes first; its files stay where they were written
-and the span lists no outputs). ComfyUI waits on the event instead of sleeping, so a set event ends the
-wait at once; the existing `_cancel` stops the job and the server is freed as after any failure. The span
+when it is set before the job starts (nothing runs). While the job runs, the waits see it: the GPU lease's
+wait (`GpuScheduler` and `FileLockGpuLease` sleep on the event, set through a context variable so the lease
+port keeps its signature), ComfyUI's poll (it waits on the event; the existing `_cancel` stops the job and
+the server is freed as after any failure, and it is checked again before queueing and before fetching),
+a `command` program (waited for in 0.2 s steps, then its process group killed) and a hosted video job (the
+poll waits on the event, then the job is deleted). A synchronous hosted image request cannot be stopped.
+When the provider has already returned its result, a late cancel does not throw it away: the result is
+returned and the span gets `hone.models.media.cancel_late = true`. The span
 records `hone.models.media.error_kind = "cancelled"` (the vocabulary of `error_kind`, though a
 cancellation raises rather than returning a result) and status `error`. `Cancelled` is in `mk.errors`
 like the other exceptions.
@@ -684,5 +691,7 @@ there as likely says "not measured yet". Some hone-frame findings name the run, 
 given to the model that run used for that kind of picture (FLUX.2 klein for edits in the standard
 profile, Z-Image Turbo for drawings from text in the quality profile). The Qwen-Image-Edit 2511 Lightning
 LoRA's install repository (`lightx2v/Qwen-Image-Edit-2511-Lightning`) is written from its file name and
-was not checked against Hugging Face from here.
+was not checked against Hugging Face from here. After an independent review (2026-10-13) every note was
+checked again against its source: notes now say which workflow a measure came from, cite the record that
+holds a finding, and a note whose source did not concern the model was removed.
 **Awaiting owner review:** confirm the attributions above.

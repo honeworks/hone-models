@@ -65,8 +65,9 @@ today by its timeout or by an exception in the calling thread.
 
 ## Migration and compatibility
 
-Additive. Existing guides without notes are valid; `pose` unknown is `None`. A caller that does not pass
-`cancel` behaves as before.
+Additive, except for `z-image-turbo`: it now declares `sizes`, so sizes outside the list are now
+refused (`CapabilityError`); add them to `capabilities.sizes` in a registry file. Existing guides without
+notes are valid; `pose` unknown is `None`. A caller that does not pass `cancel` behaves as before.
 
 ## Acceptance
 

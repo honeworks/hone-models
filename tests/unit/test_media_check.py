@@ -97,3 +97,17 @@ def test_a_failed_tiny_job_exits_1(tmp_path: Path, monkeypatch: pytest.MonkeyPat
 def test_default_out_folder_is_under_hone_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("HONE_HOME", str(tmp_path / "home"))
     assert _media_check.default_out_dir() == tmp_path / "home" / "models" / "checks"
+
+
+@pytest.mark.parametrize(
+    "model_id",
+    sorted(m.id for m in mk.registry.load().models.values() if m.kind == "image" and m.workflow),
+)
+def test_check_runs_every_packaged_image_entry(
+    model_id: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    memory(monkeypatch, None)
+    with FakeComfyUI():
+        found = _media_check.check(mk.image(model_id, sink=mk.records.MemorySink()), tmp_path)
+    assert found["error"] is None
+    assert (found["width"], found["height"]) == (256, 256)

@@ -4,7 +4,7 @@ and the GPU memory sampled while it runs, so a new workflow is proven and its `v
 
 The tiny job takes the smallest inputs that make every packaged model run: a 256x256 image, 10 s of
 audio (HeartMuLa's shortest), a 1 s, 256x256 clip from a generated start frame; only the inputs the entry
-takes are passed.
+takes are passed, and a generated picture as the one reference of an entry that needs one.
 """
 
 from __future__ import annotations
@@ -50,6 +50,8 @@ def check(client: MediaClient, out_dir: Path, *, seed: int = 1) -> dict[str, Any
         inputs["lyrics"] = LYRICS
     if "image" in client.inputs and client.kind != "music":
         inputs["image"] = start_frame(out_dir / "start-frame.png", 256, 256)
+    if client.config.empty_slots == "repeat_last" and "references" in client.inputs:  # needs one (D-083)
+        inputs["references"] = [start_frame(out_dir / "start-frame.png", 256, 256)]
     started = time.monotonic()
     with peak_gpu_mb() as peak, client.session():
         r = client.generate(PROMPTS[client.kind], out=out_dir / client.model_id, seed=seed, **inputs)

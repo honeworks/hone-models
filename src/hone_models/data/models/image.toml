@@ -47,7 +47,7 @@ examples = ["a shop sign that reads \"OPEN LATE\" above the door"]
 source = "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"
 [[models."z-image-turbo".guide.notes]]
 about = "general"
-says = "Long, structured prompts of 80 to 250 words work: shot, subject, clothing and colours, background, light, style. Write plain sentences: a tag list did worse than no detail at all, and a period label alone barely changed the picture."
+says = "Its guides ask for long, structured prompts of 80 to 250 words: shot, subject, clothing and colours, background, light, style. Write plain sentences: a tag list did worse than no detail at all, and a period label alone barely changed the picture."
 source = "hone-frame/design/research/prompting-findings.md"
 checked = 2026-10-03
 [[models."z-image-turbo".guide.notes]]
@@ -87,8 +87,8 @@ source = "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"
 checked = 2026-09-29
 [[models."z-image-turbo".guide.notes]]
 about = "sizes"
-says = "Used on the 8 GB card at 1024x1024, at 2048x1024 for a row of four full figures, and at the 16:9, 9:16, 1:1 and 4:5 start-frame sizes; other sizes are unproven (add them in your own registry file)."
-source = "hone-music-video/design/decisions.md D-023, D-030"
+says = "Run on the 8 GB card at 1024x1024, at 2048x1024 for a row of four full figures and at 1024x576 for 16:9 frames; the 9:16, 1:1 and 4:5 frame sizes were never run, and the other declared sizes are allowed but unproven."
+source = "hone-frame/src/hone_frame/data/presets/profile.toml; hone-music-video/design/decisions.md D-023, D-030"
 checked = 2026-10-10
 
 # FLUX.2 klein 4B with references (hone-frame's proven workflow, its D-016): two reference slots, both
@@ -141,7 +141,7 @@ source = "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
 [[models."flux.2-klein-4b".guide.notes]]
 about = "general"
 says = "Keep prompts to about 40 to 120 words with the subject first: the model weighs the first words most, and its guides say prompts over 100 words confuse it. Write sentences, not tags."
-source = "hone-frame/design/changes/0002-prompt-dialects.md"
+source = "hone-frame/design/changes/0002-prompt-dialects.md; hone-frame/design/research/prompting-findings.md"
 checked = 2026-10-02
 [[models."flux.2-klein-4b".guide.notes]]
 about = "faces"
@@ -175,8 +175,8 @@ source = "hone-frame/design/research/prompting-findings.md; hone-frame/design/de
 checked = 2026-10-03
 [[models."flux.2-klein-4b".guide.notes]]
 about = "objects"
-says = "Asked to turn an object it returned near-copies of the reference; flat objects (a bow, a coiled lasso) look the same from front, back and side. For a real turn use qwen-image-edit-2511 with its camera phrase."
-source = "hone-frame/design/changes/0007-quality-pipeline.md"
+says = "Asked to turn an object (a mace) it returned near-copies of the reference; flat objects (a bow, a coiled lasso) look the same from front, back and side. For a real turn use qwen-image-edit-2511 with its camera phrase."
+source = "hone-frame/design/changes/0007-quality-pipeline.md; hone-frame/design/research/prompting-findings.md"
 checked = 2026-10-04
 [[models."flux.2-klein-4b".guide.notes]]
 about = "objects"
@@ -200,7 +200,7 @@ source = "hone-frame/design/decisions.md D-017"
 checked = 2026-10-02
 [[models."flux.2-klein-4b".guide.notes]]
 about = "sizes"
-says = "Proven at 1024x1024 on the 8 GB card, about 30 s a picture; other sizes are unproven."
+says = "Run at 1024x1024 on the 8 GB card, about 30 s a picture; the other declared sizes are allowed but unproven."
 source = "hone-frame/design/changes/0007-quality-pipeline.md"
 checked = 2026-10-04
 
@@ -247,7 +247,7 @@ source = "hone-frame/design/research/prompting-findings.md; hone-frame/design/de
 checked = 2026-10-03
 [[models."flux.2-klein-4b-text".guide.notes]]
 about = "people"
-says = "Spell out what is worn: a culture or period name alone falls back to Western costume, and concrete garments fix it."
+says = "Spell out what is worn: the studies hone-frame cites find image models fall back to Western costume from a culture or period name; concrete garments fixed it on Z-Image Turbo (not tested on this model)."
 source = "hone-frame/design/research/prompting-findings.md"
 checked = 2026-10-03
 [[models."flux.2-klein-4b-text".guide.notes]]
@@ -257,7 +257,7 @@ source = "hone-frame/design/decisions.md D-016"
 checked = 2026-10-02
 [[models."flux.2-klein-4b-text".guide.notes]]
 about = "sizes"
-says = "Proven at 1024x1024 on the 8 GB card; other sizes are unproven."
+says = "Run at 1024x1024 on the 8 GB card; the other declared sizes are allowed but unproven."
 source = "hone-frame/src/hone_frame/data/hone-models.toml"
 checked = 2026-10-02
 
@@ -331,18 +331,18 @@ source = "hone-frame/design/changes/0002-prompt-dialects.md"
 checked = 2026-10-02
 [[models."qwen-image-edit-2511".guide.notes]]
 about = "faces"
-says = "For a close-up give a portrait (a large face) as image 1: from a full-body front view first, a close-up came out younger and softer than the character. Saying \"keeps the face of image 1: same age, same features\" helps too."
+says = "For a close-up give a portrait (a large face) as image 1: from a full-body front view first, a close-up came out younger and softer than the character (seen with hone-music-video's 4-step workflow). hone-music-video also ends such prompts with \"keeps the face of image 1: same age, same features\"."
 source = "hone-music-video/design/decisions.md D-065"
 checked = 2026-10-10
 [[models."qwen-image-edit-2511".guide.notes]]
 about = "people"
-says = "For a character's side and back views the Multiple-Angles LoRA made practically no difference, and its back view merged a character's two shoulder snakes into one arc."
+says = "For a character's side and back views the Multiple-Angles LoRA made practically no difference (hone-music-video's 4-step workflow), and its back view merged a character's two shoulder snakes into one arc."
 source = "hone-music-video/design/decisions.md D-136"
 checked = 2026-10-11
 [[models."qwen-image-edit-2511".guide.notes]]
 about = "poses"
-says = "Give the pose as a picture among the references (a plain mannequin or a skeleton); text alone keeps the reference's pose on the editing models tried, and skeleton pose transfer is reported to work on Qwen-Image-Edit 2509."
-source = "hone-music-video/experiments/research/1-image-conditioning.md"
+says = "Give the pose as a picture: a plain mannequin in the pose among the references is the route proven in this family (on FLUX.2 klein). Skeletons are unproven on 2511: a user reports that 2509's OpenPose obedience no longer works in 2511, and LoRAs (AnyPose, VNCCS PoseStudio) are said to restore it."
+source = "hone-frame/design/research/prompting-findings.md; hone-music-video/experiments/research/1-image-conditioning.md"
 checked = 2026-10-13
 [[models."qwen-image-edit-2511".guide.notes]]
 about = "objects"
@@ -356,7 +356,7 @@ source = "hone-frame/src/hone_frame/data/hone-models.toml"
 checked = 2026-10-02
 [[models."qwen-image-edit-2511".guide.notes]]
 about = "sizes"
-says = "Proven at 1024x1024 (about 2 minutes a picture with the 8-step Lightning LoRA, against about 8 minutes for 40 plain steps) and at 1024x576 for 16:9 frames; other sizes are unproven."
+says = "This 8-step workflow was run at 1024x1024 (about 2 minutes a picture, against about 8 minutes for 40 plain steps). 1024x576 was run only with hone-music-video's own 4-step workflow (about 141 s). The other declared sizes are allowed but unproven."
 source = "hone-frame/src/hone_frame/data/hone-models.toml; hone-music-video/design/decisions.md D-030"
 checked = 2026-10-10
 
@@ -549,8 +549,8 @@ source = "hone-music-video/src/hone_music_video/data/models.toml"
 checked = 2026-10-11
 [[models."qwen-image-2.1-turbo".guide.notes]]
 about = "faces"
-says = "In a picture where a face must be recognised, give the character's portrait instead of a full body; a full body carries only a small face."
-source = "hone-music-video/design/current.md §10.1; hone-music-video/design/decisions.md D-145"
+says = "hone-music-video gives a face shot the character's portrait instead of a full body, a rule adopted after Qwen-Image-Edit 2511 drew a close-up from a full body younger and softer; it was not measured separately on this model."
+source = "hone-music-video/design/current.md §10.1; hone-music-video/design/decisions.md D-065"
 checked = 2026-10-11
 [[models."qwen-image-2.1-turbo".guide.notes]]
 about = "hands"
@@ -559,8 +559,8 @@ source = "hone-music-video/experiments/weak-points.md §H"
 checked = 2026-10-13
 [[models."qwen-image-2.1-turbo".guide.notes]]
 about = "people"
-says = "Give each character one picture of its body or its face: from two full bodies of one character it drew that character twice, and a portrait beside a body added a third person in two of three seeds."
-source = "hone-music-video/design/decisions.md D-145"
+says = "Give each character one picture: six or ten full-body views read at 512 px drew each character twice (at 1024 px they did not), and a full body plus a drawn portrait per character added a third person in two of three seeds, although one body and one face crop per character showed no duplicates in an earlier test."
+source = "hone-music-video/design/changes/0021-qwen-image-2.1-turbo.md; hone-music-video/design/decisions.md D-145"
 checked = 2026-10-11
 [[models."qwen-image-2.1-turbo".guide.notes]]
 about = "people"
@@ -576,11 +576,6 @@ checked = 2026-10-13
 about = "objects"
 says = "The reference's side is copied: a laptop whose only picture showed the back of the lid was drawn with that side to the camera, typed on from behind. Give an object a picture of the side the picture needs."
 source = "hone-music-video/experiments/issues.md §8"
-checked = 2026-10-13
-[[models."qwen-image-2.1-turbo".guide.notes]]
-about = "objects"
-says = "An unusual object (a mace with an ox's head) is drawn as the nearest common object unless a picture of it is given."
-source = "hone-music-video/src/hone_music_video/data/prompts/limits.md"
 checked = 2026-10-13
 [[models."qwen-image-2.1-turbo".guide.notes]]
 about = "places"
@@ -599,8 +594,8 @@ source = "hone-music-video/design/decisions.md D-146"
 checked = 2026-10-11
 [[models."qwen-image-2.1-turbo".guide.notes]]
 about = "references"
-says = "References cost time, not memory: read at 1024 px a scene took 21 s with none, 63 s with 3, 215 s with 6 and 436 s with 10; read at 512 px, 24, 34 and 51 s. With none it draws from the prompt alone."
-source = "hone-music-video/experiments/scene-refs/out.log; hone-music-video/design/decisions.md D-140"
+says = "References cost time, not memory: read at 1024 px a scene took 21 s with none, 63 s with 3, 215 s with 6 and 436 s with 10; read at 512 px, 24, 34 and 51 s, but with 6 or 10 at 512 px each character was drawn twice. With none it draws from the prompt alone."
+source = "hone-music-video/design/changes/0021-qwen-image-2.1-turbo.md; hone-music-video/design/decisions.md D-140"
 checked = 2026-10-11
 [[models."qwen-image-2.1-turbo".guide.notes]]
 about = "sizes"

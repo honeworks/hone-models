@@ -243,8 +243,8 @@ def test_scoring_entries_cannot_be_called() -> None:
 
 
 def test_comfyui_catalog_entry_without_workflow_says_so(isolated: Path) -> None:
-    with FakeComfyUI(), pytest.raises(ConfigError, match=r"no workflow yet for 'flux\.2-klein-4b'"):
-        mk.image("flux.2-klein-4b").generate("a cat", out=isolated / "cat.png")
+    with FakeComfyUI(), pytest.raises(ConfigError, match=r"no workflow yet for 'krea-2-turbo'"):
+        mk.image("krea-2-turbo").generate("a cat", out=isolated / "cat.png")
 
 
 def test_a_packaged_id_declared_twice_is_refused(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

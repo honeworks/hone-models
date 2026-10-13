@@ -1,7 +1,9 @@
 # Packaged catalog: image generation and editing (change 0015 §3b). A ComfyUI entry has a `workflow` (API
 # format, relative to hone_models/data/) and an `inputs` table once the workflow is written and proven with
 # `hone-models models check <id>` (every model installed on the reference machine has one, D-070); until
-# then calling it says the workflow is missing. `vram_gb` is the peak measured by that check.
+# then calling it says the workflow is missing. `vram_gb` is the peak measured by that check, or set near
+# the whole card on purpose where a comment says so. `sizes` lists the sizes used on the reference
+# machine (D-081); `guide.notes` say how a model behaves per situation, each with its evidence (0020).
 # `install.files` go to <HONE_COMFYUI_DIR or ~/ComfyUI>/models/<to>.
 
 [models."z-image-turbo"]
@@ -21,6 +23,8 @@ vram_gb = 6.3
 max_references = 0
 license = "Apache-2.0"
 commercial_use = true
+pose = "none"
+sizes = ["256x256", "512x512", "768x768", "1024x1024", "1024x576", "576x1024", "704x880", "832x1248", "2048x1024"]
 [models."z-image-turbo".install]
 source = "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"
 files = [
@@ -35,19 +39,84 @@ note = "the old app's model: a fast baseline"
 summary = "Fast photorealistic text-to-image in 8 steps; renders English and Chinese text."
 prompt = "Detailed natural-language description: subject, clothing, setting, light, camera; no negative prompt (guidance 0)."
 source = "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"
-checked = 2026-09-29
+checked = 2026-10-13
 [[models."z-image-turbo".guide.features]]
 name = "text in images"
 how = "Write the text in quotes in the prompt and say where it goes."
 examples = ["a shop sign that reads \"OPEN LATE\" above the door"]
 source = "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"
+[[models."z-image-turbo".guide.notes]]
+about = "general"
+says = "Long, structured prompts of 80 to 250 words work: shot, subject, clothing and colours, background, light, style. Write plain sentences: a tag list did worse than no detail at all, and a period label alone barely changed the picture."
+source = "hone-frame/design/research/prompting-findings.md"
+checked = 2026-10-03
+[[models."z-image-turbo".guide.notes]]
+about = "general"
+says = "There is no negative prompt: write every constraint as a positive sentence (\"the background is plain white\")."
+source = "hone-frame/design/changes/0002-prompt-dialects.md"
+checked = 2026-10-02
+[[models."z-image-turbo".guide.notes]]
+about = "general"
+says = "It is distilled: new seeds give near-identical pictures for one prompt. For different candidates, vary what the prompt leaves open (face shape, build, how a garment is worn)."
+source = "hone-frame/design/decisions.md D-037"
+checked = 2026-10-03
+[[models."z-image-turbo".guide.notes]]
+about = "general"
+says = "A flat 2D look held only when the prompt opened and closed with the 2D wording."
+source = "hone-frame/design/changes/0002-prompt-dialects.md"
+checked = 2026-10-02
+[[models."z-image-turbo".guide.notes]]
+about = "people"
+says = "Spell out what is worn (\"a lamellar coat laced with red cord, a conical helmet with a mail curtain\"): from a culture or period name alone it drew Western costume."
+source = "hone-frame/design/research/prompting-findings.md"
+checked = 2026-10-03
+[[models."z-image-turbo".guide.notes]]
+about = "poses"
+says = "To draw a mannequin for a pose picture, describe the body only: \"raising the mace overhead\" drew the mannequin holding a hammer despite \"empty hands, holding nothing\"."
+source = "hone-frame/design/changes/0007-quality-pipeline.md"
+checked = 2026-10-04
+[[models."z-image-turbo".guide.notes]]
+about = "references"
+says = "It takes no reference pictures; to keep a character or an object from a picture, use an editing model."
+source = "hone-music-video/experiments/issues.md"
+checked = 2026-10-13
+[[models."z-image-turbo".guide.notes]]
+about = "text"
+says = "It renders English and Chinese text: quote the words and say where they go."
+source = "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"
+checked = 2026-09-29
+[[models."z-image-turbo".guide.notes]]
+about = "sizes"
+says = "Used on the 8 GB card at 1024x1024, at 2048x1024 for a row of four full figures, and at the 16:9, 9:16, 1:1 and 4:5 start-frame sizes; other sizes are unproven (add them in your own registry file)."
+source = "hone-music-video/design/decisions.md D-023, D-030"
+checked = 2026-10-10
 
+# FLUX.2 klein 4B with references (hone-frame's proven workflow, its D-016): two reference slots, both
+# needed by the graph (each feeds a VAEEncode and a ReferenceLatent), so one reference is given twice
+# (`empty_slots`, hone-frame D-017). `vram_gb` is near the whole card on purpose: the GPU scheduler then
+# unloads a planner or judge first (hone-frame's measured out-of-memory without it).
 [models."flux.2-klein-4b"]
 provider = "comfyui"
 kind = "image"
+workflow = "workflows/flux.2-klein-4b.json"
+outputs = ["27"]
+defaults = { size = "1024x1024", steps = 4 }
+max_timeout_s = 1800.0
+empty_slots = "repeat_last"
+[models."flux.2-klein-4b".inputs]
+prompt = "4.text"
+seed = "23.noise_seed"
+steps = "21.steps"
+references = ["11.image", "13.image"]
+width = ["20.width", "21.width"]
+height = ["20.height", "21.height"]
 [models."flux.2-klein-4b".capabilities]
+vram_gb = 7.2
+max_references = 2
 license = "Apache-2.0"
 commercial_use = true
+pose = "reference"
+sizes = ["256x256", "512x512", "768x768", "1024x1024", "1024x576", "576x1024", "704x880", "832x1248", "2048x1024"]
 [models."flux.2-klein-4b".install]
 source = "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
 files = [
@@ -59,24 +128,168 @@ size_gb = 16.1
 tier = 1
 note = "generation and reference editing in one small model; fits the GPU (shares qwen_3_4b with z-image-turbo)"
 [models."flux.2-klein-4b".guide]
-summary = "Small FLUX.2: text-to-image and multi-reference editing in one model, 4 steps."
-prompt = "Natural-language description; for edits say what to change and what to keep from each reference."
+summary = "Small FLUX.2 editing from one or two reference images, 4 steps; flux.2-klein-4b-text draws from the prompt alone."
+prompt = "Natural-language description, subject first; for edits say what to change and what to keep from each reference."
 source = "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
-checked = 2026-09-29
+checked = 2026-10-13
 [[models."flux.2-klein-4b".guide.features]]
 name = "reference editing"
 how = "Give one or more reference images and describe the change; the model keeps what the prompt does not change."
 input = "references"
 examples = ["the woman from image 1 wearing the jacket from image 2, same pose"]
 source = "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
+[[models."flux.2-klein-4b".guide.notes]]
+about = "general"
+says = "Keep prompts to about 40 to 120 words with the subject first: the model weighs the first words most, and its guides say prompts over 100 words confuse it. Write sentences, not tags."
+source = "hone-frame/design/changes/0002-prompt-dialects.md"
+checked = 2026-10-02
+[[models."flux.2-klein-4b".guide.notes]]
+about = "faces"
+says = "Tiny face marks (a mole, a small scar) move between edits, from cheek to chin to forehead; give an exact position and size and check the result."
+source = "hone-frame/design/research/prompting-findings.md"
+checked = 2026-10-03
+[[models."flux.2-klein-4b".guide.notes]]
+about = "people"
+says = "In every edit say who the person is (\"a young woman of about twenty\", \"a beard reaching the chest\"): with only \"the same face as image 1\" beards changed length and a woman in armour got a moustache."
+source = "hone-frame/design/research/root-causes-2026-10-03.md"
+checked = 2026-10-03
+[[models."flux.2-klein-4b".guide.notes]]
+about = "people"
+says = "For another view of the same person, state the change first (\"the same man, turned around, seen from behind\") and leave out what the view cannot show: a long prompt that opened with the style and re-described the face drew the back view facing the camera."
+source = "hone-frame/design/changes/0002-prompt-dialects.md"
+checked = 2026-10-02
+[[models."flux.2-klein-4b".guide.notes]]
+about = "people"
+says = "Left and right flip when a pose turns: an armlet moved between arms and down to the wrists."
+source = "hone-frame/design/research/prompting-findings.md"
+checked = 2026-10-03
+[[models."flux.2-klein-4b".guide.notes]]
+about = "poses"
+says = "An edit keeps the pose of its reference: with text alone \"running\" became a hop and \"kneeling\" half-standing. A plain wooden mannequin in the pose as image 2 (\"in exactly the body pose of the wooden mannequin in image 2\") fixed kneeling, running, sitting and a fighting stance."
+source = "hone-frame/design/research/prompting-findings.md"
+checked = 2026-10-03
+[[models."flux.2-klein-4b".guide.notes]]
+about = "poses"
+says = "With a mannequin as the pose, a 2D figure came out slightly slimmer and more 3D-looking. In a side view a foot came out turned backwards; ask side views for the feet to turn with the body."
+source = "hone-frame/design/research/prompting-findings.md; hone-frame/design/decisions.md D-029"
+checked = 2026-10-03
+[[models."flux.2-klein-4b".guide.notes]]
+about = "objects"
+says = "Asked to turn an object it returned near-copies of the reference; flat objects (a bow, a coiled lasso) look the same from front, back and side. For a real turn use qwen-image-edit-2511 with its camera phrase."
+source = "hone-frame/design/changes/0007-quality-pipeline.md"
+checked = 2026-10-04
+[[models."flux.2-klein-4b".guide.notes]]
+about = "objects"
+says = "A side-on reference does not give a top view (of a horse)."
+source = "hone-frame/design/research/prompting-findings.md"
+checked = 2026-10-03
+[[models."flux.2-klein-4b".guide.notes]]
+about = "places"
+says = "Tell a view of a place to keep the place (\"the same place, buildings, materials and colours\"): one asked to keep \"the same face, hair, build, clothes\" came out as a man's portrait in front of the fortress."
+source = "hone-frame/design/decisions.md D-040"
+checked = 2026-10-03
+[[models."flux.2-klein-4b".guide.notes]]
+about = "scenes"
+says = "Never drop the sentence that says which reference is whom (\"image 1 is Rostam, image 2 is the mace\"): without it a sword nobody asked for appeared and a woman became \"he\"."
+source = "hone-frame/design/research/root-causes-2026-10-03.md"
+checked = 2026-10-03
+[[models."flux.2-klein-4b".guide.notes]]
+about = "references"
+says = "Call the references \"image 1\" and \"image 2\". The workflow needs both slots filled, so a single reference is given twice; with none, use flux.2-klein-4b-text."
+source = "hone-frame/design/decisions.md D-017"
+checked = 2026-10-02
+[[models."flux.2-klein-4b".guide.notes]]
+about = "sizes"
+says = "Proven at 1024x1024 on the 8 GB card, about 30 s a picture; other sizes are unproven."
+source = "hone-frame/design/changes/0007-quality-pipeline.md"
+checked = 2026-10-04
 
+# FLUX.2 klein 4B from the prompt alone: the same model files, no reference nodes (hone-frame's workflow).
+[models."flux.2-klein-4b-text"]
+provider = "comfyui"
+kind = "image"
+workflow = "workflows/flux.2-klein-4b-text.json"
+outputs = ["27"]
+defaults = { size = "1024x1024", steps = 4 }
+max_timeout_s = 1800.0
+[models."flux.2-klein-4b-text".inputs]
+prompt = "4.text"
+seed = "23.noise_seed"
+steps = "21.steps"
+width = ["20.width", "21.width"]
+height = ["20.height", "21.height"]
+[models."flux.2-klein-4b-text".capabilities]
+vram_gb = 7.2
+max_references = 0
+license = "Apache-2.0"
+commercial_use = true
+pose = "none"
+sizes = ["256x256", "512x512", "768x768", "1024x1024", "1024x576", "576x1024", "704x880", "832x1248", "2048x1024"]
+[models."flux.2-klein-4b-text".install]
+source = "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
+files = [
+  { repo = "Comfy-Org/vae-text-encorder-for-flux-klein-4b", file = "split_files/diffusion_models/flux-2-klein-4b.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/vae-text-encorder-for-flux-klein-4b", file = "split_files/text_encoders/qwen_3_4b.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/vae-text-encorder-for-flux-klein-4b", file = "split_files/vae/flux2-vae.safetensors", to = "vae" },
+]
+size_gb = 16.1
+tier = 1
+note = "the same files as flux.2-klein-4b"
+[models."flux.2-klein-4b-text".guide]
+summary = "Small FLUX.2 text-to-image in 4 steps (flux.2-klein-4b without references)."
+prompt = "Natural-language description, subject first, about 40 to 150 words."
+source = "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
+checked = 2026-10-13
+[[models."flux.2-klein-4b-text".guide.notes]]
+about = "general"
+says = "Write sentences, not tags, and put what matters first: the model weighs the first words most. hone-frame allows 150 words when the prompt carries a look guide (the guides' range is 50 to 150)."
+source = "hone-frame/design/research/prompting-findings.md; hone-frame/design/decisions.md D-035"
+checked = 2026-10-03
+[[models."flux.2-klein-4b-text".guide.notes]]
+about = "people"
+says = "Spell out what is worn: a culture or period name alone falls back to Western costume, and concrete garments fix it."
+source = "hone-frame/design/research/prompting-findings.md"
+checked = 2026-10-03
+[[models."flux.2-klein-4b-text".guide.notes]]
+about = "references"
+says = "It takes no reference pictures; flux.2-klein-4b is the same model with two reference slots."
+source = "hone-frame/design/decisions.md D-016"
+checked = 2026-10-02
+[[models."flux.2-klein-4b-text".guide.notes]]
+about = "sizes"
+says = "Proven at 1024x1024 on the 8 GB card; other sizes are unproven."
+source = "hone-frame/src/hone_frame/data/hone-models.toml"
+checked = 2026-10-02
+
+# Qwen-Image-Edit 2511 (Q4 GGUF through the ComfyUI-GGUF node) with the Multiple-Angles LoRA (strength 0
+# in the workflow: set `lora_strength = 1.0` for a camera phrase) and lightx2v's 8-step Lightning LoRA (40
+# plain steps took about 8 minutes a picture; `lightning = 0.0, steps = 40, cfg = 4.0` gives the plain
+# model back). Three reference slots; without any it draws from text. hone-frame's proven workflow.
 [models."qwen-image-edit-2511"]
 provider = "comfyui"
 kind = "image"
+workflow = "workflows/qwen-image-edit-2511.json"
+outputs = ["40"]
+defaults = { size = "1024x1024", steps = 8, cfg = 1.0 }
+max_timeout_s = 3600.0
+[models."qwen-image-edit-2511".inputs]
+prompt = "20.prompt"
+negative = "21.prompt"
+seed = "31.seed"
+steps = "31.steps"
+cfg = "31.cfg"
+lora_strength = "2.strength_model"
+lightning = "7.strength_model"
+references = ["11.image", "12.image", "13.image"]
+width = "30.width"
+height = "30.height"
 [models."qwen-image-edit-2511".capabilities]
+vram_gb = 7.6
 max_references = 3
 license = "Apache-2.0"
 commercial_use = true
+pose = "reference"
+sizes = ["256x256", "512x512", "768x768", "1024x1024", "1024x576", "576x1024", "704x880", "832x1248", "2048x1024"]
 # The Multiple-Angles LoRA's phrases (from its model card): "<sks> <azimuth> <elevation> <distance>".
 [models."qwen-image-edit-2511".prompt_inputs.camera_angle]
 place = "prepend"
@@ -88,16 +301,17 @@ files = [
   { repo = "Comfy-Org/Qwen-Image_ComfyUI", file = "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors", to = "text_encoders" },
   { repo = "Comfy-Org/Qwen-Image_ComfyUI", file = "split_files/vae/qwen_image_vae.safetensors", to = "vae" },
   { repo = "fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA", file = "qwen-image-edit-2511-multiple-angles-lora.safetensors", to = "loras" },
+  { repo = "lightx2v/Qwen-Image-Edit-2511-Lightning", file = "Qwen-Image-Edit-2511-Lightning-8steps-V1.0-bf16.safetensors", to = "loras" },
 ]
 size_gb = 23.2
 tier = 1
 note = "strongest open editing model: keeps a character across shots; GGUF Q4 through the ComfyUI-GGUF node, plus the Multiple-Angles LoRA for character sheets"
 [models."qwen-image-edit-2511".guide]
 summary = "Edits or re-renders up to three reference images; keeps a character's identity; new camera angles with the Multiple-Angles LoRA."
-prompt = "Plain sentences saying what to change; call the references 'image 1', 'image 2', 'image 3'."
-inputs = { camera_angle = "a camera position of the Multiple-Angles LoRA; written at the start of the prompt" }
+prompt = "Plain sentences saying what to keep and what to change; call the references 'image 1', 'image 2', 'image 3'."
+inputs = { camera_angle = "a camera position of the Multiple-Angles LoRA; written at the start of the prompt (set lora_strength = 1.0 for it to move the camera)", lora_strength = "the Multiple-Angles LoRA's strength: 0 (the default) leaves it out, 1.0 turns the camera", lightning = "the 8-step Lightning LoRA's strength: 1.0 (the default); 0 with steps = 40 and cfg = 4.0 is the plain model", cfg = "classifier-free guidance: 1.0 with the Lightning LoRA" }
 source = "https://huggingface.co/Qwen/Qwen-Image-Edit-2511"
-checked = 2026-09-29
+checked = 2026-10-13
 [[models."qwen-image-edit-2511".guide.features]]
 name = "camera angle"
 how = "The Multiple-Angles LoRA moves the camera when the prompt holds one of its phrases (8 azimuths x 4 elevations x 3 distances); the camera_angle input writes one."
@@ -110,6 +324,41 @@ how = "Place people or objects from several references into one scene, naming ea
 input = "references"
 examples = ["The magician bear is on the left, the alchemist bear is on the right, facing each other in the central park square."]
 source = "https://huggingface.co/Qwen/Qwen-Image-Edit-2511"
+[[models."qwen-image-edit-2511".guide.notes]]
+about = "general"
+says = "Write instructions as \"keep X, change Y\", naming what must not change. With the camera phrase, \"wide shot\" fits a full figure and \"medium shot\" crops it."
+source = "hone-frame/design/changes/0002-prompt-dialects.md"
+checked = 2026-10-02
+[[models."qwen-image-edit-2511".guide.notes]]
+about = "faces"
+says = "For a close-up give a portrait (a large face) as image 1: from a full-body front view first, a close-up came out younger and softer than the character. Saying \"keeps the face of image 1: same age, same features\" helps too."
+source = "hone-music-video/design/decisions.md D-065"
+checked = 2026-10-10
+[[models."qwen-image-edit-2511".guide.notes]]
+about = "people"
+says = "For a character's side and back views the Multiple-Angles LoRA made practically no difference, and its back view merged a character's two shoulder snakes into one arc."
+source = "hone-music-video/design/decisions.md D-136"
+checked = 2026-10-11
+[[models."qwen-image-edit-2511".guide.notes]]
+about = "poses"
+says = "Give the pose as a picture among the references (a plain mannequin or a skeleton); text alone keeps the reference's pose on the editing models tried, and skeleton pose transfer is reported to work on Qwen-Image-Edit 2509."
+source = "hone-music-video/experiments/research/1-image-conditioning.md"
+checked = 2026-10-13
+[[models."qwen-image-edit-2511".guide.notes]]
+about = "objects"
+says = "With the Multiple-Angles LoRA at strength 1 it turns an object for real (a true side profile of a mace) where FLUX.2 klein returned near-copies. A top view from a three-quarter picture did not work."
+source = "hone-frame/design/changes/0007-quality-pipeline.md"
+checked = 2026-10-04
+[[models."qwen-image-edit-2511".guide.notes]]
+about = "references"
+says = "Call the references \"image 1\", \"image 2\", \"image 3\" and say what to keep from each; without references it draws from the prompt alone."
+source = "hone-frame/src/hone_frame/data/hone-models.toml"
+checked = 2026-10-02
+[[models."qwen-image-edit-2511".guide.notes]]
+about = "sizes"
+says = "Proven at 1024x1024 (about 2 minutes a picture with the 8-step Lightning LoRA, against about 8 minutes for 40 plain steps) and at 1024x576 for 16:9 frames; other sizes are unproven."
+source = "hone-frame/src/hone_frame/data/hone-models.toml; hone-music-video/design/decisions.md D-030"
+checked = 2026-10-10
 
 [models."krea-2-turbo"]
 provider = "comfyui"
@@ -242,10 +491,130 @@ files = [
 ]
 size_gb = 14.3
 tier = 3
-note = "the trending model; test only to learn the ceiling (research licence)"
+note = "the trending model; test only to learn the ceiling (research licence); qwen-image-2.1-turbo is the callable form (D-082)"
 [models."qwen-image-2.1".guide]
 summary = "Qwen-Image 2.1 text-to-image: strong text rendering and prompt following; research licence."
 prompt = "Detailed natural-language description; quote any text to render."
+source = "https://huggingface.co/Qwen/Qwen-Image-2.1"
+checked = 2026-09-29
+
+# Qwen-Image-2.1 (int8) with the Turbo LoRA, 8 steps at cfg 1, the int8 Qwen3-VL 8B encoder (hone-music-video's
+# proven workflow, its 0021). Ten reference slots (the encoder's image_1..image_10, each also VAE-encoded);
+# an empty slot is removed with its links, so it draws from text alone too. References are read at about
+# `ref_resolution` px: more references cost time, not memory (7.0 to 7.5 GB peak; `vram_gb` near the whole
+# card on purpose). Research and evaluation only: the Qwen research licence.
+[models."qwen-image-2.1-turbo"]
+provider = "comfyui"
+kind = "image"
+workflow = "workflows/qwen-image-2.1-turbo.json"
+outputs = ["9"]
+defaults = { size = "1024x1024", steps = 8, cfg = 1.0, ref_resolution = 768 }
+max_timeout_s = 3600.0
+[models."qwen-image-2.1-turbo".inputs]
+prompt = "5.prompt"
+seed = "7.seed"
+steps = "7.steps"
+cfg = "7.cfg"
+ref_resolution = "5.resolution"
+width = "6.width"
+height = "6.height"
+references = ["20.image", "21.image", "22.image", "23.image", "24.image", "25.image", "26.image", "27.image", "28.image", "29.image"]
+[models."qwen-image-2.1-turbo".capabilities]
+vram_gb = 7.6
+max_references = 10
+license = "Qwen research license"
+commercial_use = false
+pose = "reference"
+sizes = ["256x256", "512x512", "768x768", "1024x1024", "1024x576", "576x1024", "704x880", "832x1248", "2048x1024"]
+[models."qwen-image-2.1-turbo".install]
+source = "https://huggingface.co/Comfy-Org/Qwen-Image-2.1"
+files = [
+  { repo = "Comfy-Org/Qwen-Image-2.1", file = "diffusion_models/qwen_image_2.1_int8_convrot.safetensors", to = "diffusion_models" },
+  { repo = "Comfy-Org/Qwen-Image-2.1", file = "text_encoders/qwen3vl_8b_int8_convrot.safetensors", to = "text_encoders" },
+  { repo = "Comfy-Org/Qwen-Image-2.1", file = "vae/qwen_image_2.1_vae_bf16.safetensors", to = "vae" },
+  { repo = "Comfy-Org/Qwen-Image-2.1", file = "loras/qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors", to = "loras" },
+]
+tier = 2
+note = "research licence: not for commercial use; the callable form of qwen-image-2.1 (D-082)"
+[models."qwen-image-2.1-turbo".guide]
+summary = "Qwen-Image 2.1 Turbo: text-to-image and up to ten reference pictures in 8 steps; research licence, no commercial use."
+prompt = "Detailed natural-language description; name each reference by its number ('the woman from image 1'); quote any text to render."
+inputs = { ref_resolution = "the size (px) each reference is read at: 768 by default; 1024 costs about 55% more time for no measured gain", cfg = "classifier-free guidance: 1.0 with the Turbo LoRA" }
+source = "https://huggingface.co/Qwen/Qwen-Image-2.1"
+checked = 2026-10-13
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "general"
+says = "Research and evaluation only (the Qwen research licence): do not publish its pictures commercially. About 50 s for a 1024x576 scene with four references on the 8 GB card."
+source = "hone-music-video/src/hone_music_video/data/models.toml"
+checked = 2026-10-11
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "faces"
+says = "In a picture where a face must be recognised, give the character's portrait instead of a full body; a full body carries only a small face."
+source = "hone-music-video/design/current.md §10.1; hone-music-video/design/decisions.md D-145"
+checked = 2026-10-11
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "hands"
+says = "In two music videos' start frames, hands and limbs were mostly clean; the extra or melting limbs came from the video model that animated them."
+source = "hone-music-video/experiments/weak-points.md §H"
+checked = 2026-10-13
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "people"
+says = "Give each character one picture of its body or its face: from two full bodies of one character it drew that character twice, and a portrait beside a body added a third person in two of three seeds."
+source = "hone-music-video/design/decisions.md D-145"
+checked = 2026-10-11
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "people"
+says = "Two characters described with nearly the same words get the same default face (twins in one scene); give characters who appear together different face traits (face shape, nose, brows, age)."
+source = "hone-music-video/experiments/weak-points.md §22"
+checked = 2026-10-13
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "poses"
+says = "It has no pose or depth control mode: a skeleton, depth or mannequin picture goes in as an ordinary reference, which works less exactly than a ControlNet (and its ControlNet does not fit 8 GB)."
+source = "hone-music-video/experiments/research/README.md"
+checked = 2026-10-13
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "objects"
+says = "The reference's side is copied: a laptop whose only picture showed the back of the lid was drawn with that side to the camera, typed on from behind. Give an object a picture of the side the picture needs."
+source = "hone-music-video/experiments/issues.md §8"
+checked = 2026-10-13
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "objects"
+says = "An unusual object (a mace with an ox's head) is drawn as the nearest common object unless a picture of it is given."
+source = "hone-music-video/src/hone_music_video/data/prompts/limits.md"
+checked = 2026-10-13
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "places"
+says = "A place drawn from words alone changes from picture to picture (a flat's window, lamps and desk moved between shots); give a recurring place a picture as a reference."
+source = "hone-music-video/experiments/weak-points.md §21"
+checked = 2026-10-13
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "scenes"
+says = "Two bodies in contact (embracing, grappling) are the weakest case for every method tried; show one body clearly and the other beside it."
+source = "hone-music-video/experiments/research/README.md"
+checked = 2026-10-13
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "references"
+says = "A picture outweighs the words: a pendant close-up given for a back view was painted on her back, even after two redos saying \"no necklace on her back\". Give a view only the pictures of what it shows."
+source = "hone-music-video/design/decisions.md D-146"
+checked = 2026-10-11
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "references"
+says = "References cost time, not memory: read at 1024 px a scene took 21 s with none, 63 s with 3, 215 s with 6 and 436 s with 10; read at 512 px, 24, 34 and 51 s. With none it draws from the prompt alone."
+source = "hone-music-video/experiments/scene-refs/out.log; hone-music-video/design/decisions.md D-140"
+checked = 2026-10-11
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "sizes"
+says = "The workflow samples at the size asked for, not at the first reference's size: sampling at the reference's size reframed the picture (zoomed in, turned a back view to the camera)."
+source = "hone-music-video/experiments/A3-qwen-latent-size/README.md"
+checked = 2026-10-13
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "sizes"
+says = "1024x576 is below the model's trained size (about 1 to 1.6 MP); small faces and hands are likely to suffer most there (not measured yet)."
+source = "hone-music-video/experiments/weak-points.md §17"
+checked = 2026-10-13
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "text"
+says = "Its model card names text rendering as a strength: quote the words to render. Not tested here."
 source = "https://huggingface.co/Qwen/Qwen-Image-2.1"
 checked = 2026-09-29
 

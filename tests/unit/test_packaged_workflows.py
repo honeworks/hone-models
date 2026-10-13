@@ -24,6 +24,11 @@ PROVEN = {
     "wan2.2-i2v-14b",
     "wan2.2-ti2v-5b",
     "ltx-video-2b-0.9.5",
+    # proven by hone-frame and hone-music-video on the same machine (change 0020)
+    "flux.2-klein-4b",
+    "flux.2-klein-4b-text",
+    "qwen-image-edit-2511",
+    "qwen-image-2.1-turbo",
 }
 SAVE_NODES = {"SaveImage", "SaveAudio", "SaveAudioAdvanced", "SaveAudioMP3", "SaveVideo"}
 
@@ -59,3 +64,19 @@ def test_workflow_matches_its_entry(cfg: mk.registry.ModelConfig) -> None:
     assert cfg.capabilities.vram_gb is not None  # measured by `models check` on the reference machine
     filled = _comfyui_workflow.fill(workflow, cfg, {"prompt": "a test", "seed": 3, **cfg.defaults})
     assert filled != workflow
+
+
+@pytest.mark.parametrize("cfg", [m for m in comfyui_entries() if m.kind == "image"], ids=lambda m: m.id)
+def test_callable_image_entries_declare_their_limits(cfg: mk.registry.ModelConfig) -> None:
+    caps = cfg.capabilities  # change 0020 §1, §3
+    assert caps.license
+    assert caps.commercial_use is not None
+    assert caps.max_references is not None
+    assert caps.sizes
+    assert caps.vram_gb
+    assert caps.pose == ("reference" if caps.max_references else "none")
+    assert isinstance(cfg.inputs, dict)
+    slots = node_targets(cfg.inputs["references"]) if caps.max_references else []
+    assert len(slots) == caps.max_references
+    assert cfg.guide is not None
+    assert cfg.guide.notes  # how it behaves, per situation

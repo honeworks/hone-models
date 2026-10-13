@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import base64
 import mimetypes
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -27,7 +28,7 @@ import httpx
 from .._http import bearer_headers, request_json
 from .._media_files import output_paths
 from .._tracing import add_event
-from ..errors import ConfigError, ModelTimeout, ProviderError
+from ..errors import Cancelled, ConfigError, ModelTimeout, ProviderError
 from ..records import log
 from ..registry import ModelConfig
 from .common import MediaJob, MediaOutcome, MediaProvider, error_kind
@@ -103,7 +104,7 @@ def _video(job: MediaJob) -> MediaOutcome:
         raise ProviderError(f"{cfg.base_url}/videos returned no job id: {str(answer)[:200]}")
     job_id = str(answer["id"])
     job.attrs["hone.models.media.job_id"] = job_id
-    final = _wait(cfg, job_id, time.monotonic() + job.timeout_s)
+    final = _wait(cfg, job_id, time.monotonic() + job.timeout_s, job.cancel)
     if final.get("status") != "completed":
         message = _job_error(final)
         return MediaOutcome([], job_id, message, error_kind(message))
@@ -125,11 +126,16 @@ def _job_error(job: dict[str, Any]) -> str:
     return text or f"the video job ended with status {job.get('status')!r}"
 
 
-def _wait(cfg: ModelConfig, job_id: str, deadline: float) -> dict[str, Any]:
-    """Poll the job until it ends; delete it on timeout or any exception."""
-    url, errors, shown = _url(cfg, f"/videos/{job_id}"), 0, -1
+def _wait(
+    cfg: ModelConfig, job_id: str, deadline: float, cancel: threading.Event | None = None
+) -> dict[str, Any]:
+    """Poll the job until it ends; delete it on timeout, when `cancel` is set (`Cancelled`) or on any
+    exception."""
+    url, errors, shown, stop = _url(cfg, f"/videos/{job_id}"), 0, -1, cancel or threading.Event()
     try:
         while True:
+            if stop.is_set():
+                raise Cancelled(f"video job {job_id} was cancelled by the caller")
             try:
                 state = _poll(url, cfg)
                 errors = 0
@@ -147,7 +153,7 @@ def _wait(cfg: ModelConfig, job_id: str, deadline: float) -> dict[str, Any]:
             now = time.monotonic()
             if now >= deadline:
                 raise ModelTimeout(f"video job {job_id} did not finish in time; it was cancelled")
-            time.sleep(min(POLL_S, deadline - now))
+            stop.wait(min(POLL_S, deadline - now))
     except BaseException:
         _cancel(cfg, job_id)
         raise

@@ -54,11 +54,13 @@ def run(job: MediaJob) -> MediaOutcome:
         try:
             values = {k: _uploaded_names(url, v) for k, v in job.inputs.items()}
             filled = workflows.fill(workflow, cfg, {"prompt": job.prompt, "seed": job.seed, **values})
+            _stop_if_cancelled(job.cancel, "before it was queued")
             job_id, submitted_ms = _submit(url, filled, cfg)
             attrs["hone.models.media.job_id"] = job_id
             _comfyui_loaded.add(url, cfg.id, job_id)
             entry = _wait(url, job_id, time.monotonic() + job.timeout_s, job.cancel)
             _queue_wait(entry, submitted_ms, attrs)
+            _stop_if_cancelled(job.cancel, f"after job {job_id} ran, before its files were fetched")
             return _outcome(url, job_id, entry, cfg, job.out)
         finally:
             attrs["hone.models.media.freed"] = session is None and server.free(url)
@@ -121,6 +123,11 @@ def _node_errors(resp: httpx.Response) -> str:
             )
     error: Any = data.get("error", {})
     return "; ".join(found) or f"{error.get('message')}: {error.get('details', '')}".rstrip(": ")
+
+
+def _stop_if_cancelled(cancel: threading.Event | None, when: str) -> None:
+    if cancel is not None and cancel.is_set():
+        raise Cancelled(f"the ComfyUI call was cancelled {when}")
 
 
 def _wait(url: str, job_id: str, deadline: float, cancel: threading.Event | None = None) -> Any:

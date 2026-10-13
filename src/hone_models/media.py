@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from . import catalog, formats, gpu
+from ._gpu_locks import cancel_waits
 from ._media_files import MediaFile as MediaFile  # noqa: PLC0414 - part of this module's API
 from ._media_files import measure
 from ._media_inputs import as_files, check_capabilities, recorded
@@ -190,21 +191,20 @@ class MediaClient:
 
 def _run(provider: MediaProvider, job: MediaJob) -> MediaOutcome:
     """The provider's job; `Cancelled` (recorded as error kind `cancelled`) when `job.cancel` is set
-    before it starts, while it runs (a provider that can stop its job) or by the time it ends."""
+    before it starts, while it waits for the GPU lease or while the provider waits for its job. A result
+    the provider already returned is kept; a cancel that came too late is recorded (D-084)."""
     try:
-        _stop_if_cancelled(job)
-        outcome = provider.run(job)
-        _stop_if_cancelled(job)
+        if job.cancel is not None and job.cancel.is_set():
+            raise Cancelled(f"the call to {job.config.id!r} was cancelled")
+        with cancel_waits(job.cancel):
+            outcome = provider.run(job)
     except Cancelled as exc:
         job.attrs["hone.models.media.error"] = str(exc)
         job.attrs["hone.models.media.error_kind"] = "cancelled"
         raise
-    return outcome
-
-
-def _stop_if_cancelled(job: MediaJob) -> None:
     if job.cancel is not None and job.cancel.is_set():
-        raise Cancelled(f"the call to {job.config.id!r} was cancelled")
+        job.attrs["hone.models.media.cancel_late"] = True
+    return outcome
 
 
 def _attributes(

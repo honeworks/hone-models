@@ -10,6 +10,7 @@ import pytest
 
 import hone_models as mk
 from hone_models.errors import Cancelled, ConfigError
+from hone_models.providers import comfyui
 from hone_models.testing import FakeComfyUI, FakeMedia
 from media_fixtures import LeaseRecorder, png_file
 
@@ -96,7 +97,8 @@ def test_ac36_guide_notes_and_pose() -> None:
         g.notes_about("feet")
 
 
-def test_ac36_cancel_stops_a_comfyui_job(tmp_path: Path) -> None:
+def test_ac36_cancel_stops_a_comfyui_job(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(comfyui, "POLL_S", 30.0)  # a sleep would wait 30 s: only the event ends it in time
     sink = mk.records.MemorySink()
     img = mk.image("z-image-turbo", sink=sink)
     stop = threading.Event()
@@ -110,7 +112,7 @@ def test_ac36_cancel_stops_a_comfyui_job(tmp_path: Path) -> None:
         waited = time.monotonic() - started
         cancels = [q["path"] for q in server.requests if q["path"].endswith("/cancel")]
         assert server.frees == 1
-    assert waited < 0.3 + 1.0  # within one poll interval of the event
+    assert waited < 1.0  # the set event ends the wait at once
     (span,) = sink.spans
     assert cancels == [f"/api/jobs/{span['attributes']['hone.models.media.job_id']}/cancel"]
     assert span["status"]["code"] == "error"
@@ -118,23 +120,53 @@ def test_ac36_cancel_stops_a_comfyui_job(tmp_path: Path) -> None:
     assert [e["name"] for e in span["events"]] == ["cancelled"]
 
 
-def test_ac36_cancel_on_a_provider_that_cannot_stop(tmp_path: Path) -> None:
+def test_ac36_a_late_cancel_keeps_the_result(tmp_path: Path) -> None:
     fake = FakeMedia.like("z-image-turbo")
     stop = threading.Event()
-    run = fake._run
-
-    def run_then_cancel(job: Any) -> Any:
-        outcome = run(job)
-        stop.set()  # set while the job runs: the job finishes, then the call raises
-        return outcome
-
-    fake._run = run_then_cancel  # type: ignore[method-assign]
-    with pytest.raises(Cancelled):
-        fake.generate("a lighthouse", size="512x512", cancel=stop, out=tmp_path / "a.png")
-    assert len(fake.calls) == 1
-    assert (tmp_path / "a.png").is_file()
+    fake.on_run = lambda job: stop.set()  # set while the job runs, after the provider's last check
+    r = fake.generate("a lighthouse", size="512x512", cancel=stop, out=tmp_path / "a.png")
+    assert r.error is None
+    assert r.path == tmp_path / "a.png"
     with pytest.raises(Cancelled):  # already set: nothing runs
         fake.generate("a lighthouse", size="512x512", cancel=stop, out=tmp_path / "b.png")
     assert len(fake.calls) == 1
-    assert [s["attributes"]["hone.models.media.error_kind"] for s in fake.sink.spans] == ["cancelled"] * 2  # type: ignore[attr-defined]
-    assert fake.generate("a lighthouse", size="512x512", out=tmp_path / "c.png").error is None  # no cancel
+    late, refused = fake.sink.spans  # type: ignore[attr-defined]
+    assert late["attributes"]["hone.models.media.cancel_late"] is True
+    assert late["status"]["code"] == "ok"
+    assert refused["attributes"]["hone.models.media.error_kind"] == "cancelled"
+
+
+@pytest.mark.parametrize("kind", ["scheduler", "file_lock"])
+def test_ac36_cancel_while_waiting_for_the_gpu(
+    kind: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(mk.gpu, "POLL_S", 30.0)  # only the event can end the wait in time
+    if kind == "scheduler":
+        lease: Any = mk.gpu.GpuScheduler(tmp_path / "ledger.json", memory=lambda: (8192, 0), stall_s=600)
+    else:
+        lease = mk.gpu.FileLockGpuLease(tmp_path / "gpu.lock")
+    held, done = threading.Event(), threading.Event()
+
+    def other_job() -> None:
+        with lease.lease("someone-else", 7.5):
+            held.set()
+            done.wait(10)
+
+    holder = threading.Thread(target=other_job)
+    holder.start()
+    held.wait(5)
+    img = mk.image("z-image-turbo", sink=mk.records.MemorySink())
+    img.gpu = lease
+    stop = threading.Event()
+    try:
+        with FakeComfyUI() as server:
+            threading.Timer(0.3, stop.set).start()
+            started = time.monotonic()
+            with pytest.raises(Cancelled, match="GPU lease"):
+                img.generate("a lighthouse", size="512x512", cancel=stop, out=tmp_path / "x.png")
+            waited = time.monotonic() - started
+    finally:
+        done.set()
+        holder.join()
+    assert waited < 1.0
+    assert server.submitted == []

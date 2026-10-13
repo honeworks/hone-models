@@ -5,6 +5,7 @@
     img.calls                                         # [(prompt, inputs, seed), ...]
     FakeMedia(kind="music").generate("lo-fi", duration_s=3, out="take.wav")   # 3 s of silence
     img.fail_next("CUDA out of memory")               # the next call: result.error, error_kind
+    img.on_run = lambda job: stop.set()               # called with each job as it runs (a test's hook)
 
 Same validation (unknown inputs, missing files, sizes and durations), span and result as the real client;
 no server, no GPU lease. Images are black PNGs of the requested `size` (default 64 x 64, `n` of them),
@@ -13,6 +14,7 @@ music is silence of `duration_s` (default 1 s), video a packaged one-second MP4.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from .._media_files import output_paths
@@ -40,6 +42,7 @@ class FakeMedia(MediaClient):
         config = ModelConfig(id=model_id or f"fake-{kind}", provider="comfyui", kind=kind)  # pyright: ignore[reportArgumentType]
         super().__init__(config, sink if sink is not None else MemorySink(), lease=NullGpuLease())
         self.calls: list[tuple[str, dict[str, Any], int]] = []
+        self.on_run: Callable[[MediaJob], None] | None = None  # called with each job while it "runs"
         self._failures: list[str] = []
 
     @classmethod
@@ -68,6 +71,8 @@ class FakeMedia(MediaClient):
 
     def _run(self, job: MediaJob) -> MediaOutcome:
         self.calls.append((job.prompt, dict(job.inputs), job.seed))
+        if self.on_run is not None:
+            self.on_run(job)
         job_id = f"fake-{len(self.calls)}"
         if self._failures:
             message = self._failures.pop(0)

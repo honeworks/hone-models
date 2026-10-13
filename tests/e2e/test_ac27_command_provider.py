@@ -145,6 +145,25 @@ def test_ac27_hang_kills_the_process_group(
     assert span["attributes"]["hone.models.media.log_tail"].endswith("working...")
 
 
+def test_ac27_cancel_while_waiting_kills_the_process_group(
+    song: mk.MediaClient, seen: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(command, "KILL_GRACE_S", 0.5)
+    stop = threading.Event()
+    threading.Timer(1.0, stop.set).start()
+    started = time.monotonic()
+    with pytest.raises(mk.errors.Cancelled, match="cancelled by the caller"):
+        song.generate("dark trap", mode="hang", cancel=stop, out=tmp_path / "take.wav")
+    assert time.monotonic() - started < 3
+    pids = json.loads((seen / "pids.json").read_text())
+    deadline = time.monotonic() + 5
+    while any(alive(p) for p in pids) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not any(alive(p) for p in pids)
+    (span,) = spans(song)
+    assert span["attributes"]["hone.models.media.error_kind"] == "cancelled"
+
+
 def test_ac27_interrupt_while_waiting_kills_the_process_group(
     song: mk.MediaClient, seen: Path, tmp_path: Path
 ) -> None:

@@ -1,5 +1,6 @@
-"""The two simple GPU lease shapes (design/current.md §7): one that never waits, one exclusive lock; and
-a look at the machine-wide lock of `scripts/gpu-lock.sh` (change 0016)."""
+"""The two simple GPU lease shapes (design/current.md §7): one that never waits, one exclusive lock; a
+look at the machine-wide lock of `scripts/gpu-lock.sh` (change 0016); and the caller's cancel event that
+ends a lease's wait (change 0020 §4, D-084)."""
 
 from __future__ import annotations
 
@@ -10,10 +11,33 @@ import threading
 import time
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager, nullcontext
+from contextvars import ContextVar
 from pathlib import Path
 from typing import IO, Any
 
+from .errors import Cancelled
+
 MACHINE_LOCK = "/tmp/honeworks-gpu.lock"  # noqa: S108 - the machine-wide lock of scripts/gpu-lock.sh
+_cancel: ContextVar[threading.Event | None] = ContextVar("hone_models_lease_cancel", default=None)
+
+
+@contextmanager
+def cancel_waits(event: threading.Event | None) -> Generator[None]:
+    """Let `event` end the lease waits started in this block (`Cancelled`); the lease port is unchanged."""
+    token = _cancel.set(event)
+    try:
+        yield
+    finally:
+        _cancel.reset(token)
+
+
+def pause(seconds: float, name: str) -> None:
+    """Sleep `seconds` of a lease's wait, or raise `Cancelled` as soon as the caller's event is set."""
+    event = _cancel.get()
+    if event is None:
+        time.sleep(seconds)
+    elif event.wait(seconds):
+        raise Cancelled(f"the wait for the GPU lease {name!r} was cancelled")
 
 
 def machine_lock_path() -> Path:
@@ -91,15 +115,15 @@ class FileLockGpuLease:
 
 
 def _flock(fh: IO[str], name: str, timeout_s: float | None) -> None:
-    if timeout_s is None:
+    if timeout_s is None and _cancel.get() is None:
         fcntl.flock(fh, fcntl.LOCK_EX)
         return
-    deadline = time.monotonic() + timeout_s
+    deadline = None if timeout_s is None else time.monotonic() + timeout_s
     while True:
         try:
             fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
             return
         except BlockingIOError:
-            if time.monotonic() >= deadline:
+            if deadline is not None and time.monotonic() >= deadline:
                 raise TimeoutError(f"GPU lock {fh.name} for {name!r} not free within {timeout_s} s") from None
-            time.sleep(0.1)
+            pause(0.1, name)

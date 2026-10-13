@@ -54,7 +54,7 @@ KIND_TIMEOUT_S = {"image": 600.0, "music": 1800.0, "video": 3600.0, "transcripti
 COMFYUI_URL = "http://127.0.0.1:8188"
 # Entry keys of generation models, all `None` on other entries.
 GENERATION_KEYS = (
-    "workflow", "inputs", "outputs", "command", "cwd", "env",
+    "workflow", "inputs", "outputs", "empty_slots", "command", "cwd", "env",
     "lyrics_format", "prompt_inputs", "guide", "install",
 )  # fmt: skip
 
@@ -79,6 +79,9 @@ class ModelConfig(BaseModel):
     workflow: str | None = None  # an API-format ComfyUI workflow; absolute once loaded
     inputs: dict[str, NodeMapping] | list[str] | None = None
     outputs: list[str] | None = None
+    # unused `references` slots: removed with their links (`None`, "remove"), or given the last reference
+    # (change 0020 §1)
+    empty_slots: Literal["remove", "repeat_last"] | None = None
     command: list[str] | None = None
     cwd: str | None = None
     env: dict[str, str] | None = None

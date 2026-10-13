@@ -20,27 +20,26 @@ or `command` provider is one more module and one more row in that table.
 
 from __future__ import annotations
 
-import re
 import secrets
+import threading
 import time
 from collections.abc import Generator, Mapping
 from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from . import catalog, formats, gpu
 from ._media_files import MediaFile as MediaFile  # noqa: PLC0414 - part of this module's API
-from ._media_files import file_record, measure
+from ._media_files import measure
+from ._media_inputs import as_files, check_capabilities, recorded
 from ._tracing import start_span
-from .errors import CapabilityError, ConfigError
+from .errors import Cancelled, ConfigError
 from .ports import RecordSink
 from .providers import MEDIA, lookup, model_attributes
-from .providers.common import FILE_INPUTS, MediaJob, MediaProvider
+from .providers.common import MediaJob, MediaOutcome, MediaProvider
 from .records import default_sink
 from .registry import ModelConfig, Registry, load, require_client
-
-_SIZE = re.compile(r"^(\d+)x(\d+)$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,13 +101,16 @@ class MediaClient:
         seed: int | None = None,
         timeout_s: float | None = None,
         trace: Mapping[str, str] | None = None,
+        cancel: threading.Event | None = None,
         **inputs: Any,
     ) -> MediaResult:
         """Run one job and write its files to `out` (several: `<stem>_1<suffix>`, ...).
 
         `inputs` are the named inputs of `self.inputs` (`size="1024x1024"`, `references=[Path(...)]`,
         `duration_s=30`, ...); a `pathlib.Path` is a file. `timeout_s` defaults to the entry's
-        `max_timeout_s`; on timeout the job is cancelled and `ModelTimeout` raised."""
+        `max_timeout_s`; on timeout the job is cancelled and `ModelTimeout` raised. Setting `cancel` (from
+        another thread) stops the call with `Cancelled`: a ComfyUI job is cancelled while it runs, other
+        providers finish their job first (change 0020 §4)."""
         cfg, provider = self.config, self._provider()
         named = self._checked(provider, inputs)
         prompt, job_inputs = formats.apply(cfg, prompt, named)  # prompt inputs written in, lyrics converted
@@ -120,9 +122,9 @@ class MediaClient:
         with start_span(f"hone.models.{cfg.kind}", self.sink, attrs, trace=trace) as span:
             job = MediaJob(
                 cfg, prompt, job_inputs, seed, Path(out), timeout_s or cfg.max_timeout_s, span["attributes"],
-                lease=lambda: self._call_lease(trace), session=self._state,
+                lease=lambda: self._call_lease(trace), session=self._state, cancel=cancel,
             )  # fmt: skip
-            outcome = provider.run(job)
+            outcome = _run(provider, job)
             files = [measure(p) for p in outcome.files]
             error, kind = outcome.error, outcome.error_kind
             if error is None and not files:
@@ -181,46 +183,28 @@ class MediaClient:
                 f"model {self.model_id!r} does not take the input(s) {unknown}; it takes {sorted(accepted)}"
             )
         named = {k: v for k, v in self.config.defaults.items() if k in accepted} | given
-        named = {k: _as_files(k, v) for k, v in named.items()}
-        _check_capabilities(self.config, named)
+        named = {k: as_files(k, v) for k, v in named.items()}
+        check_capabilities(self.config, named)
         return named
 
 
-def _as_files(name: str, value: Any) -> Any:
-    """File inputs as `Path`s (a string names a file for `references`, `image` and `source`); every file
-    must exist."""
-    if name in FILE_INPUTS:
-        value = [_path(v) for v in _items(value)] if isinstance(value, list) else _path(value)
-    for item in _items(value):
-        if isinstance(item, Path) and not item.is_file():
-            raise ConfigError(f"input {name!r}: file {item} does not exist")
-    return value
+def _run(provider: MediaProvider, job: MediaJob) -> MediaOutcome:
+    """The provider's job; `Cancelled` (recorded as error kind `cancelled`) when `job.cancel` is set
+    before it starts, while it runs (a provider that can stop its job) or by the time it ends."""
+    try:
+        _stop_if_cancelled(job)
+        outcome = provider.run(job)
+        _stop_if_cancelled(job)
+    except Cancelled as exc:
+        job.attrs["hone.models.media.error"] = str(exc)
+        job.attrs["hone.models.media.error_kind"] = "cancelled"
+        raise
+    return outcome
 
 
-def _items(value: Any) -> list[Any]:
-    return cast(list[Any], value) if isinstance(value, list) else [value]
-
-
-def _path(value: Any) -> Any:
-    return Path(value) if isinstance(value, str) else value
-
-
-def _check_capabilities(cfg: ModelConfig, named: dict[str, Any]) -> None:
-    """Refuse what the entry declares impossible (unknown stays allowed)."""
-    caps, model = cfg.capabilities, cfg.id
-    size = named.get("size")
-    if size is not None and not _SIZE.match(str(size)):
-        raise ConfigError(f"size must read 'WxH' (e.g. '1024x1024'), got {size!r}")
-    if size is not None and caps.sizes is not None and size not in caps.sizes:
-        raise CapabilityError(f"model {model!r} makes the sizes {caps.sizes}, not {size!r}")
-    duration = named.get("duration_s")
-    if duration is not None and caps.durations_s is not None and duration not in caps.durations_s:
-        raise CapabilityError(f"model {model!r} makes durations of {caps.durations_s} s, not {duration}")
-    if duration is not None and caps.max_duration_s is not None and duration > caps.max_duration_s:
-        raise CapabilityError(f"model {model!r} makes at most {caps.max_duration_s} s, not {duration}")
-    references: list[Any] = named.get("references") or []
-    if caps.max_references is not None and len(references) > caps.max_references:
-        raise CapabilityError(f"model {model!r} takes at most {caps.max_references} references")
+def _stop_if_cancelled(job: MediaJob) -> None:
+    if job.cancel is not None and job.cancel.is_set():
+        raise Cancelled(f"the call to {job.config.id!r} was cancelled")
 
 
 def _attributes(
@@ -231,20 +215,11 @@ def _attributes(
         **model_attributes(cfg, cfg.kind),
         "gen_ai.request.seed": seed,
         "hone.models.media.prompt": prompt,
-        "hone.models.media.inputs": _recorded(named),
+        "hone.models.media.inputs": recorded(named),
         "hone.models.media.session": in_session,
         "hone.models.media.license": cfg.capabilities.license,
         "hone.models.media.commercial_use": cfg.capabilities.commercial_use,
     }
-
-
-def _recorded(named: dict[str, Any]) -> dict[str, Any]:
-    """The inputs as recorded: files as `{"path", "sha256", "bytes"}`."""
-
-    def one(value: Any) -> Any:
-        return file_record(value) if isinstance(value, Path) else value
-
-    return {k: [one(i) for i in _items(v)] if isinstance(v, list) else one(v) for k, v in named.items()}
 
 
 def _cost(cfg: ModelConfig, files: list[MediaFile], requested_s: float | None) -> float | None:

@@ -3,9 +3,10 @@
 The entry's `inputs` table maps each named input to one or more `"<node id>.<input>"` paths; `size`
 fills the `width` and `height` mappings; a `{ path, per_second, add }` mapping converts seconds to
 frames; `references` maps to a list of slots, and a slot without a reference is removed with every link
-to it. Another file input (`image`, `source`) mapped to a list of slots is optional in the same way: when
-the call leaves it out, its slot nodes are removed; mapped to one path, the workflow's own value stays (a
-placeholder file ComfyUI refuses, so the input is required).
+to it (an entry with `empty_slots = "repeat_last"` gets the last reference there instead). Another file
+input (`image`, `source`) mapped to a list of slots is optional in the same way: when the call leaves it
+out, its slot nodes are removed; mapped to one path, the workflow's own value stays (a placeholder file
+ComfyUI refuses, so the input is required).
 """
 
 from __future__ import annotations
@@ -101,9 +102,12 @@ def _set(workflow: Workflow, target: NodeInput, value: Any, cfg: ModelConfig, na
 
 
 def _fill_slots(workflow: Workflow, slots: list[NodeInput], references: list[Any], cfg: ModelConfig) -> None:
-    """One reference per slot, in order; slots left over are removed with the links to them."""
+    """One reference per slot, in order; slots left over are removed with the links to them, or, for an
+    entry with `empty_slots = "repeat_last"`, given the last reference (its graph needs every slot)."""
     if len(references) > len(slots):
         raise CapabilityError(f"model {cfg.id!r} has {len(slots)} reference slots, not {len(references)}")
+    if cfg.empty_slots == "repeat_last" and references:  # none at all: the media client refuses the call
+        references = references + [references[-1]] * (len(slots) - len(references))
     for slot, reference in zip(slots, references, strict=False):
         _set(workflow, slot, reference, cfg, "references")
     for slot in slots[len(references) :]:

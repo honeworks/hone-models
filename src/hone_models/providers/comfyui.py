@@ -3,14 +3,16 @@
 One job: the workflow is filled with the call's inputs (`_comfyui_workflow`), file inputs are uploaded
 once under their SHA-256 name into `input/hone/`, the job is queued with `POST /prompt` (`node_errors`
 become a `ConfigError`), `GET /history/{id}` is polled (1 s, then 2 s after the first minute) and the
-output files are fetched with `GET /view`. A timeout or any exception while waiting cancels the job
-(`POST /api/jobs/{id}/cancel`, else `/queue` delete or `/interrupt`). A plain call ends with `POST /free`;
-a session frees once at its end. Every job is noted in the loaded-models file (`_comfyui_loaded`).
+output files are fetched with `GET /view`. A timeout, the caller's `cancel` event (`Cancelled`) or any
+exception while waiting cancels the job (`POST /api/jobs/{id}/cancel`, else `/queue` delete or
+`/interrupt`). A plain call ends with `POST /free`; a session frees once at its end. Every job is noted
+in the loaded-models file (`_comfyui_loaded`).
 """
 
 from __future__ import annotations
 
 import secrets
+import threading
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -22,7 +24,7 @@ import httpx
 from .. import _comfyui_loaded
 from .._media_files import file_digest, output_paths
 from .._tracing import add_event
-from ..errors import ConfigError, ModelTimeout, ProviderError
+from ..errors import Cancelled, ConfigError, ModelTimeout, ProviderError
 from ..records import log
 from ..registry import ModelConfig
 from . import _comfyui_server as server
@@ -55,7 +57,7 @@ def run(job: MediaJob) -> MediaOutcome:
             job_id, submitted_ms = _submit(url, filled, cfg)
             attrs["hone.models.media.job_id"] = job_id
             _comfyui_loaded.add(url, cfg.id, job_id)
-            entry = _wait(url, job_id, time.monotonic() + job.timeout_s)
+            entry = _wait(url, job_id, time.monotonic() + job.timeout_s, job.cancel)
             _queue_wait(entry, submitted_ms, attrs)
             return _outcome(url, job_id, entry, cfg, job.out)
         finally:
@@ -121,11 +123,14 @@ def _node_errors(resp: httpx.Response) -> str:
     return "; ".join(found) or f"{error.get('message')}: {error.get('details', '')}".rstrip(": ")
 
 
-def _wait(url: str, job_id: str, deadline: float) -> Any:
-    """Poll the history until the job is there; cancel it on timeout or any exception."""
-    started, errors = time.monotonic(), 0
+def _wait(url: str, job_id: str, deadline: float, cancel: threading.Event | None = None) -> Any:
+    """Poll the history until the job is there; cancel it on timeout, when `cancel` is set (`Cancelled`)
+    or on any exception."""
+    started, errors, stop = time.monotonic(), 0, cancel or threading.Event()
     try:
         while True:
+            if stop.is_set():
+                raise Cancelled(f"ComfyUI job {job_id} was cancelled by the caller")
             try:
                 entry = _checked(httpx.get(f"{url}/history/{job_id}", timeout=30), "poll").json().get(job_id)
                 errors = 0
@@ -139,7 +144,7 @@ def _wait(url: str, job_id: str, deadline: float) -> Any:
             now = time.monotonic()
             if now >= deadline:
                 raise ModelTimeout(f"ComfyUI job {job_id} did not finish in time; it was cancelled")
-            time.sleep(min(POLL_S if now - started < 60 else POLL_LATE_S, deadline - now))
+            stop.wait(min(POLL_S if now - started < 60 else POLL_LATE_S, deadline - now))
     except BaseException:
         _cancel(url, job_id)
         raise

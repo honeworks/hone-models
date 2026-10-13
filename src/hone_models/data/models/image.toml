@@ -52,9 +52,9 @@ source = "hone-frame/design/research/prompting-findings.md"
 checked = 2026-10-03
 [[models."z-image-turbo".guide.notes]]
 about = "general"
-says = "There is no negative prompt: write every constraint as a positive sentence (\"the background is plain white\")."
-source = "hone-frame/design/changes/0002-prompt-dialects.md"
-checked = 2026-10-02
+says = "There is no negative prompt: write every constraint as a positive sentence (\"the background is plain white\"); \"no cape\" written in the prompt tends to draw a cape."
+source = "hone-frame/design/changes/0002-prompt-dialects.md; hone-frame/design/decisions.md D-034"
+checked = 2026-10-03
 [[models."z-image-turbo".guide.notes]]
 about = "general"
 says = "It is distilled: new seeds give near-identical pictures for one prompt. For different candidates, vary what the prompt leaves open (face shape, build, how a garment is worn)."
@@ -62,8 +62,8 @@ source = "hone-frame/design/decisions.md D-037"
 checked = 2026-10-03
 [[models."z-image-turbo".guide.notes]]
 about = "general"
-says = "A flat 2D look held only when the prompt opened and closed with the 2D wording."
-source = "hone-frame/design/changes/0002-prompt-dialects.md"
+says = "Put the style words at the start and again at the end: a flat 2D look held only when the prompt opened and closed with the 2D wording."
+source = "hone-frame/design/changes/0002-prompt-dialects.md; hone-frame/src/hone_frame/data/prompting.toml (before 0008)"
 checked = 2026-10-02
 [[models."z-image-turbo".guide.notes]]
 about = "people"
@@ -75,6 +75,11 @@ about = "poses"
 says = "To draw a mannequin for a pose picture, describe the body only: \"raising the mace overhead\" drew the mannequin holding a hammer despite \"empty hands, holding nothing\". (Seen in a hone-frame run whose model was not recorded; most likely this one.)"
 source = "hone-frame/design/changes/0007-quality-pipeline.md"
 checked = 2026-10-04
+[[models."z-image-turbo".guide.notes]]
+about = "poses"
+says = "From text alone it follows full-body poses less well than flux.2-klein-4b-text: lying came out sitting, crouching and kneeling on one knee near standing, and it often added a display stand. It did not turn the head to look back over the shoulder, nor draw a true lunge."
+source = "hone-frame mannequin library generation, 2026-10-13 (pose-first prompts, three seeds per model)"
+checked = 2026-10-13
 [[models."z-image-turbo".guide.notes]]
 about = "references"
 says = "It takes no reference pictures; to keep a character or an object from a picture, use an editing model."
@@ -140,9 +145,14 @@ examples = ["the woman from image 1 wearing the jacket from image 2, same pose"]
 source = "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
 [[models."flux.2-klein-4b".guide.notes]]
 about = "general"
-says = "Keep prompts to about 40 to 120 words with the subject first: the model weighs the first words most, and its guides say prompts over 100 words confuse it. Write sentences, not tags."
-source = "hone-frame/design/changes/0002-prompt-dialects.md; hone-frame/design/research/prompting-findings.md"
+says = "Keep prompts to about 40 to 120 words with the subject first: the model weighs the first words most, and its guides say prompts over 100 words confuse it. Write sentences, not tags; hone-frame kept an edit of one reference to 110 words and a composition of several to 120."
+source = "hone-frame/design/changes/0002-prompt-dialects.md; hone-frame/design/research/prompting-findings.md; hone-frame/src/hone_frame/data/prompting.toml (before 0008)"
 checked = 2026-10-02
+[[models."flux.2-klein-4b".guide.notes]]
+about = "general"
+says = "There is no negative prompt: write every constraint as a positive sentence, since \"no cape\" written in the prompt tends to draw a cape."
+source = "hone-frame/design/decisions.md D-034"
+checked = 2026-10-03
 [[models."flux.2-klein-4b".guide.notes]]
 about = "faces"
 says = "Tiny face marks (a mole, a small scar) move between edits, from cheek to chin to forehead; give an exact position and size and check the result. (Seen in a hone-frame run whose model was not recorded; most likely this one.)"
@@ -165,7 +175,7 @@ source = "hone-frame/design/research/prompting-findings.md"
 checked = 2026-10-03
 [[models."flux.2-klein-4b".guide.notes]]
 about = "poses"
-says = "An edit keeps the pose of its reference: with text alone \"running\" became a hop and \"kneeling\" half-standing. A plain wooden mannequin in the pose as image 2 (\"in exactly the body pose of the wooden mannequin in image 2\") fixed kneeling, running, sitting and a fighting stance."
+says = "An edit keeps the pose of its reference: with text alone \"running\" became a hop, \"seated\" a crouch and \"kneeling\" half-standing. A plain wooden mannequin in the pose as image 2 (\"in exactly the body pose of the wooden mannequin in image 2\") fixed kneeling, running, sitting and a fighting stance."
 source = "hone-frame/design/research/prompting-findings.md"
 checked = 2026-10-03
 [[models."flux.2-klein-4b".guide.notes]]
@@ -180,9 +190,9 @@ source = "hone-frame/design/changes/0007-quality-pipeline.md; hone-frame/design/
 checked = 2026-10-04
 [[models."flux.2-klein-4b".guide.notes]]
 about = "objects"
-says = "A side-on reference does not give a top view (of a horse)."
-source = "hone-frame/design/research/prompting-findings.md"
-checked = 2026-10-03
+says = "A top view failed from a side-on reference (of a horse) and from a three-quarter one; it failed on qwen-image-edit-2511 too."
+source = "hone-frame/design/research/prompting-findings.md; hone-frame/design/changes/0007-quality-pipeline.md"
+checked = 2026-10-04
 [[models."flux.2-klein-4b".guide.notes]]
 about = "places"
 says = "Tell a view of a place to keep the place (\"the same place, buildings, materials and colours\"): one asked to keep \"the same face, hair, build, clothes\" came out as a man's portrait in front of the fortress. (Seen in a hone-frame run whose model was not recorded; most likely this one.)"
@@ -246,10 +256,25 @@ says = "Write sentences, not tags, and put what matters first: the model weighs 
 source = "hone-frame/design/research/prompting-findings.md; hone-frame/design/decisions.md D-035"
 checked = 2026-10-03
 [[models."flux.2-klein-4b-text".guide.notes]]
+about = "general"
+says = "Write the subject (and what it wears) first, then the setting, then the style; nouns matter more than adjectives. One idea per sentence, no lists of synonyms."
+source = "hone-frame/src/hone_frame/data/prompting.toml (before 0008)"
+checked = 2026-10-02
+[[models."flux.2-klein-4b-text".guide.notes]]
+about = "general"
+says = "There is no negative prompt: write every constraint as a positive sentence, since \"no cape\" written in the prompt tends to draw a cape."
+source = "hone-frame/design/decisions.md D-034"
+checked = 2026-10-03
+[[models."flux.2-klein-4b-text".guide.notes]]
 about = "people"
 says = "Spell out what is worn: the studies hone-frame cites find image models fall back to Western costume from a culture or period name; concrete garments fixed it on Z-Image Turbo (not tested on this model)."
 source = "hone-frame/design/research/prompting-findings.md"
 checked = 2026-10-03
+[[models."flux.2-klein-4b-text".guide.notes]]
+about = "poses"
+says = "From text alone it followed full-body pose descriptions clearly better than z-image-turbo (running, walking, kneeling on one knee, lying, crouching). It did not turn the head to look back over the shoulder, and a lunge came out as a long stride."
+source = "hone-frame mannequin library generation, 2026-10-13 (pose-first prompts, three seeds per model)"
+checked = 2026-10-13
 [[models."flux.2-klein-4b-text".guide.notes]]
 about = "references"
 says = "It takes no reference pictures; flux.2-klein-4b is the same model with two reference slots."
@@ -326,9 +351,19 @@ examples = ["The magician bear is on the left, the alchemist bear is on the righ
 source = "https://huggingface.co/Qwen/Qwen-Image-Edit-2511"
 [[models."qwen-image-edit-2511".guide.notes]]
 about = "general"
-says = "Write instructions as \"keep X, change Y\", naming what must not change. With the camera phrase, \"wide shot\" fits a full figure and \"medium shot\" crops it."
-source = "hone-frame/design/changes/0002-prompt-dialects.md"
+says = "Write instructions as \"keep X, change Y\", naming what must not change; hone-frame kept a view edit to about 110 words and a composition to 150. With the camera phrase, \"wide shot\" fits a full figure and \"medium shot\" crops it."
+source = "hone-frame/design/changes/0002-prompt-dialects.md; hone-frame/src/hone_frame/data/prompting.toml (before 0008)"
 checked = 2026-10-02
+[[models."qwen-image-edit-2511".guide.notes]]
+about = "general"
+says = "The camera phrase \"<sks> <direction> <height> <distance>\" goes at the very start and moves the camera only with lora_strength = 1.0. Directions are the camera's place around the subject (front view, front-right quarter view, right side view, back-right quarter view, back view, back-left quarter view, left side view, front-left quarter view); heights are low-angle shot, eye-level shot, elevated shot, high-angle shot; distances are close-up, medium shot, wide shot."
+source = "https://huggingface.co/fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA"
+checked = 2026-10-13
+[[models."qwen-image-edit-2511".guide.notes]]
+about = "general"
+says = "The camera_angle input's choices end in \"medium shot\" (except close_up and wide), which crops a full figure; for a whole figure write the phrase yourself with \"wide shot\"."
+source = "hone-models/src/hone_models/data/models/image.toml; hone-frame/design/changes/0002-prompt-dialects.md"
+checked = 2026-10-13
 [[models."qwen-image-edit-2511".guide.notes]]
 about = "faces"
 says = "For a close-up give a portrait (a large face) as image 1: from a full-body front view first, a close-up came out younger and softer than the character (seen with hone-music-video's 4-step workflow). hone-music-video also ends such prompts with \"keeps the face of image 1: same age, same features\"."
@@ -568,9 +603,19 @@ says = "Two characters described with nearly the same words get the same default
 source = "hone-music-video/experiments/weak-points.md §22"
 checked = 2026-10-13
 [[models."qwen-image-2.1-turbo".guide.notes]]
+about = "people"
+says = "It draws difficult costumes and creatures from text more faithfully than z-image-turbo: on five hard characters its four-view sheets were all right (Zahhak's snakes in every view, the ox-headed mace), where Z-Image Turbo repeated or missed views and drew the mace as an axe."
+source = "hone-music-video/design/changes/0021-qwen-image-2.1-turbo.md"
+checked = 2026-10-11
+[[models."qwen-image-2.1-turbo".guide.notes]]
+about = "references"
+says = "It has ten slots, but hone-music-video gives a scene at most six references (read at 768 px); ten read at 1024 px took over seven minutes."
+source = "hone-music-video/design/changes/0021-qwen-image-2.1-turbo.md"
+checked = 2026-10-11
+[[models."qwen-image-2.1-turbo".guide.notes]]
 about = "poses"
-says = "It has no pose or depth control mode: a skeleton, depth or mannequin picture goes in as an ordinary reference, which works less exactly than a ControlNet (and its ControlNet does not fit 8 GB)."
-source = "hone-music-video/experiments/research/README.md"
+says = "It has no pose or depth control mode: a skeleton, depth or mannequin picture goes in as an ordinary reference, which works less exactly than a ControlNet (and its ControlNet does not fit 8 GB). The research suggests saying \"image N is only a pose guide: draw <character> in exactly the body pose of the mannequin in image N; do not copy its material or colour\" (not measured yet)."
+source = "hone-music-video/experiments/research/README.md; hone-music-video/experiments/research/1-image-conditioning.md"
 checked = 2026-10-13
 [[models."qwen-image-2.1-turbo".guide.notes]]
 about = "objects"

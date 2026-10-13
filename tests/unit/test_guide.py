@@ -108,3 +108,40 @@ def test_cli_list_table_shows_installed(monkeypatch: pytest.MonkeyPatch) -> None
     assert "nomic-embed-text" in result.output
     assert "installed" in result.output
     assert " no " in result.output  # FakeOllama lists no models
+
+
+def test_notes_by_situation_and_pose() -> None:
+    raw = {
+        "id": "n", "provider": "none", "kind": "image", "capabilities": {"pose": "reference"},
+        "guide": {"notes": [
+            {"about": "hands", "says": "Hands are fine.", "source": "a.md", "checked": "2026-10-13"},
+            {"about": "faces", "says": "Faces need a portrait."},
+            {"about": "faces", "says": "Small faces blur."},
+        ]},
+    }  # fmt: skip
+    g = build(ModelConfig.model_validate(raw), installed="unknown")
+    assert [n.says for n in g.notes_about("faces")] == ["Faces need a portrait.", "Small faces blur."]
+    assert g.notes_about("places") == []
+    text = g.as_text()
+    assert text.index("  faces:") < text.index("    - Small faces blur.") < text.index("  hands:")
+    assert "    - Hands are fine. (a.md, checked 2026-10-13)" in text
+    assert "Pose: reference (" in text
+    data = json.loads(json.dumps(g.as_dict()))
+    hands = {"about": "hands", "says": "Hands are fine.", "source": "a.md", "checked": "2026-10-13"}
+    assert data["notes"][0] == hands
+    assert data["pose"] == "reference"
+    with pytest.raises(mk.errors.ConfigError, match="choose one of: general, faces, hands"):
+        g.notes_about("feet")
+
+
+def test_an_unknown_note_situation_is_refused_at_load(tmp_path: Path) -> None:
+    path = tmp_path / "m.toml"
+    path.write_text(
+        '[models.m]\nprovider = "comfyui"\nkind = "image"\n'
+        '[[models.m.guide.notes]]\nabout = "feet"\nsays = "Feet turn backwards."\n'
+    )
+    with pytest.raises(mk.errors.ConfigError, match=r"'feet' is not one of: general, faces, .*, sizes"):
+        mk.registry.load([path])
+    path.write_text('[models.m]\nprovider = "comfyui"\nkind = "image"\ncapabilities = { pose = "stick" }\n')
+    with pytest.raises(mk.errors.ConfigError, match="'none', 'reference' or 'control'"):
+        mk.registry.load([path])

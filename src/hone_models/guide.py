@@ -3,6 +3,7 @@
     g = mk.guide("qwen-image-edit-2511")
     g.summary, g.prompt, g.features[0].name, g.features[0].examples, g.source
     g.inputs            # every input the model takes: common ones, its own, prompt inputs with their choices
+    g.notes_about("faces")   # how it behaves in one situation (change 0020 §2); g.pose: how it takes a pose
     g.as_text()         # one block of plain text, for a person or for an LLM prompt
     g.as_dict()         # the JSON form
 
@@ -17,7 +18,8 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 
 from . import catalog
-from ._registry_shapes import GuideFeature
+from ._registry_shapes import NOTE_ABOUT, GuideFeature, GuideNote
+from .errors import ConfigError
 from .formats import prompt_input_names
 from .providers import MEDIA
 from .providers.common import COMMON_INPUTS, listed_inputs
@@ -35,6 +37,13 @@ COMMON_NOTES = {
     "duration_s": "seconds of output",
     "n": "how many outputs",
     "steps": "sampling steps",
+}
+
+# What `capabilities.pose` means (change 0020 §3).
+POSE_TEXT = {
+    "none": "pose pictures are not useful",
+    "reference": "a skeleton or mannequin is an ordinary reference picture; less exact than a control",
+    "control": "a pose skeleton is a control input (the `pose` input)",
 }
 
 
@@ -59,6 +68,8 @@ class ModelGuide:
     prompt: str | None
     inputs: dict[str, GuideInput]
     features: list[GuideFeature]
+    notes: list[GuideNote]
+    pose: str | None
     source: str | None
     checked: date | None
     license: str | None
@@ -78,8 +89,15 @@ class ModelGuide:
             n: {"origin": i.origin, "note": i.note, "choices": i.choices} for n, i in self.inputs.items()
         }
         data["features"] = [f.model_dump() for f in self.features]
+        data["notes"] = [n.model_dump(mode="json") for n in self.notes]
         data["checked"] = self.checked.isoformat() if self.checked else None
         return data
+
+    def notes_about(self, about: str) -> list[GuideNote]:
+        """The notes for one situation (`faces`, `hands`, ...: `NOTE_ABOUT`), in the order written."""
+        if about not in NOTE_ABOUT:
+            raise ConfigError(f"no situation {about!r}; choose one of: {', '.join(NOTE_ABOUT)}")
+        return [n for n in self.notes if n.about == about]
 
     def as_text(self) -> str:
         """One block of plain text, for a person or for an LLM prompt."""
@@ -93,6 +111,7 @@ class ModelGuide:
             lines.append("Features:")
             for feature in self.features:
                 lines += _feature_text(feature)
+        lines += _notes_text(self)
         lines += _limits_text(self)
         how = f" (install: hone-models models install {self.id})"
         lines.append(
@@ -115,7 +134,8 @@ def build(cfg: ModelConfig, installed: str | None = None) -> ModelGuide:
     return ModelGuide(
         id=cfg.id, kind=cfg.kind, summary=written.summary if written else None,
         prompt=written.prompt if written else None, inputs=accepted_inputs(cfg),
-        features=list(written.features) if written else [], source=written.source if written else None,
+        features=list(written.features) if written else [], notes=list(written.notes) if written else [],
+        pose=caps.pose, source=written.source if written else None,
         checked=written.checked if written else None, license=caps.license,
         commercial_use=caps.commercial_use, sizes=caps.sizes, durations_s=caps.durations_s,
         max_duration_s=caps.max_duration_s, max_references=caps.max_references,
@@ -174,6 +194,19 @@ def _feature_text(feature: GuideFeature) -> list[str]:
     return lines + ([f"    source: {feature.source}"] if feature.source else [])
 
 
+def _notes_text(g: ModelGuide) -> list[str]:
+    """The notes grouped by situation, in the order of `NOTE_ABOUT`."""
+    lines = ["Notes:"] if g.notes else []
+    for about in NOTE_ABOUT:
+        found = g.notes_about(about)
+        lines += [f"  {about}:"] if found else []
+        for note in found:
+            checked = f"checked {note.checked}" if note.checked else None
+            evidence = ", ".join(x for x in (note.source, checked) if x)
+            lines.append(f"    - {note.says}" + (f" ({evidence})" if evidence else ""))
+    return lines
+
+
 def _limits_text(g: ModelGuide) -> list[str]:
     limits = [
         f"sizes {', '.join(g.sizes)}" if g.sizes else None,
@@ -183,6 +216,8 @@ def _limits_text(g: ModelGuide) -> list[str]:
     ]
     shown = [limit for limit in limits if limit]
     lines = [f"Limits: {'; '.join(shown)}"] if shown else []
+    if g.pose:
+        lines.append(f"Pose: {g.pose} ({POSE_TEXT[g.pose]})")
     if g.license or g.commercial_use is not None:
         use = {True: "allowed", False: "not allowed", None: "not stated"}[g.commercial_use]
         lines.append(f"License: {g.license or 'not stated'} (commercial use: {use})")

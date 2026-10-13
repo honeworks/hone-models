@@ -72,7 +72,7 @@ source = "hone-frame/design/research/prompting-findings.md"
 checked = 2026-10-03
 [[models."z-image-turbo".guide.notes]]
 about = "poses"
-says = "To draw a mannequin for a pose picture, describe the body only: \"raising the mace overhead\" drew the mannequin holding a hammer despite \"empty hands, holding nothing\"."
+says = "To draw a mannequin for a pose picture, describe the body only: \"raising the mace overhead\" drew the mannequin holding a hammer despite \"empty hands, holding nothing\". (Seen in a hone-frame run whose model was not recorded; most likely this one.)"
 source = "hone-frame/design/changes/0007-quality-pipeline.md"
 checked = 2026-10-04
 [[models."z-image-turbo".guide.notes]]
@@ -145,7 +145,7 @@ source = "hone-frame/design/changes/0002-prompt-dialects.md; hone-frame/design/r
 checked = 2026-10-02
 [[models."flux.2-klein-4b".guide.notes]]
 about = "faces"
-says = "Tiny face marks (a mole, a small scar) move between edits, from cheek to chin to forehead; give an exact position and size and check the result."
+says = "Tiny face marks (a mole, a small scar) move between edits, from cheek to chin to forehead; give an exact position and size and check the result. (Seen in a hone-frame run whose model was not recorded; most likely this one.)"
 source = "hone-frame/design/research/prompting-findings.md"
 checked = 2026-10-03
 [[models."flux.2-klein-4b".guide.notes]]
@@ -160,7 +160,7 @@ source = "hone-frame/design/changes/0002-prompt-dialects.md"
 checked = 2026-10-02
 [[models."flux.2-klein-4b".guide.notes]]
 about = "people"
-says = "Left and right flip when a pose turns: an armlet moved between arms and down to the wrists."
+says = "Left and right flip when a pose turns: an armlet moved between arms and down to the wrists. (Seen in a hone-frame run whose model was not recorded; most likely this one.)"
 source = "hone-frame/design/research/prompting-findings.md"
 checked = 2026-10-03
 [[models."flux.2-klein-4b".guide.notes]]
@@ -170,7 +170,7 @@ source = "hone-frame/design/research/prompting-findings.md"
 checked = 2026-10-03
 [[models."flux.2-klein-4b".guide.notes]]
 about = "poses"
-says = "With a mannequin as the pose, a 2D figure came out slightly slimmer and more 3D-looking. In a side view a foot came out turned backwards; ask side views for the feet to turn with the body."
+says = "With a mannequin as the pose, a 2D figure came out slightly slimmer and more 3D-looking. In a side view a foot came out turned backwards; ask side views for the feet to turn with the body. (Seen in a hone-frame run whose model was not recorded; most likely this one.)"
 source = "hone-frame/design/research/prompting-findings.md; hone-frame/design/decisions.md D-029"
 checked = 2026-10-03
 [[models."flux.2-klein-4b".guide.notes]]
@@ -185,7 +185,7 @@ source = "hone-frame/design/research/prompting-findings.md"
 checked = 2026-10-03
 [[models."flux.2-klein-4b".guide.notes]]
 about = "places"
-says = "Tell a view of a place to keep the place (\"the same place, buildings, materials and colours\"): one asked to keep \"the same face, hair, build, clothes\" came out as a man's portrait in front of the fortress."
+says = "Tell a view of a place to keep the place (\"the same place, buildings, materials and colours\"): one asked to keep \"the same face, hair, build, clothes\" came out as a man's portrait in front of the fortress. (Seen in a hone-frame run whose model was not recorded; most likely this one.)"
 source = "hone-frame/design/decisions.md D-040"
 checked = 2026-10-03
 [[models."flux.2-klein-4b".guide.notes]]

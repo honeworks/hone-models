@@ -16,7 +16,6 @@ saying what was decided.
 | [D-016](#d-016-sibling-packages-as-development-only-path-sources) | Remove the `[tool.uv.sources]` path sources once the sibling packages are published, before hone-models is published. |
 | [D-019](#d-019-the-jev-api-mapping-is-unverified) | Verify the Jev API mapping against the real API (endpoint, auth, field names, token counts). |
 | [D-022](#d-022-the-packaged-gemma4-12b-entry-and-its-ollama-tag) | Before publishing, point the packaged `gemma4-12b` entry at the public Ollama tag `gemma4:12b` (and keep the local tag through a user registry alias). |
-| [D-085](#d-085-where-the-guide-notes-come-from) | Confirm the model each guide note is attributed to, and the Lightning LoRA's install repository. |
 
 ## D-001: `records.py` is a public module
 The span sinks live in one public module, `hone_models.records` (with `read_spans`, `add_secret` and
@@ -690,8 +689,12 @@ date of the evidence as `checked`. Only what those files measured or saw is writ
 there as likely says "not measured yet". Some hone-frame findings name the run, not the model: they are
 given to the model that run used for that kind of picture (FLUX.2 klein for edits in the standard
 profile, Z-Image Turbo for drawings from text in the quality profile). The Qwen-Image-Edit 2511 Lightning
-LoRA's install repository (`lightx2v/Qwen-Image-Edit-2511-Lightning`) is written from its file name and
-was not checked against Hugging Face from here. After an independent review (2026-10-13) every note was
+LoRA's install repository (`lightx2v/Qwen-Image-Edit-2511-Lightning`) was written from its file name and
+then checked on Hugging Face (2026-10-13): the repository holds
+`Qwen-Image-Edit-2511-Lightning-8steps-V1.0-bf16.safetensors`. After an independent review (2026-10-13) every note was
 checked again against its source: notes now say which workflow a measure came from, cite the record that
 holds a finding, and a note whose source did not concern the model was removed.
-**Awaiting owner review:** confirm the attributions above.
+**Owner review (2026-10-13):** the owner does not remember which model those runs used, so the five
+notes concerned (the hammer mannequin, the moving face marks, the left/right flip, the backward foot and
+the place drawn as a portrait) end with "Seen in a hone-frame run whose model was not recorded; most
+likely this one." No further review needed.

@@ -24,7 +24,7 @@ max_references = 0
 license = "Apache-2.0"
 commercial_use = true
 pose = "none"
-sizes = ["256x256", "512x512", "768x768", "1024x1024", "1024x576", "576x1024", "704x880", "832x1248", "2048x1024"]
+sizes = ["256x256", "512x512", "768x768", "1024x1024", "1328x1328", "1024x576", "576x1024", "1280x720", "720x1280", "1344x768", "768x1344", "1664x928", "928x1664", "1024x768", "768x1024", "1152x864", "864x1152", "1216x832", "832x1216", "1536x1024", "1024x1536", "1152x896", "896x1152", "704x880", "832x1248", "1536x640", "640x1536", "2048x1024"]
 [models."z-image-turbo".install]
 source = "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"
 files = [
@@ -116,7 +116,7 @@ max_references = 2
 license = "Apache-2.0"
 commercial_use = true
 pose = "reference"
-sizes = ["256x256", "512x512", "768x768", "1024x1024", "1024x576", "576x1024", "704x880", "832x1248", "2048x1024"]
+sizes = ["256x256", "512x512", "768x768", "1024x1024", "1328x1328", "1024x576", "576x1024", "1280x720", "720x1280", "1344x768", "768x1344", "1664x928", "928x1664", "1024x768", "768x1024", "1152x864", "864x1152", "1216x832", "832x1216", "1536x1024", "1024x1536", "1152x896", "896x1152", "704x880", "832x1248", "1536x640", "640x1536", "2048x1024"]
 [models."flux.2-klein-4b".install]
 source = "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
 files = [
@@ -224,7 +224,7 @@ max_references = 0
 license = "Apache-2.0"
 commercial_use = true
 pose = "none"
-sizes = ["256x256", "512x512", "768x768", "1024x1024", "1024x576", "576x1024", "704x880", "832x1248", "2048x1024"]
+sizes = ["256x256", "512x512", "768x768", "1024x1024", "1328x1328", "1024x576", "576x1024", "1280x720", "720x1280", "1344x768", "768x1344", "1664x928", "928x1664", "1024x768", "768x1024", "1152x864", "864x1152", "1216x832", "832x1216", "1536x1024", "1024x1536", "1152x896", "896x1152", "704x880", "832x1248", "1536x640", "640x1536", "2048x1024"]
 [models."flux.2-klein-4b-text".install]
 source = "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
 files = [
@@ -289,7 +289,7 @@ max_references = 3
 license = "Apache-2.0"
 commercial_use = true
 pose = "reference"
-sizes = ["256x256", "512x512", "768x768", "1024x1024", "1024x576", "576x1024", "704x880", "832x1248", "2048x1024"]
+sizes = ["256x256", "512x512", "768x768", "1024x1024", "1328x1328", "1024x576", "576x1024", "1280x720", "720x1280", "1344x768", "768x1344", "1664x928", "928x1664", "1024x768", "768x1024", "1152x864", "864x1152", "1216x832", "832x1216", "1536x1024", "1024x1536", "1152x896", "896x1152", "704x880", "832x1248", "1536x640", "640x1536", "2048x1024"]
 # The Multiple-Angles LoRA's phrases (from its model card): "<sks> <azimuth> <elevation> <distance>".
 [models."qwen-image-edit-2511".prompt_inputs.camera_angle]
 place = "prepend"
@@ -525,7 +525,7 @@ max_references = 10
 license = "Qwen research license"
 commercial_use = false
 pose = "reference"
-sizes = ["256x256", "512x512", "768x768", "1024x1024", "1024x576", "576x1024", "704x880", "832x1248", "2048x1024"]
+sizes = ["256x256", "512x512", "768x768", "1024x1024", "1328x1328", "1024x576", "576x1024", "1280x720", "720x1280", "1344x768", "768x1344", "1664x928", "928x1664", "1024x768", "768x1024", "1152x864", "864x1152", "1216x832", "832x1216", "1536x1024", "1024x1536", "1152x896", "896x1152", "704x880", "832x1248", "1536x640", "640x1536", "2048x1024"]
 [models."qwen-image-2.1-turbo".install]
 source = "https://huggingface.co/Comfy-Org/Qwen-Image-2.1"
 files = [

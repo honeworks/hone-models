@@ -634,7 +634,10 @@ it is a `CapabilityError`). The five local image entries (`z-image-turbo`, `flux
 `flux.2-klein-4b-text`, `qwen-image-edit-2511`, `qwen-image-2.1-turbo`) share one list: the sizes
 hone-frame and hone-music-video use on the 8 GB reference machine (1024x1024; the 16:9, 9:16, 1:1 and 4:5
 start frames 1024x576, 576x1024, 768x768, 704x880; full figures 832x1248; four-figure sheets 2048x1024),
-plus 256x256 and 512x512, which `models check` and AC-30 use. Not every model was run at every size: the
+plus 256x256 and 512x512, which `models check` and AC-30 use. On the owner's request (2026-10-13) the list
+also holds the common sizes, every side a multiple of 16: 1280x720 and 720x1280, 1344x768, 1664x928 and
+1328x1328 (Qwen-Image's native 16:9 and 1:1), 4:3 (1024x768, 1152x864), 3:2 (1216x832, 1536x1024),
+1152x896, 21:9 (1536x640) and their portrait forms. Not every model was run at every size: the
 notes about `sizes` say which were proven for each. A caller that needs another size adds it in its own
 registry file (a later list replaces the packaged one). The catalog-only image entries (no workflow) keep
 only what is known (licence, `commercial_use`); their `vram_gb` and sizes are unmeasured.

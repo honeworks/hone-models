@@ -33,7 +33,7 @@ mk.embedder(model_id, *, registry=None, sink=None) -> Embedder
 mk.speech(model_id, *, registry=None, sink=None) -> SpeechClient   # extras `speech` (kokoro-82m), `expressive` (chatterbox)
 mk.image(model_id, *, registry=None, sink=None) -> MediaClient     # also mk.music(...), mk.video(...) (change 0015)
 mk.transcriber(model_id, *, registry=None, sink=None) -> Transcriber   # extra `transcribe` (faster_whisper)
-mk.guide(model_id, *, registry=None) -> ModelGuide                   # what a model takes (§3, change 0015 §3a)
+mk.guide(model_id, *, registry=None) -> ModelGuide                   # what a model takes (§3, change 0015 §3a); .notes_about(about)
 mk.select(require=None, *, kind="chat", prefer=None, registry=None) -> list[ModelConfig]   # every match, best first
 mk.catalog.installed(cfg) -> "yes" | "no" | "unknown", mk.catalog.install_commands(cfg) -> list[str]
 mk.formats.convert_lyrics(text, lyrics_format), mk.formats.apply(cfg, prompt, inputs)   # common input formats
@@ -56,7 +56,7 @@ mk.replay.Replayer(sink=None, registry=None)
 mk.records.SqliteSpanSink(path), JsonlSpanSink(path), MemorySink(), NullSink()
 mk.records.read_spans(path), default_store(), add_secret(value)
 mk.current_trace()
-mk.errors: HoneModelsError, ConfigError, CapabilityError, ContextOverflow, ProviderError, ModelTimeout, ValidationFailed
+mk.errors: HoneModelsError, ConfigError, CapabilityError, ContextOverflow, ProviderError, ModelTimeout, ValidationFailed, Cancelled
 mk.PORTS_VERSION
 hone_models.calls: find_calls(spans, since=..., model=...), call_stats(calls, by=...)
 hone_models.testing: FakeOllama(responder=None), FakeSpeech, FakeSpeech.like(model_id), FakeComfyUI(run_s=0, port=0, jobs_api=True),
@@ -146,7 +146,7 @@ joined with 0.25 s of silence, paragraphs with 0.6 s. A plain call loads the mod
 afterwards; `with tts.session():` holds the GPU lease for the block, loads the model on its first call
 and frees it once at the end (also on an exception); sessions do not nest.
 
-`generate(prompt, *, out, seed=None, timeout_s=None, trace=None, **inputs)` returns a `MediaResult` with
+`generate(prompt, *, out, seed=None, timeout_s=None, trace=None, cancel=None, **inputs)` returns a `MediaResult` with
 `files` (a `MediaFile(path, sha256, bytes, mime, width, height, duration_s)` each, unknown values `None`),
 `path` (the first file or `None`), `model`, `seed`, `span_id`, `elapsed_s`, `error`, `error_kind`
 (`out_of_memory`, `refused`, `invalid_input`, `no_output`, `failed`), `job_id`, `cost_usd` (a naive flat
@@ -160,7 +160,11 @@ random seed; the seed used is on the result and the span. Several files are `<st
 `out` without a media suffix takes the provider's (a dot in a name such as `v1.2` is not a suffix). A job that ran without usable output is a result (`error`,
 `error_kind`, no files, span status `error`); one that could not be submitted, run or fetched raises
 (`ConfigError` for ComfyUI `node_errors`, `ProviderError` (a `command` program's non-zero exit included),
-`ModelTimeout` after cancelling the job; any exception while waiting cancels the job too). A local model's call leases the GPU by itself
+`ModelTimeout` after cancelling the job; any exception while waiting cancels the job too). `cancel` is a
+`threading.Event` the caller may set from another thread ([0020](changes/0020-model-guides-and-cancel.md)):
+the call raises `Cancelled`, the span records `error_kind = "cancelled"`; ComfyUI checks it while polling
+and cancels its job (within one poll interval), the other providers finish their job first, and an event
+already set runs nothing. A local model's call leases the GPU by itself
 (`capabilities.vram_gb`) and frees the model afterwards; `with client.session():` holds the lease, the
 server and the model for the block and frees them once at the end; sessions do not nest.
 
@@ -183,7 +187,7 @@ exception); sessions do not nest. Aligning known lyrics to the heard words stays
   `RuntimeError`: `ConfigError` (unknown id, bad registry, missing API key), `CapabilityError` (the model
   is declared unable to do what was asked), `ContextOverflow` (a `CapabilityError`, with the numbers),
   `ProviderError` (HTTP or transport failure, with the status), `ModelTimeout` (a `ProviderError`),
-  `ValidationFailed`.
+  `ValidationFailed`, `Cancelled` (the caller's `cancel` event was set, 0020).
 
 ## 3. Registry
 
@@ -264,7 +268,10 @@ it applies emotion and intensity in `capabilities.expressive`.
 - **Generation entries.** A `comfyui` entry names an API-format `workflow` (a relative path is resolved
   against the registry file declaring it), an `inputs` table mapping each named input to one or more
   `"<node id>.<input>"` paths (`{ path, per_second, add }` converts seconds to frames; `width` / `height`
-  are filled from `size`; `references` is a list of slots) and optional `outputs` (node ids). Other
+  are filled from `size`; `references` is a list of slots) and optional `outputs` (node ids).
+  `empty_slots = "repeat_last"` gives the free reference slots the last reference (a graph that needs
+  every slot, FLUX.2 klein's), and a call without any reference raises `CapabilityError` before any
+  request; by default a free slot is removed with its links (0020). Other
   providers list extra input names in `inputs`. A `command` entry gives `command` (a list with the
   placeholders `{request}`, `{out_dir}`, `{adapter:<name>}`; `~`, `$VAR` and `${VAR}` expanded, as in
   `cwd` and the `env` values) and optional `cwd` and `env`; `install.dir_env` names its project folder
@@ -276,7 +283,10 @@ it applies emotion and intensity in `capabilities.expressive`.
   their links); mapped to one path it is required. The packaged catalog ships a workflow
   (`hone_models/data/workflows/<id>.json`) for every ComfyUI model installed on the reference machine, with
   `vram_gb` measured by `hone-models models check <id>` (a tiny job in a session, the peak of the whole
-  card; D-070, D-072); a ComfyUI catalog entry without a `workflow` yet raises `ConfigError` "no workflow
+  card; D-070, D-072); `flux.2-klein-4b`, `flux.2-klein-4b-text`, `qwen-image-edit-2511` and
+  `qwen-image-2.1-turbo` ship the workflows hone-frame and hone-music-video proved there, with `vram_gb`
+  set near the whole card; every callable image entry declares `license`, `commercial_use`,
+  `max_references`, `sizes` (those used on the reference machine, D-081) and `vram_gb` (0020); a ComfyUI catalog entry without a `workflow` yet raises `ConfigError` "no workflow
   yet for '<id>'" when called; `command`, `cwd` and
   `env` are for the `command` provider. Registry files are trusted configuration: a `command` entry
   runs the program it names.
@@ -292,7 +302,13 @@ it applies emotion and intensity in `capabilities.expressive`.
   call. `mk.guide(id)` returns a `ModelGuide`: the guide, every accepted input (common, the model's own,
   prompt inputs with their choices) with its note, the limits (`sizes`, `durations_s`, `max_duration_s`,
   `max_references`), licence, `commercial_use`, the install state and commands; `as_text()` and
-  `as_dict()` (JSON). An entry without a guide gets one built from its inputs and capabilities
+  `as_dict()` (JSON). **Notes per situation** ([0020](changes/0020-model-guides-and-cancel.md)):
+  `[[models.<id>.guide.notes]]` with `about` (one of `general`, `faces`, `hands`, `people`, `poses`,
+  `objects`, `places`, `scenes`, `text`, `references`, `sizes`; another value is a `ConfigError` naming
+  them), `says` (one or two plain sentences), optional `source` and `checked`; `ModelGuide.notes`,
+  `notes_about(about)` and `as_text()` grouped by situation in that order. `capabilities.pose` (`none`,
+  `reference`, `control`; `None` unknown) is the guide's `pose`, shown in `as_text()`; the packaged image
+  models that take references are `reference`, `z-image-turbo` and `flux.2-klein-4b-text` `none`. An entry without a guide gets one built from its inputs and capabilities
   (`summary = None`). `capabilities.features` is filled from the guide's feature names.
 - **Installed or not** (§3b). `install` gives `source`, an Ollama name (`ollama`), Hugging Face files with
   their ComfyUI folder (`files`), a whole repository for the HF cache (`hf`), or a project (`repo`, `setup`,
@@ -555,7 +571,7 @@ OpenTelemetry GenAI names where they exist, `hone.models.*` otherwise:
 | `hone.models.media.{job_id,workflow_sha256,revised_prompt}` | the provider's job id; the ComfyUI workflow's SHA-256; a hosted image model's rewrite of the prompt (content) |
 | `hone.models.media.{session,loaded,freed,server_started,queue_wait_ms}` | in a session; this call loaded the model / freed it / found the server started by its session; ms queued before running |
 | `hone.models.media.log_tail` | `command`: the last 40 lines of stderr, at most 4 KiB; content |
-| `hone.models.media.{error,error_kind}` | as on the result; the error is content |
+| `hone.models.media.{error,error_kind}` | as on the result, or `cancelled` for a call the caller cancelled (0020); the error is content |
 | `hone.models.media.{license,commercial_use,cost_estimated}` | from the registry; `cost_estimated` when `hone.models.cost_usd` is the naive flat-price estimate |
 | `hone.models.transcribe.audio` | transcribe spans: the audio file as `{"path", "sha256", "bytes"}` |
 | `hone.models.transcribe.{language,duration_s,words_count,session,loaded}` | the language asked for, then the one heard; the audio's duration; in a session; this call loaded the model |
@@ -703,6 +719,7 @@ models in `tests/gpu/`.
 | AC-33 **[real]** | `prepare(["a"])` with Ollama holding `a` and `b` and ComfyUI a model not needed; with ComfyUI holding only needed models; with another process's lease (`if_busy` `"block"` and `"unload"`); with the lock held elsewhere; with the unload of `b` failing | `b` unloaded, ComfyUI freed, span recorded; ComfyUI kept; blocked: nothing sent, `blocked_by` names the holder; `"unload"`: `b` unloaded, `blocked_by` still reported; failure: in `errors`, span status `error`, `b` still loaded; on the real machine `prepare([])` leaves nothing loaded |
 | AC-34 | `load("a")` on FakeOllama; a model partly on the CPU; a server timing out; a `comfyui` entry; `GpuScheduler(unload_others=True, if_busy="block")` short of memory while another process holds a lease | an empty-prompt `/api/generate` with `keep_alive`, `loaded: True` with seconds; `vram_gb < size_gb`; `loaded: False` with the error; `loaded: None`, "not supported", no request; the other process's models are not unloaded and the lease times out as before |
 | AC-35 | An `openai_compatible` entry with `base_url_env` and `api_key_env`: the URL from the environment; the variable and a `base_url`; neither; `./.env` with `export`, quotes and comments while a variable is already set; `HONE_ENV_FILE`; a malformed `.env` line; a URL with `user:password@` and a key from `.env`, one call answered and one failing | the request goes to the variable's URL with the key; the variable wins, `base_url` when unset; `ConfigError` naming the variable and no request; the file's values exported, the existing one kept; the named file read first, a missing one a `ConfigError`; `ConfigError` naming file and line without the line's text; neither the key nor the password in the SQLite files, the URL stored as `https://***@...` ([0017](changes/0017-settings-from-the-environment.md)) |
+| AC-36 | `flux.2-klein-4b`, `flux.2-klein-4b-text`, `qwen-image-edit-2511` and `qwen-image-2.1-turbo` through `FakeComfyUI` with every slot filled and with one reference; `flux.2-klein-4b` without a reference; `mk.guide(...).notes_about("faces")`, `as_text()`; an unknown `about`; `cancel` set during a hanging fake ComfyUI job; `cancel` on a provider that cannot stop (`FakeMedia`) during and before the job ([0020](changes/0020-model-guides-and-cancel.md)) | prompt, seed, size, steps and every reference slot on the mapped nodes; one reference repeated into FLUX's second slot, the free slots of the others removed; `CapabilityError` before any request; the face notes, notes grouped by situation and the pose; `ConfigError` naming the allowed values; the job cancelled at the server and `Cancelled` within one poll interval, span `error_kind = "cancelled"`; the job finishes then `Cancelled`, and nothing runs when already set |
 
 ## 12. Examples
 

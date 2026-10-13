@@ -130,12 +130,12 @@ so a long answer (`max_tokens=7000`) gets up to 600 s on a fresh machine; hosted
 measurement get 120 s.
 
 **Generation models.** `kind` is `chat` (default), `embedding`, `decision`, `speech`, `image`, `music`,
-`video`, `transcription` or `scoring` (catalog entries hone-models cannot call yet). A `comfyui` entry adds `workflow`, an `inputs` table of workflow paths and
-`outputs`; a `command` entry adds `command`, `cwd`, `env` and its project folder variable
+`video`, `transcription` or `scoring` (catalog entries hone-models cannot call yet). A `comfyui` entry adds `workflow`, an `inputs` table of workflow paths,
+`outputs` and `empty_slots` (`"repeat_last"` when the graph needs every reference slot filled); a `command` entry adds `command`, `cwd`, `env` and its project folder variable
 `install.dir_env` (registry files are trusted configuration: a `command` entry runs the program it
 names); generation capabilities are `max_references`, `sizes`, `max_duration_s`, `durations_s`,
 `word_timestamps`, `commercial_use` (information only: it never blocks a call, and it is copied onto every
-result) and `features`; `price` also takes `per_image` and `per_output_second`. `max_timeout_s` defaults
+result), `features` and `pose` (`none`, `reference` or `control`: how a pose picture is taken); `price` also takes `per_image` and `per_output_second`. `max_timeout_s` defaults
 by kind: image 600 s, music 1800 s, video 3600 s, transcription 600 s. `lyrics_format`, `prompt_inputs`, `guide` and `install` are described in
 [models-and-guides.md](models-and-guides.md). An
 `openai_compatible` entry of kind `image` or `video` calls a hosted images or video API; its `inputs` is a

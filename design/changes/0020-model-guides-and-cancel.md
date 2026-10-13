@@ -2,7 +2,7 @@
 
 ## Status
 
-`accepted` 2026-10-13 (owner, for hone-frame change 0008: "unlike hone-music-video, where we added things
+`implemented in 0.1.0` (decisions D-081 to D-085). `accepted` 2026-10-13 (owner, for hone-frame change 0008: "unlike hone-music-video, where we added things
 manually, it's not allowed here"; "all model knowledge moves to hone-models"; "even add the research only
 ones ... but show a warning"; "pause will stop the current image as well").
 

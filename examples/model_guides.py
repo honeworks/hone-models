@@ -6,8 +6,9 @@ What: read a model's guide, choose the models that declare a feature, send lyric
     catalog models are installed and what would install the others.
 
 How: `mk.guide(id)` returns a `ModelGuide` (summary, prompt advice, every accepted input with its note,
-    features with examples and a source, limits, licence, install state; `as_text()` for a person or an
-    LLM). `mk.select({"features": [...]}, kind=...)` returns the models that declare every listed feature.
+    features with examples and a source, notes per situation (`notes_about("faces")`), pose support,
+    limits, licence, install state; `as_text()` for a person or an LLM). `mk.select({"features": [...]},
+    kind=...)` returns the models that declare every listed feature.
     An entry's `lyrics_format` and `prompt_inputs` make the media client convert `lyrics` and write
     `camera_angle` into the prompt before the model sees them. `mk.catalog.installed(cfg)` says `yes`,
     `no` or `unknown`; `mk.catalog.install_commands(cfg)` lists what would fetch the model.
@@ -36,6 +37,9 @@ angle = g.features[0]
 print(f"feature: {angle.name}; e.g. {angle.examples[0]}; source {angle.source}")
 assert angle.input == "camera_angle"
 assert g.commercial_use is True
+for note in g.notes_about("faces"):  # how it behaves in one situation, with the evidence
+    print(f"faces: {note.says} ({note.source})")
+assert g.pose == "reference"  # a pose goes in as an ordinary reference picture
 
 # 2. Which models can do it: every listed feature must be declared.
 print("camera angle:", [m.id for m in mk.select({"features": ["camera angle"]}, kind="image")])

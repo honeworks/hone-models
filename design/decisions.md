@@ -16,6 +16,7 @@ saying what was decided.
 | [D-016](#d-016-sibling-packages-as-development-only-path-sources) | Remove the `[tool.uv.sources]` path sources once the sibling packages are published, before hone-models is published. |
 | [D-019](#d-019-the-jev-api-mapping-is-unverified) | Verify the Jev API mapping against the real API (endpoint, auth, field names, token counts). |
 | [D-022](#d-022-the-packaged-gemma4-12b-entry-and-its-ollama-tag) | Before publishing, point the packaged `gemma4-12b` entry at the public Ollama tag `gemma4:12b` (and keep the local tag through a user registry alias). |
+| [D-085](#d-085-where-the-guide-notes-come-from) | Confirm the model each guide note is attributed to, and the Lightning LoRA's install repository. |
 
 ## D-001: `records.py` is a public module
 The span sinks live in one public module, `hone_models.records` (with `read_spans`, `add_secret` and
@@ -626,3 +627,59 @@ with a TODO: its v2-medium checkpoint and the SongGeneration runtime tokenizer o
 To enable it: re-download `lglg666/SongGeneration-Runtime` or move to the upstream code, prove it with
 `hone-models models check songgeneration-v2-medium`, then remove `disabled`.
 No review needed.
+
+## D-081: the image entries' `sizes` are the sizes used on the reference machine
+0020 asks every callable image entry to declare `sizes`, and a declared list is enforced (a size not in
+it is a `CapabilityError`). The five local image entries (`z-image-turbo`, `flux.2-klein-4b`,
+`flux.2-klein-4b-text`, `qwen-image-edit-2511`, `qwen-image-2.1-turbo`) share one list: the sizes
+hone-frame and hone-music-video use on the 8 GB reference machine (1024x1024; the 16:9, 9:16, 1:1 and 4:5
+start frames 1024x576, 576x1024, 768x768, 704x880; full figures 832x1248; four-figure sheets 2048x1024),
+plus 256x256 and 512x512, which `models check` and AC-30 use. Not every model was run at every size: the
+notes about `sizes` say which were proven for each. A caller that needs another size adds it in its own
+registry file (a later list replaces the packaged one). The catalog-only image entries (no workflow) keep
+only what is known (licence, `commercial_use`); their `vram_gb` and sizes are unmeasured.
+No review needed.
+
+## D-082: `qwen-image-2.1-turbo` beside `qwen-image-2.1`
+The catalog had `qwen-image-2.1` without a workflow (the base model at full steps, with the `w4a8` text
+encoder). hone-music-video proved `qwen-image-2.1-turbo`: the same int8 diffusion model with the Turbo
+LoRA at 8 steps and the int8 Qwen3-VL encoder. Both stay: the turbo entry is the callable one, with its
+own install files (those on the reference machine), and `qwen-image-2.1` stays a catalog entry for the
+full-step model, its note pointing at the turbo entry. Merging them would have changed what
+`qwen-image-2.1` installs and given the base id a LoRA it does not name. `max_references` is the
+workflow's ten slots (hone-music-video sends at most six; its notes give the time each costs).
+No review needed.
+
+## D-083: FLUX.2 klein's free reference slot gets the last reference (`empty_slots`)
+FLUX.2 klein's workflow chains each reference through a `VAEEncode` and a `ReferenceLatent`; removing a
+free slot's `LoadImage` leaves the `VAEEncode` without pixels and ComfyUI refuses the graph (hone-frame
+D-017). Removing the whole chain would need rewiring the conditioning, which is not general. So an entry
+may say `empty_slots = "repeat_last"`: the free slots get the last reference (the same picture twice is a
+stronger hint for it and changes nothing else; the record keeps the references given), and a call with no
+reference raises `CapabilityError` before any request (`flux.2-klein-4b-text` draws from the prompt). The
+default (unset, or `"remove"`) is unchanged. Qwen's encoders take optional image inputs, so their free
+slots are removed as before (0, 3, 4, 6 and 10 references proven in hone-music-video, its D-140).
+No review needed.
+
+## D-084: cancelling a media call
+`cancel` is a `threading.Event` on `MediaClient.generate` and `MediaJob`. The client raises `Cancelled`
+when it is set before the job starts (nothing runs) or by the time the provider returns (a hosted or
+`command` job, which cannot be stopped from here, finishes first; its files stay where they were written
+and the span lists no outputs). ComfyUI waits on the event instead of sleeping, so a set event ends the
+wait at once; the existing `_cancel` stops the job and the server is freed as after any failure. The span
+records `hone.models.media.error_kind = "cancelled"` (the vocabulary of `error_kind`, though a
+cancellation raises rather than returning a result) and status `error`. `Cancelled` is in `mk.errors`
+like the other exceptions.
+No review needed.
+
+## D-085: where the guide notes come from
+The notes of `z-image-turbo`, `flux.2-klein-4b`, `flux.2-klein-4b-text`, `qwen-image-edit-2511` and
+`qwen-image-2.1-turbo` are drawn from hone-frame's research notes, decisions and change records and from
+hone-music-video's design, decisions, prompts and experiments, each with its file as `source` and the
+date of the evidence as `checked`. Only what those files measured or saw is written; a finding listed
+there as likely says "not measured yet". Some hone-frame findings name the run, not the model: they are
+given to the model that run used for that kind of picture (FLUX.2 klein for edits in the standard
+profile, Z-Image Turbo for drawings from text in the quality profile). The Qwen-Image-Edit 2511 Lightning
+LoRA's install repository (`lightx2v/Qwen-Image-Edit-2511-Lightning`) is written from its file name and
+was not checked against Hugging Face from here.
+**Awaiting owner review:** confirm the attributions above.

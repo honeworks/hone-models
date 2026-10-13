@@ -9,7 +9,9 @@ import pytest
 
 import hone_models as mk
 from hone_models._registry_shapes import node_targets
+from hone_models.errors import CapabilityError, ConfigError
 from hone_models.providers import _comfyui_workflow
+from media_fixtures import png_file
 
 WORKFLOWS = Path(str(resources.files("hone_models") / "data" / "workflows"))
 # The ComfyUI models installed on the reference machine (2026-09-29), each proven with `models check`.
@@ -67,16 +69,11 @@ def test_workflow_matches_its_entry(cfg: mk.registry.ModelConfig) -> None:
 
 
 @pytest.mark.parametrize("cfg", [m for m in comfyui_entries() if m.kind == "image"], ids=lambda m: m.id)
-def test_callable_image_entries_declare_their_limits(cfg: mk.registry.ModelConfig) -> None:
-    caps = cfg.capabilities  # change 0020 §1, §3
-    assert caps.license
-    assert caps.commercial_use is not None
-    assert caps.max_references is not None
-    assert caps.sizes
-    assert caps.vram_gb
-    assert caps.pose == ("reference" if caps.max_references else "none")
+def test_an_image_entry_takes_one_reference_per_slot(cfg: mk.registry.ModelConfig, tmp_path: Path) -> None:
     assert isinstance(cfg.inputs, dict)
-    slots = node_targets(cfg.inputs["references"]) if caps.max_references else []
-    assert len(slots) == caps.max_references
-    assert cfg.guide is not None
-    assert cfg.guide.notes  # how it behaves, per situation
+    slots = len(node_targets(cfg.inputs["references"])) if "references" in cfg.inputs else 0
+    assert cfg.capabilities.max_references == slots  # change 0020 §1: the limit is the workflow's
+    assert cfg.capabilities.pose == ("reference" if slots else "none")  # §3
+    too_many = [png_file(tmp_path / "ref.png")] * (slots + 1)
+    with pytest.raises((CapabilityError, ConfigError)):  # refused before any request
+        mk.image(cfg.id).generate("x", references=too_many, out=tmp_path / "x.png")

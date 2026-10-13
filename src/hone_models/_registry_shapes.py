@@ -14,6 +14,8 @@ from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from .errors import ConfigError
+
 
 class Price(BaseModel):
     """USD per million tokens; for generation, per image or per second of output (a flat estimate)."""
@@ -133,9 +135,10 @@ NOTE_ABOUT = (
 
 
 def check_about(about: str) -> str:
-    """`about` if it is one of `NOTE_ABOUT`, else a `ValueError` naming the allowed values."""
+    """`about` if it is one of `NOTE_ABOUT`, else a `ConfigError` naming the allowed values (used when a
+    registry is loaded and by `ModelGuide.notes_about`)."""
     if about not in NOTE_ABOUT:
-        raise ValueError(f"note about {about!r} is not one of: {', '.join(NOTE_ABOUT)}")
+        raise ConfigError(f"no situation {about!r} for a guide note; choose one of: {', '.join(NOTE_ABOUT)}")
     return about
 
 

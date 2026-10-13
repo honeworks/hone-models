@@ -170,3 +170,19 @@ def test_ac36_cancel_while_waiting_for_the_gpu(
         holder.join()
     assert waited < 1.0
     assert server.submitted == []
+
+
+def test_ac36_qwen_edit_own_inputs_and_a_single_reference(tmp_path: Path) -> None:
+    ref = png_file(tmp_path / "ref.png")
+    with FakeComfyUI() as server:
+        mk.image("qwen-image-edit-2511").generate(
+            "the same man", negative="blurry", lora_strength=1.0, lightning=0.0, references=ref,
+            out=tmp_path / "a.png",
+        )  # fmt: skip
+        mk.image("flux.2-klein-4b").generate("the same man", references=ref, out=tmp_path / "b.png")
+    qwen, flux = server.submitted
+    assert node_value(qwen, "21.prompt") == "blurry"
+    assert node_value(qwen, "2.strength_model") == 1.0
+    assert node_value(qwen, "7.strength_model") == 0.0
+    assert node_value(qwen, "11.image").startswith("hone/")  # one Path is a list of one reference
+    assert node_value(flux, "11.image") == node_value(flux, "13.image")

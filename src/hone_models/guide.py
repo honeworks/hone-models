@@ -18,8 +18,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 
 from . import catalog
-from ._registry_shapes import NOTE_ABOUT, GuideFeature, GuideNote
-from .errors import ConfigError
+from ._registry_shapes import NOTE_ABOUT, GuideFeature, GuideNote, check_about
 from .formats import prompt_input_names
 from .providers import MEDIA
 from .providers.common import COMMON_INPUTS, listed_inputs
@@ -43,7 +42,7 @@ COMMON_NOTES = {
 POSE_TEXT = {
     "none": "pose pictures are not useful",
     "reference": "a skeleton or mannequin is an ordinary reference picture; less exact than a control",
-    "control": "a pose skeleton is a control input (the `pose` input)",
+    "control": "a control input of the model (none of the packaged models has one yet)",
 }
 
 
@@ -95,9 +94,7 @@ class ModelGuide:
 
     def notes_about(self, about: str) -> list[GuideNote]:
         """The notes for one situation (`faces`, `hands`, ...: `NOTE_ABOUT`), in the order written."""
-        if about not in NOTE_ABOUT:
-            raise ConfigError(f"no situation {about!r}; choose one of: {', '.join(NOTE_ABOUT)}")
-        return [n for n in self.notes if n.about == about]
+        return [n for n in self.notes if n.about == check_about(about)]
 
     def as_text(self) -> str:
         """One block of plain text, for a person or for an LLM prompt."""

@@ -140,7 +140,10 @@ def test_an_unknown_note_situation_is_refused_at_load(tmp_path: Path) -> None:
         '[models.m]\nprovider = "comfyui"\nkind = "image"\n'
         '[[models.m.guide.notes]]\nabout = "feet"\nsays = "Feet turn backwards."\n'
     )
-    with pytest.raises(mk.errors.ConfigError, match=r"'feet' is not one of: general, faces, .*, sizes"):
+    with pytest.raises(
+        mk.errors.ConfigError,
+        match=r"'m': no situation 'feet' for a guide note; choose one of: general, .*, sizes",
+    ):
         mk.registry.load([path])
     path.write_text('[models.m]\nprovider = "comfyui"\nkind = "image"\ncapabilities = { pose = "stick" }\n')
     with pytest.raises(mk.errors.ConfigError, match="'none', 'reference' or 'control'"):

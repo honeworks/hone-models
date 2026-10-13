@@ -299,7 +299,7 @@ def _parse(model_id: str, raw: Mapping[str, Any]) -> ModelConfig:
         raise ConfigError(f"registry entry {model_id!r}: remove the 'id' key; the table name is the id")
     try:
         return ModelConfig(id=model_id, **raw)
-    except ValidationError as exc:
+    except (ValidationError, ConfigError) as exc:  # a shape's own check may raise ConfigError
         raise ConfigError(f"invalid registry entry for {model_id!r}: {exc}") from exc
 
 

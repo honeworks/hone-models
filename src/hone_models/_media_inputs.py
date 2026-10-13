@@ -17,7 +17,9 @@ _SIZE = re.compile(r"^(\d+)x(\d+)$")
 
 def as_files(name: str, value: Any) -> Any:
     """File inputs as `Path`s (a string names a file for `references`, `image` and `source`); every file
-    must exist."""
+    must exist. `references` is always a list (a single file becomes a list of one)."""
+    if name == "references":
+        value = items(value)
     if name in FILE_INPUTS:
         value = [_path(v) for v in items(value)] if isinstance(value, list) else _path(value)
     for item in items(value):

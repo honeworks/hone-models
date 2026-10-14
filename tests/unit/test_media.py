@@ -124,6 +124,12 @@ def test_error_kinds(message: str, kind: str) -> None:
     assert error_kind(message) == kind
 
 
+def test_references_none_means_no_reference(tmp_path: Path) -> None:
+    fake = FakeMedia()
+    fake.generate("x", references=None, out=tmp_path / "o.png")
+    assert fake.calls[0][1]["references"] == []
+
+
 def test_file_inputs_as_strings_and_recorded(tmp_path: Path) -> None:
     ref = tmp_path / "ref.png"
     ref.write_bytes(b"not really a png")

@@ -626,3 +626,75 @@ with a TODO: its v2-medium checkpoint and the SongGeneration runtime tokenizer o
 To enable it: re-download `lglg666/SongGeneration-Runtime` or move to the upstream code, prove it with
 `hone-models models check songgeneration-v2-medium`, then remove `disabled`.
 No review needed.
+
+## D-081: the image entries' `sizes` are the sizes used on the reference machine
+0020 asks every callable image entry to declare `sizes`, and a declared list is enforced (a size not in
+it is a `CapabilityError`). The five local image entries (`z-image-turbo`, `flux.2-klein-4b`,
+`flux.2-klein-4b-text`, `qwen-image-edit-2511`, `qwen-image-2.1-turbo`) share one list: the sizes
+hone-frame and hone-music-video ask for on the 8 GB reference machine (1024x1024; the 16:9, 9:16, 1:1 and
+4:5 start frames 1024x576, 576x1024, 768x768, 704x880; full figures 832x1248; four-figure sheets
+2048x1024), plus 256x256 and 512x512, which `models check` and AC-30 use. Of these, only 1024x1024 (every
+model), 1024x576 (z-image-turbo; qwen-image-edit-2511 with hone-music-video's 4-step workflow; Qwen-Image
+2.1 Turbo), 832x1248 and 2048x1024 (Qwen-Image 2.1 Turbo, z-image-turbo's sheets), 256x256 and 512x512
+(z-image-turbo) were run; the 9:16, 1:1 and 4:5 frame sizes never were (hone-music-video D-030). On the owner's request (2026-10-13) the list
+also holds the common sizes, every side a multiple of 16: 1280x720 and 720x1280, 1344x768, 1664x928 and
+1328x1328 (Qwen-Image's native 16:9 and 1:1), 4:3 (1024x768, 1152x864), 3:2 (1216x832, 1536x1024),
+1152x896, 21:9 (1536x640) and their portrait forms. Every declared size is allowed; those not run above
+are unproven, and each model's notes about `sizes` say which were run for it. A caller that needs another size adds it in its own
+registry file (a later list replaces the packaged one). The catalog-only image entries (no workflow) keep
+only what is known (licence, `commercial_use`); their `vram_gb` and sizes are unmeasured.
+No review needed.
+
+## D-082: `qwen-image-2.1-turbo` beside `qwen-image-2.1`
+The catalog had `qwen-image-2.1` without a workflow (the base model at full steps, with the `w4a8` text
+encoder). hone-music-video proved `qwen-image-2.1-turbo`: the same int8 diffusion model with the Turbo
+LoRA at 8 steps and the int8 Qwen3-VL encoder. Both stay: the turbo entry is the callable one, with its
+own install files (those on the reference machine), and `qwen-image-2.1` stays a catalog entry for the
+full-step model, its note pointing at the turbo entry. Merging them would have changed what
+`qwen-image-2.1` installs and given the base id a LoRA it does not name. `max_references` is the
+workflow's ten slots (hone-music-video sends at most six; its notes give the time each costs).
+No review needed.
+
+## D-083: FLUX.2 klein's free reference slot gets the last reference (`empty_slots`)
+FLUX.2 klein's workflow chains each reference through a `VAEEncode` and a `ReferenceLatent`; removing a
+free slot's `LoadImage` leaves the `VAEEncode` without pixels and ComfyUI refuses the graph (hone-frame
+D-017). Removing the whole chain would need rewiring the conditioning, which is not general. So an entry
+may say `empty_slots = "repeat_last"`: the free slots get the last reference (the same picture twice is a
+stronger hint for it and changes nothing else; the record keeps the references given), and a call with no
+reference raises `CapabilityError` before any request (`flux.2-klein-4b-text` draws from the prompt). The
+default (unset, or `"remove"`) is unchanged. Qwen's encoders take optional image inputs, so their free
+slots are removed as before (0, 3, 4, 6 and 10 references proven in hone-music-video, its D-140).
+No review needed.
+
+## D-084: cancelling a media call
+`cancel` is a `threading.Event` on `MediaClient.generate` and `MediaJob`. The client raises `Cancelled`
+when it is set before the job starts (nothing runs). While the job runs, the waits see it: the GPU lease's
+wait (`GpuScheduler` and `FileLockGpuLease` sleep on the event, set through a context variable so the lease
+port keeps its signature), ComfyUI's poll (it waits on the event; the existing `_cancel` stops the job and
+the server is freed as after any failure, and it is checked again before queueing and before fetching),
+a `command` program (waited for in 0.2 s steps, then its process group killed) and a hosted video job (the
+poll waits on the event, then the job is deleted). A synchronous hosted image request cannot be stopped.
+When the provider has already returned its result, a late cancel does not throw it away: the result is
+returned and the span gets `hone.models.media.cancel_late = true`. The span
+records `hone.models.media.error_kind = "cancelled"` (the vocabulary of `error_kind`, though a
+cancellation raises rather than returning a result) and status `error`. `Cancelled` is in `mk.errors`
+like the other exceptions.
+No review needed.
+
+## D-085: where the guide notes come from
+The notes of `z-image-turbo`, `flux.2-klein-4b`, `flux.2-klein-4b-text`, `qwen-image-edit-2511` and
+`qwen-image-2.1-turbo` are drawn from hone-frame's research notes, decisions and change records and from
+hone-music-video's design, decisions, prompts and experiments, each with its file as `source` and the
+date of the evidence as `checked`. Only what those files measured or saw is written; a finding listed
+there as likely says "not measured yet". Some hone-frame findings name the run, not the model: they are
+given to the model that run used for that kind of picture (FLUX.2 klein for edits in the standard
+profile, Z-Image Turbo for drawings from text in the quality profile). The Qwen-Image-Edit 2511 Lightning
+LoRA's install repository (`lightx2v/Qwen-Image-Edit-2511-Lightning`) was written from its file name and
+then checked on Hugging Face (2026-10-13): the repository holds
+`Qwen-Image-Edit-2511-Lightning-8steps-V1.0-bf16.safetensors`. After an independent review (2026-10-13) every note was
+checked again against its source: notes now say which workflow a measure came from, cite the record that
+holds a finding, and a note whose source did not concern the model was removed.
+**Owner review (2026-10-13):** the owner does not remember which model those runs used, so the five
+notes concerned (the hammer mannequin, the moving face marks, the left/right flip, the backward foot and
+the place drawn as a portrait) end with "Seen in a hone-frame run whose model was not recorded; most
+likely this one." No further review needed.

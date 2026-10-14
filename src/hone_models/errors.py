@@ -37,3 +37,7 @@ class ModelTimeout(ProviderError):  # noqa: N818 - public name (design/current.m
 
 class ValidationFailed(HoneModelsError):  # noqa: N818 - public name (design/current.md §2)
     """Model output did not match the requested schema (used inside the structured pipeline)."""
+
+
+class Cancelled(HoneModelsError):  # noqa: N818 - public name (design/current.md §2)
+    """The caller cancelled the call (`cancel=` set) before it finished (change 0020 §4)."""

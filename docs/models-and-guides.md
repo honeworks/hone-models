@@ -40,6 +40,42 @@ with its source; `hone-models models guide --stale 90` lists the guides not chec
 
 A guide is documentation for whoever writes the prompt; it never changes a call.
 
+## Notes per situation
+
+A model behaves differently with faces, hands, several people, poses, objects, places, text and
+references, and a prompt writer needs to know how. A guide's **notes** say it, one or two plain sentences
+each, with the evidence (`source`: a file in the honeworks repositories or a URL) and the date it was
+`checked`. Each note is `about` one situation from a fixed list: `general`, `faces`, `hands`, `people`,
+`poses`, `objects`, `places`, `scenes`, `text`, `references`, `sizes`; any other value is a `ConfigError`
+naming them when the registry loads.
+
+```python
+import hone_models as mk
+
+g = mk.guide("qwen-image-edit-2511")
+for note in g.notes_about("faces"):  # the face notes, in the order written
+    print(note.says, note.source, note.checked)
+print(g.pose)  # 'reference': a skeleton or mannequin goes in as an ordinary reference picture
+text = g.as_text()  # the notes grouped by situation, then the limits and the pose support
+assert "Notes:" in text and "Pose: reference" in text
+assert mk.guide("z-image-turbo").pose == "none"  # it takes no reference pictures
+```
+
+`capabilities.pose` says how a model takes a pose: `none` (pose pictures are not useful), `reference` (a
+skeleton or a mannequin picture goes in as an ordinary reference, which works less exactly than a
+control) or `control` (a control input of the model; none of the packaged models has one yet). The packaged image
+models that take references are `reference`.
+
+In a catalog entry:
+
+```toml
+[[models."my-image".guide.notes]]
+about = "poses"
+says = "An edit keeps the pose of its reference; a mannequin in the pose as image 2 fixes it."
+source = "hone-frame/design/research/prompting-findings.md"
+checked = 2026-10-03
+```
+
 ## Choosing models by what they can do
 
 `capabilities.features` holds the names of the guide's features, so selection can ask for them.

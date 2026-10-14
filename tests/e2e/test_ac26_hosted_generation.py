@@ -4,6 +4,8 @@ file, a naive cost, and sizes or durations the model does not declare refused be
 
 import base64
 import json
+import threading
+import time
 from pathlib import Path
 
 import httpx
@@ -11,7 +13,7 @@ import pytest
 import respx
 
 import hone_models as mk
-from hone_models.errors import CapabilityError, ModelTimeout
+from hone_models.errors import Cancelled, CapabilityError, ModelTimeout
 from hone_models.providers import openai_media
 from media_fixtures import png_file
 
@@ -178,6 +180,23 @@ def test_ac26_video_timeout_deletes_the_job(db: Path, recorded, tmp_path: Path) 
     assert delete.called
     (span,) = stored(db)
     assert any(e["name"] == "cancelled" for e in span["events"])
+
+
+def test_ac26_cancel_while_polling_deletes_the_job(
+    db: Path, recorded, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(openai_media, "POLL_S", 30.0)  # only the event ends the wait in time
+    clip, stop = client("video", "test-sora", db), threading.Event()
+    with respx.mock(base_url=API, assert_all_mocked=True) as mock:
+        mock.post("/videos").respond(json=recorded("openai_video_queued.json"))
+        mock.get(f"/videos/{VIDEO_ID}").respond(json=recorded("openai_video_in_progress.json"))
+        delete = mock.delete(f"/videos/{VIDEO_ID}").respond(json={"id": VIDEO_ID, "deleted": True})
+        threading.Timer(0.3, stop.set).start()
+        started = time.monotonic()
+        with pytest.raises(Cancelled, match=VIDEO_ID):
+            clip.generate("a storm at sea", cancel=stop, out=tmp_path / "x.mp4")
+    assert time.monotonic() - started < 1.0
+    assert delete.called
 
 
 def test_ac26_undeclared_size_or_duration_fails_before_any_request(db: Path, tmp_path: Path) -> None:

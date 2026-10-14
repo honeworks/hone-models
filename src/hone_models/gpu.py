@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from ._gpu_locks import FileLockGpuLease, NullGpuLease
+from ._gpu_locks import FileLockGpuLease, NullGpuLease, pause
 from ._gpu_memory import MemoryReader, ProcessReader, free_mb, read_memory, read_processes
 from ._gpu_room import (
     IfBusy,
@@ -310,7 +310,7 @@ class _Wait:
                 nested_in=self.entry.get("nested_in"),
             )
         self._report(waited, free, others)
-        time.sleep(POLL_S)
+        pause(POLL_S, self.entry["name"])
 
     def _report(self, waited: float, free: int, others: list[dict[str, Any]]) -> None:
         if not self.listed:

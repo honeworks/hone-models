@@ -36,7 +36,7 @@ converted per model, and inputs such as `camera_angle` become the model's own ph
 
 ## Calling
 
-`generate(prompt, *, out, seed=None, timeout_s=None, trace=None, **inputs) -> MediaResult`
+`generate(prompt, *, out, seed=None, timeout_s=None, trace=None, cancel=None, **inputs) -> MediaResult`
 
 - **Named inputs.** Besides `prompt` and `seed` there is a small shared vocabulary: `negative`, `size`
   (`"WxH"`), `references` (a list of image files), `image` (a start frame), `source` and `strength`
@@ -59,6 +59,31 @@ converted per model, and inputs such as `camera_angle` become the model's own ph
 - **Timeout.** `timeout_s` defaults to the entry's `max_timeout_s` (by kind: image 600 s, music 1800 s,
   video 3600 s). When it runs out the job is cancelled at the provider and `ModelTimeout` is raised; any
   other exception while waiting (`Ctrl-C` included) cancels the job too, then goes on.
+- **Cancel.** `cancel` takes a `threading.Event`; set it from another thread (a Pause or Stop button) to
+  stop the call with `mk.errors.Cancelled`, at once: while it waits for the GPU lease, before ComfyUI
+  queues the job or fetches its files, while a ComfyUI job, a `command` program or a hosted video job
+  runs (the job is cancelled, the program's processes killed). An event already set when the call starts
+  runs nothing. A hosted image request cannot be stopped mid-way; a result a provider already returned
+  is kept, and the span says the cancel came late (`hone.models.media.cancel_late`). Otherwise the span
+  records `error_kind = "cancelled"`.
+
+```python
+import threading
+from pathlib import Path
+
+import hone_models as mk
+from hone_models.testing import FakeComfyUI
+
+stop = threading.Event()
+with FakeComfyUI() as server:
+    server.queue("hang")  # a job that would never end
+    threading.Timer(0.2, stop.set).start()  # the person presses Stop
+    try:
+        mk.image("z-image-turbo").generate("a harbour", size="512x512", cancel=stop, out=Path("x.png"))
+    except mk.errors.Cancelled as exc:
+        print(exc)  # ComfyUI job ... was cancelled by the caller
+assert any(q["path"].endswith("/cancel") for q in server.requests)
+```
 
 ## Results
 
@@ -82,7 +107,8 @@ the provider's message and `error_kind` says what to do next:
 
 A job that could not be submitted, run or fetched raises: `ConfigError` for a workflow ComfyUI refuses
 (its `node_errors`, naming the node and the input), `ProviderError` for a server that is not there, a
-transport failure or an HTTP error, `ModelTimeout` for a timeout.
+transport failure or an HTTP error, `ModelTimeout` for a timeout, `Cancelled` when the caller's `cancel`
+event was set.
 
 **Cost** is a naive estimate: one flat price per entry, `capabilities.price.per_image` times the images
 or `per_output_second` times the seconds of output; `cost_estimated` is `True` when it is set, and
@@ -157,6 +183,9 @@ commercial_use = true
 duration_s = { path = "50.length", per_second = 16, add = 1 }   # seconds to frames: 5 s -> 81
 ```
 
+- A workflow whose graph needs every reference slot (each feeds more nodes, as FLUX.2 klein's reference
+  chain does) sets `empty_slots = "repeat_last"` on the entry: the free slots get the last reference, and
+  a call without any reference raises `CapabilityError` before any request.
 - `references` is always a list of slots. Another file input (`image`, `source`) mapped to a list is a
   slot too, so it is optional: a call without it removes the node and the links to it (Wan 2.2 TI2V-5B
   makes a video from the prompt alone then). Mapped to one path it is required: the workflow's own value
@@ -241,6 +270,27 @@ large model takes minutes.
   both entries are `command` entries (below).
 - Differences from ComfyUI's templates (LTX's start-frame strength and frame rate, the save nodes, and
   more) are listed in D-070.
+
+Four more image models come with the workflows that hone-frame and hone-music-video proved on the same
+card in real work (not with `models check`); their `vram_gb` is set near the whole card on purpose, so
+the GPU scheduler unloads a chat model before an image job:
+
+| Entry | Takes besides `prompt`, `seed` | Defaults | References | Time (8 GB card) | `vram_gb` |
+|---|---|---|---|---|---|
+| `flux.2-klein-4b` | `references` (1 or 2; one is given twice), `size`, `steps` | 1024x1024, 4 steps | 2 slots, `empty_slots = "repeat_last"` | about 30 s | 7.2 |
+| `flux.2-klein-4b-text` | `size`, `steps` | 1024x1024, 4 steps | none | | 7.2 |
+| `qwen-image-edit-2511` | `references` (0 to 3), `negative`, `size`, `steps`, `cfg`, `lora_strength`, `lightning`, `camera_angle` | 1024x1024, 8 steps, cfg 1 | 3 slots | about 2 min | 7.6 |
+| `qwen-image-2.1-turbo` | `references` (0 to 10), `size`, `steps`, `cfg`, `ref_resolution` | 1024x1024, 8 steps, cfg 1, 768 | 10 slots | about 50 s (1024x576, 4 references) | 7.6 |
+
+- `qwen-image-edit-2511` runs the Q4 GGUF (the ComfyUI-GGUF node) with lightx2v's 8-step Lightning LoRA
+  (`lightning = 0.0, steps = 40, cfg = 4.0` is the plain model, about 8 minutes a picture) and the
+  Multiple-Angles LoRA at strength 0: pass `lora_strength = 1.0` with a `camera_angle` to turn the camera.
+- `qwen-image-2.1-turbo` is under the Qwen research licence (`commercial_use = false`): research and
+  evaluation only. Each reference costs time, not memory.
+- Each entry's `sizes` lists the sizes used on the reference machine; another size raises
+  `CapabilityError`, so add it in your own registry file to try it. `mk.guide(id).notes` says how each
+  model behaves with faces, hands, several people, poses, objects, places and references
+  ([models-and-guides.md](models-and-guides.md#notes-per-situation)).
 
 The packaged `command` models, proven the same way on the same card (without ComfyUI; the whole card's
 peak, with the model loaded from the page cache):

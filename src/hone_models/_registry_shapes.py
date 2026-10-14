@@ -14,6 +14,8 @@ from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from .errors import ConfigError
+
 
 class Price(BaseModel):
     """USD per million tokens; for generation, per image or per second of output (a flat estimate)."""
@@ -54,6 +56,8 @@ class Capabilities(BaseModel):
     word_timestamps: bool | None = None
     commercial_use: bool | None = None  # information only: never blocks a call
     features: list[str] | None = None  # the names of the guide's features
+    # how a pose picture is taken (change 0020): not at all, as an ordinary reference, or as a control input
+    pose: Literal["none", "reference", "control"] | None = None
 
 
 _NODE_PATH = re.compile(r"^[^.\s]+\.[^.\s]+$")  # "<node id>.<input name>"
@@ -123,6 +127,36 @@ class GuideFeature(BaseModel):
     source: str | None = None
 
 
+# The situations a guide note is about (change 0020 §2), in the order a guide shows them.
+NOTE_ABOUT = (
+    "general", "faces", "hands", "people", "poses", "objects",
+    "places", "scenes", "text", "references", "sizes",
+)  # fmt: skip
+
+
+def check_about(about: str) -> str:
+    """`about` if it is one of `NOTE_ABOUT`, else a `ConfigError` naming the allowed values (used when a
+    registry is loaded and by `ModelGuide.notes_about`)."""
+    if about not in NOTE_ABOUT:
+        raise ConfigError(f"no situation {about!r} for a guide note; choose one of: {', '.join(NOTE_ABOUT)}")
+    return about
+
+
+class GuideNote(BaseModel):
+    """How a model behaves in one situation (`about`), in one or two plain sentences, with its evidence."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    about: str
+    says: str
+    source: str | None = None
+    checked: date | None = None
+
+    @field_validator("about")
+    @classmethod
+    def _about(cls, value: str) -> str:
+        return check_about(value)
+
+
 class Guide(BaseModel):
     """What a model can take, for whoever writes its prompt (§3a); never used by the call itself."""
 
@@ -131,6 +165,7 @@ class Guide(BaseModel):
     prompt: str | None = None
     inputs: dict[str, str] = {}
     features: list[GuideFeature] = []
+    notes: list[GuideNote] = []
     source: str | None = None
     checked: date | None = None
 
@@ -183,7 +218,8 @@ def shape_errors(provider: str, raw: dict[str, Any]) -> list[str]:
     else:
         if isinstance(inputs, dict):
             errors.append("inputs is a list of input names (a table of paths is for comfyui entries)")
-        errors += [f"{key} is for comfyui entries" for key in ("workflow", "outputs") if key in raw]
+        comfyui_keys = ("workflow", "outputs", "empty_slots")
+        errors += [f"{key} is for comfyui entries" for key in comfyui_keys if key in raw]
         if provider != "command":
             errors += [f"{key} is for command entries" for key in ("command", "cwd", "env") if key in raw]
     return errors

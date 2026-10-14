@@ -5,6 +5,7 @@ give a `SpeechEngine`, generation providers a `MediaProvider`."""
 from __future__ import annotations
 
 import gc
+import threading
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
@@ -128,7 +129,8 @@ class MediaJob:
     `hone.models.media.*` keys there (job id, workflow hash, loaded / freed / server_started, ...), so they
     are recorded even when it raises. It enters `lease()` around the work that uses the GPU (a no-op
     for hosted models and inside a session). `session` is the state its `session()` yielded, `None`
-    outside a session."""
+    outside a session. `cancel`, when set by the caller, asks the provider to stop its job now (a provider
+    that cannot stop one finishes it; the client then raises `Cancelled`)."""
 
     config: ModelConfig
     prompt: str
@@ -139,6 +141,7 @@ class MediaJob:
     attrs: dict[str, Any]
     lease: Callable[[], AbstractContextManager[Any]]
     session: dict[str, Any] | None = None
+    cancel: threading.Event | None = None
 
 
 @dataclass(frozen=True, slots=True)

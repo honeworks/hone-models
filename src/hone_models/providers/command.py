@@ -10,9 +10,10 @@ The protocol: hone-models writes `request.json` (`model`, `prompt`, `seed`, `out
 inputs as absolute paths, the entry's `defaults`) into a fresh job folder next to `out`; the program
 writes its files into `out_dir` and may write `out_dir/result.json`, `{"files": [...], "error": ...,
 "meta": {...}}`. An `error` there is `result.error`; exit code 0 gives the files (those listed, else every
-file in `out_dir`); any other exit code is a `ProviderError` with the last lines of stderr. On timeout or
-any exception while waiting the group gets SIGTERM, then SIGKILL after `KILL_GRACE_S`. The job folder is
-removed after a success and kept after a failure, with the program's `stdout.log` and `stderr.log`.
+file in `out_dir`); any other exit code is a `ProviderError` with the last lines of stderr. On timeout,
+the caller's `cancel` event (`Cancelled`) or any exception while waiting the group gets SIGTERM, then
+SIGKILL after `KILL_GRACE_S`. The job folder is removed after a success and kept after a failure, with
+the program's `stdout.log` and `stderr.log`.
 """
 
 from __future__ import annotations
@@ -25,18 +26,21 @@ import secrets
 import shutil
 import signal
 import subprocess
+import threading
+import time
 from importlib import resources
 from pathlib import Path
 from typing import Any
 
 from .._media_files import output_paths
 from .._tracing import add_event
-from ..errors import ConfigError, ModelTimeout, ProviderError
+from ..errors import Cancelled, ConfigError, ModelTimeout, ProviderError
 from ..registry import ModelConfig
 from ._comfyui_server import UNSAFE_ENV
 from .common import MediaJob, MediaOutcome, MediaProvider, error_kind, listed_inputs
 
 KILL_GRACE_S = 10.0  # between SIGTERM and SIGKILL
+WAIT_STEP_S = 0.2  # the process is waited for in steps this long, to see the caller's cancel event
 TAIL_LINES = 40
 TAIL_BYTES = 4096  # `hone.models.media.log_tail` cap
 _TOKEN = re.compile(r"\{(request|out_dir|adapter:[^{}]+)\}|\$\{(\w+)\}|\$(\w+)")
@@ -59,7 +63,7 @@ def run(job: MediaJob) -> MediaOutcome:
     attrs["hone.models.media.job_id"] = job_id
     try:
         with job.lease():
-            code = _wait(_start(argv, cwd, env, job_dir), job.timeout_s, job_id)
+            code = _wait(_start(argv, cwd, env, job_dir), job.timeout_s, job_id, job.cancel)
     finally:
         tail = log_tail(job_dir / "stderr.log")
         if tail:
@@ -168,10 +172,23 @@ def _start(argv: list[str], cwd: Path | None, env: dict[str, str], job_dir: Path
             raise ProviderError(f"cannot start {argv[0]!r}: {exc}") from exc
 
 
-def _wait(proc: subprocess.Popen[bytes], timeout_s: float, job_id: str) -> int:
-    """The exit code; on timeout or any exception while waiting the process group is stopped."""
+def _wait(
+    proc: subprocess.Popen[bytes], timeout_s: float, job_id: str, cancel: threading.Event | None = None
+) -> int:
+    """The exit code; on timeout, the caller's `cancel` (`Cancelled`) or any exception while waiting the
+    process group is stopped. The process is waited for in steps of `WAIT_STEP_S` to see the event."""
+    deadline = time.monotonic() + timeout_s
     try:
-        return proc.wait(timeout=timeout_s)
+        while True:
+            if cancel is not None and cancel.is_set():
+                raise Cancelled(
+                    f"command job {job_id} was cancelled by the caller; its processes were stopped"
+                )
+            try:
+                return proc.wait(timeout=max(0.0, min(WAIT_STEP_S, deadline - time.monotonic())))
+            except subprocess.TimeoutExpired:
+                if time.monotonic() >= deadline:
+                    raise
     except subprocess.TimeoutExpired:
         _stop(proc, job_id)
         raise ModelTimeout(

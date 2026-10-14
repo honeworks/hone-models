@@ -9,7 +9,9 @@ import pytest
 
 import hone_models as mk
 from hone_models._registry_shapes import node_targets
+from hone_models.errors import CapabilityError, ConfigError
 from hone_models.providers import _comfyui_workflow
+from media_fixtures import png_file
 
 WORKFLOWS = Path(str(resources.files("hone_models") / "data" / "workflows"))
 # The ComfyUI models installed on the reference machine (2026-09-29), each proven with `models check`.
@@ -24,6 +26,11 @@ PROVEN = {
     "wan2.2-i2v-14b",
     "wan2.2-ti2v-5b",
     "ltx-video-2b-0.9.5",
+    # proven by hone-frame and hone-music-video on the same machine (change 0020)
+    "flux.2-klein-4b",
+    "flux.2-klein-4b-text",
+    "qwen-image-edit-2511",
+    "qwen-image-2.1-turbo",
 }
 SAVE_NODES = {"SaveImage", "SaveAudio", "SaveAudioAdvanced", "SaveAudioMP3", "SaveVideo"}
 
@@ -59,3 +66,14 @@ def test_workflow_matches_its_entry(cfg: mk.registry.ModelConfig) -> None:
     assert cfg.capabilities.vram_gb is not None  # measured by `models check` on the reference machine
     filled = _comfyui_workflow.fill(workflow, cfg, {"prompt": "a test", "seed": 3, **cfg.defaults})
     assert filled != workflow
+
+
+@pytest.mark.parametrize("cfg", [m for m in comfyui_entries() if m.kind == "image"], ids=lambda m: m.id)
+def test_an_image_entry_takes_one_reference_per_slot(cfg: mk.registry.ModelConfig, tmp_path: Path) -> None:
+    assert isinstance(cfg.inputs, dict)
+    slots = len(node_targets(cfg.inputs["references"])) if "references" in cfg.inputs else 0
+    assert cfg.capabilities.max_references == slots  # change 0020 §1: the limit is the workflow's
+    assert cfg.capabilities.pose == ("reference" if slots else "none")  # §3
+    too_many = [png_file(tmp_path / "ref.png")] * (slots + 1)
+    with pytest.raises((CapabilityError, ConfigError)):  # refused before any request
+        mk.image(cfg.id).generate("x", references=too_many, out=tmp_path / "x.png")

@@ -2,6 +2,7 @@
 
 import json
 import sys
+import threading
 from pathlib import Path
 
 import httpx
@@ -228,3 +229,53 @@ def test_fake_comfyui_edges() -> None:
         assert httpx.get(f"{server.url}/api/jobs/{job}").json()["status"] == "in_progress"
         assert httpx.post(f"{server.url}/api/jobs/{job}/cancel").json() == {"cancelled": True}
         assert httpx.get(f"{server.url}/api/jobs/{job}").json()["status"] == "cancelled"
+
+
+def test_repeat_last_fills_every_slot(tmp_path: Path) -> None:
+    flow = {
+        "1": {"class_type": "LoadImage", "inputs": {"image": ""}},
+        "2": {"class_type": "LoadImage", "inputs": {"image": ""}},
+        "3": {"class_type": "VAEEncode", "inputs": {"pixels": ["2", 0]}},
+    }
+    inputs = 'inputs = { references = ["1.image", "2.image"] }'
+    cfg = entry(tmp_path, f'workflow = "wf.json"\nempty_slots = "repeat_last"\n{inputs}', flow).get("m")
+    one = _comfyui_workflow.fill(flow, cfg, {"references": ["a.png"]})
+    assert (one["1"]["inputs"]["image"], one["2"]["inputs"]["image"]) == ("a.png", "a.png")
+    assert one["3"]["inputs"] == {"pixels": ["2", 0]}  # the chain behind the second slot keeps its input
+    two = _comfyui_workflow.fill(flow, cfg, {"references": ["a.png", "b.png"]})
+    assert (two["1"]["inputs"]["image"], two["2"]["inputs"]["image"]) == ("a.png", "b.png")
+    removed = entry(tmp_path, f'workflow = "wf.json"\n{inputs}', flow).get("m")
+    assert "2" not in _comfyui_workflow.fill(flow, removed, {"references": ["a.png"]})  # the default
+
+
+def test_repeat_last_needs_a_reference_and_a_comfyui_entry(tmp_path: Path) -> None:
+    flow = {"1": {"class_type": "LoadImage", "inputs": {"image": ""}}}
+    extra = 'workflow = "wf.json"\nempty_slots = "repeat_last"\ninputs = { references = ["1.image"] }'
+    img = mk.image("m", registry=entry(tmp_path, extra, flow), sink=mk.records.MemorySink())
+    with FakeComfyUI() as server, pytest.raises(CapabilityError, match="needs at least one reference"):
+        img.generate("x", out=tmp_path / "x.png")
+    assert server.requests == []  # refused before any request
+    path = tmp_path / "o.toml"
+    path.write_text('[models.o]\nprovider = "openai_compatible"\nkind = "image"\nempty_slots = "remove"\n')
+    with pytest.raises(ConfigError, match="empty_slots is for comfyui entries"):
+        mk.registry.load([path])
+
+
+@pytest.mark.parametrize("step", ["_uploaded_names", "_queue_wait"])
+def test_cancel_before_queueing_and_before_fetching(
+    step: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stop = threading.Event()
+    real = getattr(comfyui, step)
+
+    def and_cancel(*args: object) -> object:
+        stop.set()
+        return real(*args)
+
+    monkeypatch.setattr(comfyui, step, and_cancel)
+    img = mk.image("test-image", registry=registry(), sink=mk.records.MemorySink())
+    with FakeComfyUI() as server, pytest.raises(mk.errors.Cancelled):
+        img.generate("x", cancel=stop, out=tmp_path / "x.png")
+    assert len(server.submitted) == (0 if step == "_uploaded_names" else 1)
+    assert not any(q["path"] == "/view" for q in server.requests)
+    assert server.frees == 1
